@@ -30,7 +30,9 @@ public:
 	// Available geometry types - extend if necessary
 	using GeometryTuple = util::TaggedTuple<geometry::Polygons, geometry::Spheres>;
 
-	Lod(const Object* parent) : m_parent{parent} {}
+	Lod(const Object* parent) :
+		m_parent{parent}
+	{}
 	// Warning: implicit sync!
 	Lod(Lod&) = default;
 	Lod(Lod&& obj) = delete;

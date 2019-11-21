@@ -95,6 +95,7 @@ void JsonLoader::clear_state() {
 	m_state.reset();
 	m_binaryFile.clear();
 	m_materialMap.clear();
+	m_loadingStage.clear();
 }
 
 TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, MipmapType mipmapType,
@@ -392,6 +393,7 @@ void JsonLoader::free_material(MaterialParams* mat) {
 
 bool JsonLoader::load_cameras(const ei::Box& aabb) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_cameras", ProfileLevel::HIGH);
+	sprintf(m_loadingStage.data(), "Parsing cameras\0");
 	using namespace rapidjson;
 	const Value& cameras = m_cameras->value;
 	assertObject(m_state, cameras);
@@ -473,6 +475,7 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 
 bool JsonLoader::load_lights() {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_lights", ProfileLevel::HIGH);
+	sprintf(m_loadingStage.data(), "Parsing lights\0");
 	using namespace rapidjson;
 	const Value& lights = m_lights->value;
 	assertObject(m_state, lights);
@@ -785,6 +788,7 @@ bool JsonLoader::load_lights() {
 
 bool JsonLoader::load_materials() {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_materials", ProfileLevel::HIGH);
+	sprintf(m_loadingStage.data(), "Parsing materials\0");
 	using namespace rapidjson;
 	const Value& materials = m_materials->value;
 	assertObject(m_state, materials);
@@ -809,6 +813,7 @@ bool JsonLoader::load_materials() {
 
 bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_scenarios", ProfileLevel::HIGH);
+	sprintf(m_loadingStage.data(), "Parsing scenarios\0");
 	using namespace rapidjson;
 	const Value& scenarios = m_scenarios->value;
 	assertObject(m_state, scenarios);
@@ -1036,6 +1041,7 @@ bool JsonLoader::load_file() {
 	this->clear_state();
 	logInfo("[JsonLoader::load_file] Parsing scene file '", m_filePath.string(), "'");
 
+	sprintf(m_loadingStage.data(), "Loading JSON\0");
 	// JSON text
 	m_jsonString = read_file(m_filePath);
 
@@ -1093,6 +1099,7 @@ bool JsonLoader::load_file() {
 	const u32 defaultGlobalLod = read_opt<u32>(m_state, defScen, "lod", 0u);
 	logInfo("[JsonLoader::load_file] Detected global LoD '", m_defaultScenario, "'");
 
+	sprintf(m_loadingStage.data(), "Parsing object properties\0");
 	// First parse binary file
 	std::unordered_map<StringView, u32> defaultObjectLods;
 	std::unordered_map<StringView, u32> defaultInstanceLods;
@@ -1115,6 +1122,7 @@ bool JsonLoader::load_file() {
 		m_state.objectNames.pop_back();
 		m_state.objectNames.pop_back();
 	}
+	sprintf(m_loadingStage.data(), "Parsing instance properties\0");
 	auto instPropsIter = get(m_state, defScen, "instanceProperties", false);
 	if(instPropsIter != defScen.MemberEnd()) {
 		m_state.objectNames.push_back(&m_defaultScenario[0u]);
@@ -1158,23 +1166,29 @@ bool JsonLoader::load_file() {
 			return false;
 		// Before we load scenarios, perform a sanity check for the currently loaded world
 		const char* sanityMsg = "";
+		sprintf(m_loadingStage.data(), "Checking world sanity\0");
 		if(!world_is_sane(&sanityMsg))
 			throw std::runtime_error("World did not pass sanity check: " + std::string(sanityMsg));
 		// Scenarios
 		m_state.current = ParserState::Level::ROOT;
 		if(!load_scenarios(m_binLoader.get_material_names()))
 			return false;
+		sprintf(m_loadingStage.data(), "Finalize world loading\0");
+		if(!world_finalize())
+			throw std::runtime_error("Failed to finalize world loading");
 		// Load the default scenario
 		m_state.reset();
 		ScenarioHdl defScenHdl = world_find_scenario(&m_defaultScenario[0u]);
 		if(defScenHdl == nullptr)
 			throw std::runtime_error("Cannot find the default scenario '" + std::string(m_defaultScenario) + "'");
 
+		sprintf(m_loadingStage.data(), "Loading initial scenario\0");
 		auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_file - load default scenario", ProfileLevel::LOW);
 		if(!world_load_scenario(defScenHdl))
 			throw std::runtime_error("Cannot load the default scenario '" + std::string(m_defaultScenario) + "'");
 		// Check if we should tessellate initially, indicated by a non-zero max. level
 		if(initTessLevel > 0.f) {
+			sprintf(m_loadingStage.data(), "Performing initial tessellation\0");
 			world_set_tessellation_level(initTessLevel);
 			scene_request_retessellation();
 		}

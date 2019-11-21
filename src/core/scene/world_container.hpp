@@ -40,6 +40,13 @@ public:
 
 	static constexpr float SUGGESTED_MAX_SCENE_SIZE = 1024.f*1024.f;
 
+	// Reserves memory for objects/instances to avoid reallocations
+	// TODO: is reserving textures sensible as well?
+	void reserve_objects(const std::size_t count);
+	void reserve_instances(const std::size_t count);
+
+	bool finalize();
+
 	// Create a new object to be filled
 	ObjectHandle create_object(const StringView name, ObjectFlags flags);
 	// Finds an object by its name
@@ -214,6 +221,11 @@ public:
 	void retessellate();
 
 private:
+	struct LodMaterialRef {
+		std::size_t offset;
+		std::size_t count;
+	};
+
 	WorldContainer();
 	WorldContainer(const WorldContainer&) = delete;
 	WorldContainer(WorldContainer&&) = default;
@@ -230,13 +242,14 @@ private:
 	// Function pointer for loading a LoD from a scene
 	std::uint32_t(CDECL *m_load_lod)(ObjectHandle obj, u32 lod) = nullptr;
 
-	// A pool for all names (keeps references valid until world clear)
+	// A pool for all object/instance names (keeps references valid until world clear)
 	util::StringPool m_namePool;
+
 	// All objects of the world.
 	std::unordered_map<StringView, Object> m_objects;
 	// All instances of the world
-	std::unordered_map<StringView, std::unique_ptr<Instance>> m_instances;
-	std::vector<std::unique_ptr<std::unordered_map<StringView, std::unique_ptr<Instance>>>> m_animatedInstances;
+	std::unordered_map<StringView, Instance> m_instances;
+	std::vector<std::unique_ptr<std::unordered_map<StringView, Instance>>> m_animatedInstances;
 	// List of all scenarios available (mapped to their names)
 	std::unordered_map<StringView, Scenario> m_scenarios;
 	// All materials in the scene.

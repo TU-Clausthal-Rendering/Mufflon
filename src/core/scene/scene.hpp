@@ -27,6 +27,13 @@ class Scenario;
  */
 class Scene {
 public:
+	// Holds offset into instance list as well as number of instances
+	// for one object
+	struct InstanceRef {
+		std::size_t offset;
+		std::size_t count;
+	};
+
 	Scene(const Scenario& scenario, const u32 animationPathIndex) :
 		m_scenario(scenario),
 		m_animationPathIndex(animationPathIndex)
@@ -40,6 +47,9 @@ public:
 	Scene& operator=(Scene&&) = delete;
 	~Scene() = default;
 
+	// Reserves an amount of objects to avoid reallocations
+	void reserve_objects(const std::size_t count);
+	void reserve_instances(const std::size_t count);
 	// Add an instance to be rendered
 	void add_instance(InstanceHandle hdl);
 
@@ -48,12 +58,12 @@ public:
 	// Synchronizes entire scene to the device
 	template < Device dev >
 	void synchronize() {
-		for(auto& obj : m_objects) {
+		// TODO
+		/*for(auto& obj : m_objects) {
 			for(InstanceHandle instance : obj.second) {
 				(void)instance;
-				// TODO
 			}
-		}
+		}*/
 		m_lightTree.synchronize<dev>(m_boundingBox);
 		m_media.synchronize<dev>();
 	}
@@ -140,8 +150,12 @@ public:
 											   const std::vector<const char*>& sphereAttribs);
 
 	// Get access to the existing objects in the scene (subset from the world)
-	const std::unordered_map<ObjectHandle, std::vector<InstanceHandle>>& get_objects() const noexcept {
+	const std::unordered_map<ObjectHandle, InstanceRef>& get_objects() const noexcept {
 		return m_objects;
+	}
+
+	const std::vector<InstanceHandle>& get_instances() const noexcept {
+		return m_instances;
 	}
 
 
@@ -176,7 +190,10 @@ private:
 
 	// List of instances and thus objects to-be-rendered
 	// We need this to ensure we only create one descriptor per object
-	std::unordered_map<ObjectHandle, std::vector<InstanceHandle>> m_objects;
+	std::unordered_map<ObjectHandle, InstanceRef> m_objects;
+	// List of instances; object list entries hold an index into this
+	std::vector<InstanceHandle> m_instances;
+
 	GenericResource m_media;			// Device copy of the media. It is not possible to access the world from a CUDA compiled file.
 	//ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
 	GenericResource m_materials;		// Device instanciation of Material parameter packs and an offset table (first table then data).

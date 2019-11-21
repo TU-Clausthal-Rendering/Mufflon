@@ -75,18 +75,6 @@ public:
 		std::size_t readUvs;
 	};
 
-	// Associates an attribute name with a type (vertex- or faceattributehandle)
-	template < class T >
-	struct VAttrDesc {
-		using Type = T;
-		std::string name;
-	};
-	template < class T >
-	struct FAttrDesc {
-		using Type = T;
-		std::string name;
-	};
-
 	class FaceIterator {
 	public:
 		static FaceIterator cbegin(const PolygonMeshType& mesh) {
@@ -161,12 +149,12 @@ public:
 	void reserve(std::size_t vertices, std::size_t edges, std::size_t tris, std::size_t quads);
 	
 	template < class T >
-	VertexAttributeHandle add_vertex_attribute(std::string name) {
-		return m_vertexAttributes.add_attribute<T>(std::move(name));
+	VertexAttributeHandle add_vertex_attribute(StringView name) {
+		return m_vertexAttributes.add_attribute<T>(name);
 	}
 	template < class T >
-	FaceAttributeHandle add_face_attribute(std::string name) {
-		return m_faceAttributes.add_attribute<T>(std::move(name));
+	FaceAttributeHandle add_face_attribute(StringView name) {
+		return m_faceAttributes.add_attribute<T>(name);
 	}
 
 	void remove_attribute(StringView /*name*/) {

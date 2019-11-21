@@ -736,7 +736,7 @@ u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 		read_uncompressed_face_attributes(object, lodState);
 		read_uncompressed_spheres(object, lodState);
 
-		logInfo("[BinaryLoader::read_lod] Loaded LoD ", actualLod, " of object object '",
+		logPedantic("[BinaryLoader::read_lod] Loaded LoD ", actualLod, " of object object '",
 				object.name, "' with ", lodState.numVertices, " vertices, ",
 				lodState.numTriangles, " triangles, ", lodState.numQuads, " quads, ",
 				lodState.numSpheres, " spheres");
@@ -749,7 +749,7 @@ u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 
 void BinaryLoader::read_object() {
 	m_objects.back().name = m_namePool.insert(read<StringView>());
-	logInfo("[BinaryLoader::read_object] Loading object '", m_objects.back().name, "'");
+	logPedantic("[BinaryLoader::read_object] Loading object '", m_objects.back().name, "'");
 	m_objects.back().flags = static_cast<ObjectFlags>( read<u32>() );
 	m_objects.back().keyframe = read<u32>();
 	m_objects.back().animObjId = read<u32>();
@@ -769,11 +769,16 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 								  const std::unordered_map<StringView, u32>& objectLods,
 								  const std::unordered_map<StringView, u32>& instanceLods) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_instances");
+	sprintf(m_loadingStage.data(), "Loading instances\0");
 	std::vector<uint8_t> hasInstance(m_objects.size(), false);
 	const u32 numInstances = read<u32>();
+	world_reserve_instances(std::max(static_cast<std::size_t>(numInstances), m_objects.size()));
 	for(u32 i = 0u; i < numInstances; ++i) {
 		if(m_abort)
 			return false;
+		// Only set the string every x instances to avoid overhead
+		if(i % 0x10000u)
+			sprintf(m_loadingStage.data(), "Loading instance %u / %u\0", i, numInstances);
 		const auto name = m_namePool.insert(read<StringView>());
 		const u32 objId = read<u32>();
 		const u32 keyframe = read<u32>();
@@ -786,6 +791,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 		if(auto iter = instanceLods.find(name); iter != instanceLods.end())
 			lod = iter->second;
 
+		// Only log below a certain threshold
 		logPedantic("[BinaryLoader::read_instances] Creating given instance (keyframe ", keyframe,
 					", animInstId ", animInstId, ") for object '", name, "\'");
 		InstanceHdl instHdl = world_create_instance(name.data(), m_objects[objId].objHdl, keyframe);
@@ -812,10 +818,16 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 		hasInstance[objId] = true;
 	}
 
+	logInfo("[BinaryLaoder::read_instances] Loaded ", numInstances, " instances");
+	sprintf(m_loadingStage.data(), "Creating default instances\0");
 	// Create identity instances for objects not having one yet
-	for(u32 i = 0u; i < static_cast<u32>(hasInstance.size()); ++i) {
+	const auto objectCount = hasInstance.size();
+	for(u32 i = 0u; i < static_cast<u32>(objectCount); ++i) {
 		if(m_abort)
 			return false;
+		// Only set the string every x objects to avoid overhead
+		if(i % 0x10000u)
+			sprintf(m_loadingStage.data(), "Checking default instance for object %u / %zu\0", i, objectCount);
 		if(!hasInstance[i]) {
 			StringView objName = m_objects[i].name;
 			logPedantic("[BinaryLoader::read_instances] Creating default instance for object '",
@@ -846,11 +858,13 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			m_aabb = ei::Box(m_aabb, instanceAabb);
 		}
 	}
+	logInfo("[BinaryLaoder::read_instances] Created", objectCount, " default instances");
 	
 	return true;
 }
 
 void BinaryLoader::deinstance() {
+	sprintf(m_loadingStage.data(), "Performing deinstancing\0");
 	// Both animated and not animated instances
 	auto applyTranformation = [](const u32 frame) {
 		const u32 numInstances = world_get_instance_count(frame);
@@ -873,7 +887,7 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 	if(!fs::exists(m_filePath))
 		throw std::runtime_error("Binary file '" + m_filePath.string() + "' doesn't exist");
 
-	logInfo("[BinaryLoader::load_lod] Loading LoD ", lod, " for object ID ", objId,
+	logPedantic("[BinaryLoader::load_lod] Loading LoD ", lod, " for object ID ", objId,
 			" from file '", m_filePath.string(), "'");
 
 	try {
@@ -942,6 +956,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		throw std::runtime_error("Binary file '" + m_filePath.string() + "' doesn't exist");
 	m_aabb.min = ei::Vec3{ 1e30f };
 	m_aabb.max = ei::Vec3{ -1e30f };
+	sprintf(m_loadingStage.data(), "Loading binary file\0");
 	logInfo("[BinaryLoader::load_file] Loading binary file '", m_filePath.string(), "'");
 	try {
 		// Open the binary file and enable exception management
@@ -980,7 +995,9 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		m_objJumpTable.resize(read<u32>());
 		for(std::size_t i = 0u; i < m_objJumpTable.size(); ++i)
 			m_objJumpTable[i] = read<u64>();
+		world_reserve_objects(m_objJumpTable.size());
 
+		sprintf(m_loadingStage.data(), "Reading object definitions\0");
 		// Next come the objects
 		for(std::size_t i = 0u; i < m_objJumpTable.size(); ++i) {
 			if(m_abort)
@@ -996,6 +1013,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 				throw std::runtime_error("Invalid object magic constant (object " + std::to_string(i) + ")");
 			read_object();
 		}
+		logInfo("[BinaryLaoder::load_file] Parsed ", m_objJumpTable.size(), " objects");
 
 		// Now come instances
 		m_fileStream.seekg(instanceStart, std::ios_base::beg);

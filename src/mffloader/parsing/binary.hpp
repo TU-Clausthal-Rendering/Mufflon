@@ -17,7 +17,9 @@ namespace mff_loader::binary {
 
 class BinaryLoader {
 public:
-	BinaryLoader() = default;
+	BinaryLoader(std::string& stage) :
+		m_loadingStage{ stage }
+	{}
 
 	/* Loads the specified file with the given global LoD level and optionally
 	 * specific LoDs for given objects (by name). Returns false if loading was
@@ -196,6 +198,7 @@ private:
 
 	// These are for aborting a load and keeping track of progress
 	std::atomic_bool m_abort = false;
+	std::string& m_loadingStage;
 };
 
 } // namespace mff_loader::binary

@@ -11,13 +11,23 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Text="Loading..."
                    Name="LoadingTextBlock"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"/>
-        <Button Grid.Row="1" Name="CancelLoadButton"
+        <ProgressBar Grid.Row="1"
+                     Width="200"
+                     IsIndeterminate="True">
+
+        </ProgressBar>
+        <TextBlock Grid.Row="2" Text="{Binding LoadingText, UpdateSourceTrigger=PropertyChanged}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"/>
+        <Button Grid.Row="3" Name="CancelLoadButton"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Click="Cancel_Click">Cancel</Button>

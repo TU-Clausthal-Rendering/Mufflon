@@ -21,6 +21,7 @@ LOADER_API LoaderStatus CDECL loader_load_json(const char* path);
 LOADER_API LoaderStatus CDECL loader_save_scene(const char* path);
 LOADER_API Boolean CDECL loader_load_lod(void* obj, uint32_t lod);
 LOADER_API Boolean CDECL loader_abort();
+LOADER_API const char* CDECL loader_get_loading_status();
 LOADER_API void CDECL loader_profiling_enable();
 LOADER_API void CDECL loader_profiling_disable();
 LOADER_API Boolean CDECL loader_profiling_set_level(ProfilingLevel level);

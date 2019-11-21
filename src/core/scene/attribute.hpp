@@ -4,6 +4,7 @@
 #include "core/memory/residency.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include "util/byte_io.hpp"
+#include "util/string_pool.hpp"
 #include "util/tagged_tuple.hpp"
 #include <cstddef>
 #include <functional>
@@ -12,7 +13,7 @@
 #include <string>
 #include "util/string_view.hpp"
 #include <type_traits>
-#include <map>
+#include <unordered_map>
 #include <vector>
 #include "core/memory/dyntype_memory.hpp"
 
@@ -113,16 +114,16 @@ public:
 
 	// Adds a new attribute; force-unload non-CPU pools
 	template < class T >
-	AttributeHandle add_attribute(std::string name) {
+	AttributeHandle add_attribute(StringView name) {
 		if(m_nameMap.find(name) != m_nameMap.end())
-			throw std::runtime_error("Attribute '" + name + "' already exists");
+			throw std::runtime_error("Attribute '" + std::string(name) + "' already exists");
 		this->unload<Device::CUDA>();
 		this->unload<Device::OPENGL>();
 		// Create the OpenMesh-Property
 		PropertyHandleType<T> propHandle;
-		m_mesh.add_property(propHandle, name);
+		m_mesh.add_property(propHandle, std::string(name));
 		if(!propHandle.is_valid())
-			throw std::runtime_error("Failed to add property '" + name + "' to OpenMesh");
+			throw std::runtime_error("Failed to add property '" + std::string(name) + "' to OpenMesh");
 		// Create the accessor...
 		// TODO: account for alignment!
 		AttribInfo info{
@@ -136,7 +137,7 @@ public:
 		m_poolSize += sizeof(T) * m_attribElemCapacity;
 		// ...and map the name to the index
 		const auto index = insert_attribute_at_first_empty(std::move(info));
-		m_nameMap.emplace(std::move(name), index);
+		m_nameMap.emplace(util::UniqueStringPool::instance().insert(name), index);
 		return AttributeHandle{ index };
 	}
 
@@ -145,10 +146,11 @@ public:
 	}
 
 	template < class T >
-	void remove(const std::string& name) {
+	void remove(StringView name) {
 		if(auto iter = m_nameMap.find(name); iter == m_nameMap.cend()) {
-			throw std::runtime_error("Attribute '" + name + "'does not exist");
+			throw std::runtime_error("Attribute '" + std::string(name) + "'does not exist");
 		} else {
+			// If this happens often, there's gonna be memory loss/leak!
 			this->unload<Device::CUDA>();
 			this->unload<Device::OPENGL>();
 			// Adjust pool sizes for following attributes
@@ -169,6 +171,7 @@ public:
 			else
 				m_attributes[iter->second].accessor = {};
 			m_nameMap.erase(iter);
+			util::UniqueStringPool::instance().remove(name);
 		}
 	}
 
@@ -304,7 +307,7 @@ private:
 	}
 
 	geometry::PolygonMeshType &m_mesh;	// References the OpenMesh mesh
-	std::map<std::string, std::size_t, std::less<>> m_nameMap;
+	std::unordered_map<StringView, std::size_t> m_nameMap;
 	std::size_t m_attribElemCount = 0u;
 	std::size_t m_attribElemCapacity = 0u;
 	std::size_t m_poolSize = 0u;
@@ -334,9 +337,9 @@ public:
 
 	// Adds a new attribute
 	template < class T >
-	AttributeHandle add_attribute(std::string name) {
+	AttributeHandle add_attribute(StringView name) {
 		if(m_nameMap.find(name) != m_nameMap.end())
-			throw std::runtime_error("Attribute '" + name + "' already exists");
+			throw std::runtime_error("Attribute '" + std::string(name) + "' already exists");
 		this->unload<Device::CUDA>();
 		this->unload<Device::OPENGL>();
 		// Create the OpenMesh-Property
@@ -348,7 +351,7 @@ public:
 		m_poolSize += sizeof(T) * m_attribElemCapacity;
 		// ...and map the name to the index
 		const auto index = insert_attribute_at_first_empty(std::move(info));
-		m_nameMap.emplace(std::move(name), index);
+		m_nameMap.emplace(util::UniqueStringPool::instance().insert(name), index);
 		return AttributeHandle{ index };
 	}
 
@@ -356,9 +359,9 @@ public:
 		return m_nameMap.find(name) != m_nameMap.cend();
 	}
 
-	void remove(const std::string& name) {
+	void remove(StringView name) {
 		if(auto iter = m_nameMap.find(name); iter == m_nameMap.cend()) {
-			throw std::runtime_error("Attribute '" + name + "'does not exist");
+			throw std::runtime_error("Attribute '" + std::string(name) + "'does not exist");
 		} else {
 			this->unload<Device::CUDA>();
 			this->unload<Device::OPENGL>();
@@ -377,6 +380,7 @@ public:
 			else
 				m_attributes[iter->second].erased = true;
 			m_nameMap.erase(iter);
+			util::UniqueStringPool::instance().remove(name);
 		}
 	}
 
@@ -481,8 +485,8 @@ private:
 		m_attributes.push_back(info);
 		return m_attributes.size() - 1u;
 	}
-
-	std::map<std::string, std::size_t, std::less<>> m_nameMap;
+	
+	std::unordered_map<StringView, std::size_t> m_nameMap;
 	std::size_t m_attribElemCount = 0u;
 	std::size_t m_attribElemCapacity = 0u;
 	std::size_t m_poolSize = 0u;
