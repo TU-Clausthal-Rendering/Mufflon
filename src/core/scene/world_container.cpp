@@ -135,10 +135,21 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 }
 
 void WorldContainer::reserve_objects(const std::size_t count) {
+	if(m_objects.size() > 0u)
+		throw std::runtime_error("You should only reserve objects before you add any");
 	m_objects.reserve(count);
+	// Set the name pool size
+	if(!m_namePool.empty())
+		throw std::runtime_error("Trying to set the size for a non-empty name pool; "
+								 "this invalidates all already stored names and shouldn't happen!");
+	// Use a heuristic based on the object count (assumed name length ~7)
+	const auto pages = 1u + 7lu * count / util::StringPool::PAGE_SIZE;
+	m_namePool = util::StringPool{ pages };
 }
 
 void WorldContainer::reserve_instances(const std::size_t count) {
+	if(m_instances.size() > 0u)
+		throw std::runtime_error("You should only reserve instances before you add any");
 	m_instances.reserve(count);
 }
 
@@ -659,6 +670,7 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 	// Reserve the (likely and maximum) number of instances
 	const bool hasAnimatedInsts = m_animatedInstances.size() > m_frameCurrent;
 	const std::size_t animatedInstCount = hasAnimatedInsts ? m_animatedInstances[m_frameCurrent].size() : 0u;
+	m_scene->reserve_objects(m_objects.size());
 	m_scene->reserve_instances(m_instances.size() + animatedInstCount);
 	// Load non-animated and animated instances
 	for(auto& instance : m_instances)

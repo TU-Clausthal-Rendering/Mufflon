@@ -488,6 +488,7 @@ CORE_API Boolean CDECL scenario_has_envmap_light(ScenarioHdl scenario);
 CORE_API LightHdl CDECL scenario_get_light_handle(ScenarioHdl scenario, IndexType index, LightType type);
 CORE_API Boolean CDECL scenario_add_light(ScenarioHdl scenario, LightHdl hdl);
 CORE_API Boolean CDECL scenario_remove_light(ScenarioHdl scenario, LightHdl hdl);
+CORE_API void CDECL scenario_reserve_material_slots(ScenarioHdl scenario, size_t count);
 CORE_API MatIdx CDECL scenario_declare_material_slot(ScenarioHdl scenario,
 													 const char* name, size_t nameLength);
 CORE_API MatIdx CDECL scenario_get_material_slot(ScenarioHdl scenario,

@@ -964,6 +964,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 		auto materialsIter = get(m_state, scenario, "materialAssignments");
 		m_state.objectNames.push_back(materialsIter->name.GetString());
 		assertObject(m_state, materialsIter->value);
+		scenario_reserve_material_slots(scenarioHdl, binMatNames.size());
 		for(const std::string& binName : binMatNames) {
 			if(m_abort)
 				return false;

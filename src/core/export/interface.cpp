@@ -2853,6 +2853,12 @@ Boolean scenario_remove_light(ScenarioHdl scenario, LightHdl hdl) {
 	CATCH_ALL(false)
 }
 
+void scenario_reserve_material_slots(ScenarioHdl scenario, size_t count) {
+	TRY
+	static_cast<Scenario*>(scenario)->reserve_material_slots(count);
+	CATCH_ALL(;)
+}
+
 MatIdx scenario_declare_material_slot(ScenarioHdl scenario,
 									  const char* name, std::size_t nameLength) {
 	TRY
