@@ -4,6 +4,7 @@
 #include "types.hpp"
 #include "util/string_pool.hpp"
 #include "util/string_view.hpp"
+#include "util/fixed_hashmap.hpp"
 #include <unordered_map>
 #include <optional>
 #include <vector>
@@ -36,14 +37,14 @@ public:
 	Scenario& operator=(Scenario&&) = delete;
 	~Scenario() = default;
 
+	// Reserve material/custom property slots (actual additions must not exceed this)
+	void reserve_material_slots(const std::size_t count);
+	void reserve_custom_object_properties(const std::size_t objects);
+	void reserve_custom_instance_properties(const std::size_t instances);
 	/*
-	 * Add a new material entry to the table. The index of the material depends on the
-	 * order of declarations and is unchanging for a scenario.
-	 */
-	void reserve_material_slots(const std::size_t count) {
-		m_materialIndices.reserve(count);
-		m_materialIndices.reserve(count);
-	}
+		* Add a new material entry to the table. The index of the material depends on the
+		* order of declarations and is unchanging for a scenario.
+		*/
 	MaterialIndex declare_material_slot(StringView binaryName);
 	MaterialIndex get_num_material_slots() const noexcept { return static_cast<MaterialIndex>(m_materialAssignment.size()); }
 	// Get the index of a slot from its name.
@@ -208,7 +209,7 @@ private:
 	// Map from binaryName to a material index (may use string_views as keys
 	// for lookups -> uses a map).
 	util::StringPool& m_namePool;
-	std::unordered_map<StringView, MaterialIndex> m_materialIndices;
+	util::FixedHashMap<StringView, MaterialIndex> m_materialIndices;
 	// Map an index to a material including all its names.
 	std::vector<MaterialDesc> m_materialAssignment;
 	// All lights which are enabled in this scenario
@@ -225,8 +226,8 @@ private:
 	bool m_hasObjectTessellation = false;
 
 	// Object blacklisting and other custom traits
-	std::unordered_map<ConstObjectHandle, CustomObjectProperty> m_perObjectCustomization;
-	std::unordered_map<ConstInstanceHandle, CustomInstanceProperty> m_perInstanceCustomization;
+	util::FixedHashMap<ConstObjectHandle, CustomObjectProperty> m_perObjectCustomization;
+	util::FixedHashMap<ConstInstanceHandle, CustomInstanceProperty> m_perInstanceCustomization;
 };
 
 }} // namespace mufflon::scene

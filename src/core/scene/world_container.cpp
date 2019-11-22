@@ -18,6 +18,10 @@ WorldContainer::WorldContainer()
 	m_envLights.insert("##DefaultBlack##", lights::Background::black());
 }
 
+WorldContainer& WorldContainer::instance() {
+	return s_container;
+}
+
 void WorldContainer::clear_instance() {
 	s_container = WorldContainer();
 }
@@ -33,7 +37,7 @@ bool WorldContainer::set_frame_current(const u32 frameCurrent) {
 	return false;
 }
 
-WorldContainer::Sanity WorldContainer::is_sane_world() const {
+WorldContainer::Sanity WorldContainer::finalize_world() const {
 	// Check for objects
 	if(m_instances.empty() && m_animatedInstances.empty())
 		return Sanity::NO_INSTANCES;
@@ -60,7 +64,7 @@ WorldContainer::Sanity WorldContainer::is_sane_world() const {
 }
 
 
-WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl) {
+WorldContainer::Sanity WorldContainer::finalize_scenario(ConstScenarioHandle hdl) {
 	bool hasEmitters = false;
 	bool hasObjects = false;
 
@@ -134,36 +138,37 @@ WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl)
 	return Sanity::SANE;
 }
 
-void WorldContainer::reserve_objects(const std::size_t count) {
-	if(m_objects.size() > 0u)
-		throw std::runtime_error("You should only reserve objects before you add any");
-	m_objects.reserve(count);
-	// Set the name pool size
+void WorldContainer::reserve(const std::size_t objects, const std::size_t instances) {
+	if(m_objects.size() > 0u || m_instances.size() > 0u)
+		throw std::runtime_error("This method may only be called on a clean world state!");
+	m_objects = util::FixedHashMap<StringView, Object>{ objects };
+	m_instances.reserve(instances);
+	// Set the name pool size (only objects have names anyway)
 	if(!m_namePool.empty())
 		throw std::runtime_error("Trying to set the size for a non-empty name pool; "
 								 "this invalidates all already stored names and shouldn't happen!");
 	// Use a heuristic based on the object count (assumed name length ~7)
-	const auto pages = 1u + 7lu * count / util::StringPool::PAGE_SIZE;
+	const auto pages = 1u + 7lu * objects / util::StringPool::PAGE_SIZE;
 	m_namePool = util::StringPool{ pages };
 }
 
-void WorldContainer::reserve_instances(const std::size_t count) {
-	if(m_instances.size() > 0u)
-		throw std::runtime_error("You should only reserve instances before you add any");
-	m_instances.reserve(count);
+void WorldContainer::reserve(const std::size_t scenarios) {
+	if(m_scenarios.size() > 0u)
+		throw std::runtime_error("This method may only be called on a clean scenario state!");
+	if(scenarios > 32u)
+		throw std::runtime_error("Too many scenarios; we are currently limited to 32 at a time");
+	m_scenarios = util::FixedHashMap<StringView, Scenario>{ scenarios };
 }
 
 ObjectHandle WorldContainer::create_object(const StringView name, ObjectFlags flags) {
 	const auto pooledName = m_namePool.insert(name);
-	auto hdl = m_objects.emplace(pooledName, Object{static_cast<u32>(m_objects.size())});
-	if(!hdl.second)
-		return nullptr;
-	hdl.first->second.set_name(hdl.first->first);
-	hdl.first->second.set_flags(flags);
-	return &hdl.first->second;
+	auto& hdl = m_objects.emplace(pooledName, Object{static_cast<u32>(m_objects.size())});
+	hdl.set_name(pooledName);
+	hdl.set_flags(flags);
+	return &hdl;
 }
 
-ObjectHandle WorldContainer::get_object(const StringView& name) {
+ObjectHandle WorldContainer::get_object(const StringView name) {
 	auto iter = m_objects.find(name);
 	if(iter != m_objects.end())
 		return &iter->second;
@@ -241,21 +246,42 @@ InstanceHandle WorldContainer::get_instance(std::size_t index, const u32 animati
 	return nullptr;
 }
 
+std::size_t WorldContainer::get_highest_instance_frame() const noexcept { 
+	return m_animatedInstances.size();
+}
+
+std::size_t WorldContainer::get_instance_count(const u32 frame) const noexcept {
+	if(frame == Instance::NO_ANIMATION_FRAME)
+		return m_instances.size();
+	else if(frame >= m_animatedInstances.size())
+		return 0u;
+	else
+		return m_animatedInstances[frame].size();
+};
+
 ScenarioHandle WorldContainer::create_scenario(const StringView name) {
 	if(m_scenarios.size() >= 32u)
 		throw std::runtime_error("Too many scenarios already exist - limit is 32 (for now)");
 	const auto pooledName = m_namePool.insert(name);
 	// TODO: switch to pointer
-	auto hdl = m_scenarios.emplace(pooledName, Scenario{ static_cast<u32>(m_scenarios.size()), m_namePool }).first;
-	hdl->second.set_name(hdl->first);
-	return &hdl->second;
+	auto& hdl = m_scenarios.emplace(pooledName, Scenario{ static_cast<u32>(m_scenarios.size()), m_namePool });
+	hdl.set_name(pooledName);
+	return &hdl;
 }
 
-ScenarioHandle WorldContainer::get_scenario(const StringView& name) {
+ScenarioHandle WorldContainer::get_scenario(const StringView name) {
 	auto iter = m_scenarios.find(name);
 	if(iter != m_scenarios.end())
 		return &iter->second;
 	return nullptr;
+}
+
+ScenarioHandle WorldContainer::get_current_scenario() const noexcept {
+	return m_scenario;
+}
+
+SceneHandle WorldContainer::get_current_scene() {
+	return m_scene.get();
 }
 
 ScenarioHandle WorldContainer::get_scenario(std::size_t index) {
@@ -267,9 +293,21 @@ ScenarioHandle WorldContainer::get_scenario(std::size_t index) {
 	return &iter->second;
 }
 
+std::size_t WorldContainer::get_scenario_count() const noexcept {
+	return m_scenarios.size();
+}
+
 MaterialHandle WorldContainer::add_material(std::unique_ptr<materials::IMaterial> material) {
 	m_materials.push_back(move(material));
 	return m_materials.back().get();
+}
+
+std::size_t WorldContainer::get_material_count() const noexcept {
+	return m_materials.size();
+}
+
+MaterialHandle WorldContainer::get_material(u32 index) {
+	return m_materials.at(index).get();
 }
 
 materials::MediumHandle WorldContainer::add_medium(const materials::Medium& medium) {
@@ -281,6 +319,10 @@ materials::MediumHandle WorldContainer::add_medium(const materials::Medium& medi
 	}
 	m_media.push_back(medium);
 	return h;
+}
+
+const materials::Medium& WorldContainer::get_medium(materials::MediumHandle hdl) const {
+	return m_media.at(hdl);
 }
 
 CameraHandle WorldContainer::add_camera(const StringView name, std::unique_ptr<cameras::Camera> camera) {
@@ -450,6 +492,11 @@ lights::Background* WorldContainer::get_background(u32 index) {
 	return &m_envLights.get(index);
 }
 
+lights::Background& WorldContainer::get_default_background() {
+	static lights::Background defaultBackground = lights::Background::black();
+	return defaultBackground;
+}
+
 void WorldContainer::remove_light(u32 index, lights::LightType type) {
 	switch(type) {
 		case lights::LightType::POINT_LIGHT:
@@ -567,6 +614,16 @@ bool WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
 		}
 	}
 	return false;
+}
+
+u32 WorldContainer::get_frame_start() const noexcept {
+	return m_frameStart;
+}
+u32 WorldContainer::get_frame_end() const noexcept {
+	return m_frameEnd;
+}
+u32 WorldContainer::get_frame_current() const noexcept {
+	return m_frameCurrent;
 }
 
 bool WorldContainer::has_texture(StringView name) const {
@@ -870,6 +927,9 @@ bool WorldContainer::load_scene_lights() {
 	return reloaded;
 }
 
+void WorldContainer::set_lod_loader_function(bool (CDECL*func)(ObjectHandle, u32)) {
+	m_load_lod = func;
+}
 
 void WorldContainer::retessellate() {
 	// Basically we need to find out which LoDs are part of the scene, re-tessellate them, and then

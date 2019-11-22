@@ -481,6 +481,7 @@ bool JsonLoader::load_lights() {
 	assertObject(m_state, lights);
 	m_state.current = ParserState::Level::LIGHTS;
 
+	m_lightMap = util::FixedHashMap<StringView, LightHdl>{ lights.MemberCount() };
 	for(auto lightIter = lights.MemberBegin(); lightIter != lights.MemberEnd(); ++lightIter) {
 		logPedantic("[JsonLoader::load_lights] Loading light '", lightIter->name.GetString(), "'");
 		if(m_abort)
@@ -812,7 +813,7 @@ bool JsonLoader::load_materials() {
 }
 
 bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
-								const std::unordered_map<StringView, binary::InstanceMapping>& instances) {
+								const mufflon::util::FixedHashMap<StringView, binary::InstanceMapping>& instances) {
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_scenarios", ProfileLevel::HIGH);
 	sprintf(m_loadingStage.data(), "Parsing scenarios\0");
 	using namespace rapidjson;
@@ -820,9 +821,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 	assertObject(m_state, scenarios);
 	m_state.current = ParserState::Level::SCENARIOS;
 
-	if(scenarios.MemberCount() > 32u)
-		throw std::runtime_error("Too many scenarios; we are currently limited to 32 at a time");
-
+	world_reserve_scenarios(scenarios.MemberCount());
 	for(auto scenarioIter = scenarios.MemberBegin(); scenarioIter != scenarios.MemberEnd(); ++scenarioIter) {
 		logPedantic("[JsonLoader::load_scenarios] Loading scenario '", scenarioIter->name.GetString(), "'");
 		if(m_abort)
@@ -878,6 +877,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 			if(m_abort)
 				return false;
 			m_state.objectNames.push_back(objectsIter->name.GetString());
+			scenario_reserve_custom_object_properties(scenarioHdl, objectsIter->value.MemberCount());
 			assertObject(m_state, objectsIter->value);
 			for(auto objIter = objectsIter->value.MemberBegin(); objIter != objectsIter->value.MemberEnd(); ++objIter) {
 				StringView objectName = objIter->name.GetString();
@@ -918,6 +918,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 		if(auto instancesIter = get(m_state, scenario, "instanceProperties", false);
 		   instancesIter != scenario.MemberEnd()) {
 			m_state.objectNames.push_back(instancesIter->name.GetString());
+			scenario_reserve_custom_instance_properties(scenarioHdl, instancesIter->value.MemberCount());
 			assertObject(m_state, instancesIter->value);
 			for(auto instIter = instancesIter->value.MemberBegin(); instIter != instancesIter->value.MemberEnd(); ++instIter) {
 				StringView instName = instIter->name.GetString();
@@ -986,7 +987,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 		m_state.objectNames.pop_back();
 
 		const char* sanityMsg = "";
-		if(!scenario_is_sane(scenarioHdl, &sanityMsg))
+		if(!world_finalize_scenario(scenarioHdl, &sanityMsg))
 			throw std::runtime_error("Scenario '" + std::string(scenarioIter->name.GetString())
 									 + "' did not pass sanity check: " + std::string(sanityMsg));
 		m_state.objectNames.pop_back();
@@ -1105,12 +1106,13 @@ bool JsonLoader::load_file() {
 
 	sprintf(m_loadingStage.data(), "Parsing object properties\0");
 	// First parse binary file
-	std::unordered_map<StringView, u32> defaultObjectLods;
-	std::unordered_map<StringView, binary::InstanceMapping> defaultInstanceLods;
+	util::FixedHashMap<StringView, u32> defaultObjectLods;
+	util::FixedHashMap<StringView, binary::InstanceMapping> defaultInstanceLods;
 	auto objPropsIter = get(m_state, defScen, "objectProperties", false);
 	if(objPropsIter != defScen.MemberEnd()) {
 		m_state.objectNames.push_back(&m_defaultScenario[0u]);
 		m_state.objectNames.push_back("objectProperties");
+		defaultObjectLods = util::FixedHashMap<StringView, u32>{ objPropsIter->value.MemberCount() };
 		for(auto propIter = objPropsIter->value.MemberBegin(); propIter != objPropsIter->value.MemberEnd(); ++propIter) {
 			// Read the object name
 			StringView objectName = propIter->name.GetString();
@@ -1120,7 +1122,7 @@ bool JsonLoader::load_file() {
 			if(auto lodIter = get(m_state, object, "lod", false); lodIter != object.MemberEnd()) {
 				const u32 localLod = read<u32>(m_state, lodIter);
 				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod, "' for object '", objectName, "'");
-				defaultObjectLods.insert({ objectName, localLod });
+				defaultObjectLods.insert(objectName, localLod);
 			}
 		}
 		m_state.objectNames.pop_back();
@@ -1131,7 +1133,7 @@ bool JsonLoader::load_file() {
 	if(instPropsIter != defScen.MemberEnd()) {
 		m_state.objectNames.push_back(&m_defaultScenario[0u]);
 		m_state.objectNames.push_back("instanceProperties");
-		defaultInstanceLods.reserve(instPropsIter->value.MemberCount());
+		defaultInstanceLods = util::FixedHashMap<StringView, binary::InstanceMapping>{ instPropsIter->value.MemberCount() };
 		for(auto propIter = instPropsIter->value.MemberBegin(); propIter != instPropsIter->value.MemberEnd(); ++propIter) {
 			// Read the instance name
 			StringView instanceName = propIter->name.GetString();
@@ -1140,7 +1142,7 @@ bool JsonLoader::load_file() {
 			assertObject(m_state, instance);
 			const u32 localLod = read_opt<u32>(m_state, instance, "lod", defaultGlobalLod);
 			const bool masked = read_opt<bool>(m_state, instance, "masked", false);
-			defaultInstanceLods.insert({ instanceName, {  localLod, nullptr } });
+			defaultInstanceLods.insert(instanceName, {  localLod, nullptr });
 
 			if(localLod != defaultGlobalLod)
 				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod,
@@ -1173,7 +1175,7 @@ bool JsonLoader::load_file() {
 		// Before we load scenarios, perform a sanity check for the currently loaded world
 		const char* sanityMsg = "";
 		sprintf(m_loadingStage.data(), "Checking world sanity\0");
-		if(!world_is_sane(&sanityMsg))
+		if(!world_finalize(&sanityMsg))
 			throw std::runtime_error("World did not pass sanity check: " + std::string(sanityMsg));
 		// Scenarios
 		m_state.current = ParserState::Level::ROOT;

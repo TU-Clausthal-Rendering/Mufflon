@@ -1123,6 +1123,9 @@
       <Filter>Source Files\core\renderer\debug</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\lights\hosek_sky_model.hpp" />
+    <ClInclude Include="..\..\src\util\fixed_hashmap.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">

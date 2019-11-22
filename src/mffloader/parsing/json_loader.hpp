@@ -5,6 +5,7 @@
 #include "json_helper.hpp"
 #include "binary.hpp"
 #include "core/export/interface.h"
+#include "util/fixed_hashmap.hpp"
 #include <ei/3dtypes.hpp>
 #include <rapidjson/document.h>
 #include <atomic>
@@ -66,7 +67,7 @@ private:
 	bool load_lights();
 	bool load_materials();
 	bool load_scenarios(const std::vector<std::string>& binMatNames,
-						const std::unordered_map<mufflon::StringView, binary::InstanceMapping>& instances);
+						const mufflon::util::FixedHashMap<mufflon::StringView, binary::InstanceMapping>& instances);
 	rapidjson::Value load_scenario(const rapidjson::GenericMemberIterator<true, rapidjson::UTF8<>, rapidjson::MemoryPoolAllocator<>>& scenarioIter, int maxRecursionDepth);
 
 	void selective_replace_keys(const rapidjson::Value& objectToCopy, rapidjson::Value& objectToCopyIn);
@@ -83,7 +84,7 @@ private:
 	fs::path m_binaryFile;
 	mufflon::StringView m_defaultScenario;
 	std::map<std::string, MaterialHdl, std::less<>> m_materialMap;
-	std::unordered_map<mufflon::StringView, LightHdl> m_lightMap;
+	mufflon::util::FixedHashMap<mufflon::StringView, LightHdl> m_lightMap;
 	ParserState m_state;
 
 	binary::BinaryLoader m_binLoader;
