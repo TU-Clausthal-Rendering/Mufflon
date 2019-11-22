@@ -322,7 +322,7 @@ Boolean core_set_log_level(LogLevel level) {
 	}
 }
 
-Boolean core_set_lod_loader(Boolean(CDECL *func)(ObjectHdl, uint32_t)) {
+Boolean core_set_lod_loader(Boolean(*func)(ObjectHdl, uint32_t)) {
 	TRY
 	CHECK_NULLPTR(func, "LoD loader function", false);
 	s_world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(ObjectHandle, u32)>(func));
@@ -350,7 +350,7 @@ Boolean core_get_target_image(const char* name, Boolean variance, const float** 
 	CATCH_ALL(false)
 }
 
-CORE_API Boolean CDECL core_get_target_image_num_channels(int* numChannels) {
+Boolean core_get_target_image_num_channels(int* numChannels) {
 	CHECK_NULLPTR(s_screenTexture, "screen texture", false);
 	*numChannels = s_screenTextureNumChannels;
 	return true;
@@ -1205,15 +1205,15 @@ void world_clear_all() {
 	CATCH_ALL(;)
 }
 
-void world_reserve_objects(const size_t count) {
+void world_reserve_objects_instances(const size_t objects, const size_t instances) {
 	TRY
-	s_world.reserve_objects(count);
+	s_world.reserve(objects, instances);
 	CATCH_ALL(;)
 }
 
-void world_reserve_instances(const size_t count) {
+void world_reserve_scenarios(const size_t scenarios) {
 	TRY
-	s_world.reserve_instances(count);
+	s_world.reserve(scenarios);
 	CATCH_ALL(;)
 }
 
@@ -1690,7 +1690,7 @@ LightHdl world_add_background_light(const char* name, BackgroundType type) {
 	CATCH_ALL((LightHdl{ 7, 0 }))
 }
 
-CORE_API Boolean CDECL world_set_light_name(LightHdl hdl, const char* newName) {
+Boolean world_set_light_name(LightHdl hdl, const char* newName) {
 	TRY
 	s_world.set_light_name(hdl.index, static_cast<lights::LightType>(hdl.type), newName);
 	return true;
@@ -1729,7 +1729,7 @@ CameraHdl world_get_camera(const char* name) {
 	CATCH_ALL(nullptr)
 }
 
-CORE_API CameraHdl CDECL world_get_camera_by_index(size_t index) {
+CameraHdl world_get_camera_by_index(size_t index) {
 	TRY
 	return static_cast<CameraHdl>(s_world.get_camera(index));
 	CATCH_ALL(0u)
@@ -1833,9 +1833,9 @@ SceneHdl world_get_current_scene() {
 	CATCH_ALL(nullptr)
 }
 
-Boolean world_is_sane(const char** msg) {
+Boolean world_finalize(const char** msg) {
 	TRY
-	switch(s_world.is_sane_world()) {
+	switch(s_world.finalize_world()) {
 		case WorldContainer::Sanity::SANE: *msg = "";  return true;
 		case WorldContainer::Sanity::NO_CAMERA: *msg = "No camera"; return false;
 		case WorldContainer::Sanity::NO_INSTANCES: *msg = "No instances"; return false;
@@ -2027,7 +2027,7 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 	CATCH_ALL(nullptr)
 }
 
-CORE_API Boolean CDECL world_add_displacement_map(const char* path, TextureHdl* hdlTex, TextureHdl* hdlMips) {
+Boolean world_add_displacement_map(const char* path, TextureHdl* hdlTex, TextureHdl* hdlMips) {
 	TRY
 	CHECK_NULLPTR(path, "texture path", false);
 	CHECK_NULLPTR(hdlTex, "texture handle", false);
@@ -2844,6 +2844,18 @@ void scenario_reserve_material_slots(ScenarioHdl scenario, size_t count) {
 	CATCH_ALL(;)
 }
 
+void scenario_reserve_custom_object_properties(ScenarioHdl scenario, size_t objects) {
+	TRY
+		static_cast<Scenario*>(scenario)->reserve_custom_object_properties(objects);
+	CATCH_ALL(;)
+}
+
+void scenario_reserve_custom_instance_properties(ScenarioHdl scenario, size_t instances) {
+	TRY
+		static_cast<Scenario*>(scenario)->reserve_custom_instance_properties(instances);
+	CATCH_ALL(;)
+}
+
 MatIdx scenario_declare_material_slot(ScenarioHdl scenario,
 									  const char* name, std::size_t nameLength) {
 	TRY
@@ -2897,10 +2909,10 @@ Boolean scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 	CATCH_ALL(false)
 }
 
-Boolean scenario_is_sane(ConstScenarioHdl scenario, const char** msg) {
+Boolean world_finalize_scenario(ConstScenarioHdl scenario, const char** msg) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
-	switch(s_world.is_sane_scenario(static_cast<ConstScenarioHandle>(scenario))) {
+	switch(s_world.finalize_scenario(static_cast<ConstScenarioHandle>(scenario))) {
 		case WorldContainer::Sanity::SANE: *msg = "";  return true;
 		case WorldContainer::Sanity::NO_CAMERA: *msg = "No camera"; return false;
 		case WorldContainer::Sanity::NO_INSTANCES: *msg = "No instances"; return false;
@@ -3657,7 +3669,7 @@ Boolean render_save_screenshot(const char* filename, const char* targetName, Boo
 	CATCH_ALL(false)
 }
 
-CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
+Boolean render_save_denoised_radiance(const char* filename) {
 #ifdef MUFFLON_ENABLE_OPEN_DENOISE
 	TRY
 	auto lock = std::scoped_lock(s_iterationMutex);

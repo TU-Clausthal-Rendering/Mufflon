@@ -15,6 +15,25 @@ Scenario::Scenario(const u32 index,
 	this->remove_background();
 }
 
+void Scenario::reserve_material_slots(const std::size_t count) {
+	if(!m_materialIndices.empty())
+		throw std::runtime_error("Must reserve before adding any material slots");
+	m_materialIndices = util::FixedHashMap<StringView, MaterialIndex>(count);
+	m_materialAssignment.reserve(count);
+}
+
+void Scenario::reserve_custom_object_properties(const std::size_t objects) {
+	if(!m_perObjectCustomization.empty())
+		throw std::runtime_error("Must reserve before adding any custom object properties");
+	m_perObjectCustomization = util::FixedHashMap<ConstObjectHandle, CustomObjectProperty>{ objects };
+}
+
+void Scenario::reserve_custom_instance_properties(const std::size_t instances) {
+	if(!m_perInstanceCustomization.empty())
+		throw std::runtime_error("Must reserve before adding any custom instance properties");
+	m_perInstanceCustomization = util::FixedHashMap<ConstInstanceHandle, CustomInstanceProperty>{ instances };
+}
+
 MaterialIndex Scenario::declare_material_slot(StringView binaryName) {
 	// Catch if this slot was added before
 	auto it = m_materialIndices.find(binaryName);
@@ -125,14 +144,14 @@ void Scenario::mask_object(ConstObjectHandle hdl) {
 	if(auto iter = m_perObjectCustomization.find(hdl); iter != m_perObjectCustomization.end())
 		iter->second.masked = true;
 	else
-		m_perObjectCustomization.insert({ hdl, CustomObjectProperty{{}, true, NO_CUSTOM_LOD} });
+		m_perObjectCustomization.emplace(hdl, CustomObjectProperty{{}, true, NO_CUSTOM_LOD});
 }
 
 void Scenario::mask_instance(ConstInstanceHandle hdl) {
 	if(auto iter = m_perInstanceCustomization.find(hdl); iter != m_perInstanceCustomization.end())
 		iter->second.masked = true;
 	else
-		m_perInstanceCustomization.insert({ hdl, CustomInstanceProperty{true, NO_CUSTOM_LOD} });
+		m_perInstanceCustomization.emplace(hdl, CustomInstanceProperty{true, NO_CUSTOM_LOD});
 }
 
 std::optional<Scenario::TessellationInfo> Scenario::get_tessellation_info(ConstObjectHandle hdl) const noexcept {
@@ -142,30 +161,24 @@ std::optional<Scenario::TessellationInfo> Scenario::get_tessellation_info(ConstO
 		return std::nullopt;
 }
 void Scenario::set_tessellation_level(ConstObjectHandle hdl, const float level) {
-	auto iter = m_perObjectCustomization.find(hdl);
-	if(iter == m_perObjectCustomization.end())
-		iter = m_perObjectCustomization.emplace(hdl, CustomObjectProperty{}).first;
-	if(!iter->second.tessInfo.has_value())
-		iter->second.tessInfo = TessellationInfo{};
-	iter->second.tessInfo->level = level;
+	auto& ref = m_perObjectCustomization[hdl];
+	if(!ref.tessInfo.has_value())
+		ref.tessInfo = TessellationInfo{};
+	ref.tessInfo->level = level;
 	m_hasObjectTessellation = true;
 }
 void Scenario::set_adaptive_tessellation(ConstObjectHandle hdl, const bool value) {
-	auto iter = m_perObjectCustomization.find(hdl);
-	if(iter == m_perObjectCustomization.end())
-		iter = m_perObjectCustomization.emplace(hdl, CustomObjectProperty{}).first;
-	if(!iter->second.tessInfo.has_value())
-		iter->second.tessInfo = TessellationInfo{};
-	iter->second.tessInfo->adaptive = value;
+	auto& ref = m_perObjectCustomization[hdl];
+	if(!ref.tessInfo.has_value())
+		ref.tessInfo = TessellationInfo{};
+	ref.tessInfo->adaptive = value;
 	m_hasObjectTessellation = true;
 }
 void Scenario::set_phong_tessellation(ConstObjectHandle hdl, const bool value) {
-	auto iter = m_perObjectCustomization.find(hdl);
-	if(iter == m_perObjectCustomization.end())
-		iter = m_perObjectCustomization.emplace(hdl, CustomObjectProperty{}).first;
-	if(!iter->second.tessInfo.has_value())
-		iter->second.tessInfo = TessellationInfo{};
-	iter->second.tessInfo->usePhong = value;
+	auto& ref = m_perObjectCustomization[hdl];
+	if(!ref.tessInfo.has_value())
+		ref.tessInfo = TessellationInfo{};
+	ref.tessInfo->usePhong = value;
 	m_hasObjectTessellation = true;
 }
 

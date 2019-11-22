@@ -9,6 +9,7 @@
 #include "core/scene/accel_structs/accel_struct_info.hpp"
 #include "core/scene/object.hpp"
 #include "core/scene/accel_structs/lbvh.hpp"
+#include "util/fixed_hashmap.hpp"
 #include <memory>
 #include <tuple>
 #include <vector>
@@ -47,7 +48,7 @@ public:
 	Scene& operator=(Scene&&) = delete;
 	~Scene() = default;
 
-	// Reserves an amount of objects to avoid reallocations
+	// Reserves the maximum number of objects to avoid reallocations
 	void reserve_objects(const std::size_t count);
 	void reserve_instances(const std::size_t count);
 	// Add an instance to be rendered
@@ -150,7 +151,7 @@ public:
 											   const std::vector<const char*>& sphereAttribs);
 
 	// Get access to the existing objects in the scene (subset from the world)
-	const std::unordered_map<ObjectHandle, InstanceRef>& get_objects() const noexcept {
+	const util::FixedHashMap<ObjectHandle, InstanceRef>& get_objects() const noexcept {
 		return m_objects;
 	}
 
@@ -190,7 +191,7 @@ private:
 
 	// List of instances and thus objects to-be-rendered
 	// We need this to ensure we only create one descriptor per object
-	std::unordered_map<ObjectHandle, InstanceRef> m_objects;
+	util::FixedHashMap<ObjectHandle, InstanceRef> m_objects;
 	// List of instances; object list entries hold an index into this
 	std::vector<InstanceHandle> m_instances;
 

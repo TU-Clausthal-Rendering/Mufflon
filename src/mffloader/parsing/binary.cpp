@@ -766,20 +766,19 @@ void BinaryLoader::read_object() {
 }
 
 bool BinaryLoader::read_instances(const u32 globalLod,
-								  const std::unordered_map<StringView, u32>& objectLods,
-								  std::unordered_map<StringView, InstanceMapping>& instanceLods) {
+								  const util::FixedHashMap<StringView, u32>& objectLods,
+								  util::FixedHashMap<StringView, InstanceMapping>& instanceLods) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_instances");
 	sprintf(m_loadingStage.data(), "Loading instances\0");
 	std::vector<uint8_t> hasInstance(m_objects.size(), false);
 	const u32 numInstances = read<u32>();
-	world_reserve_instances(static_cast<std::size_t>(numInstances) + m_objects.size());
 	for(u32 i = 0u; i < numInstances; ++i) {
 		if(m_abort)
 			return false;
 		// Only set the string every x instances to avoid overhead
 		if(i % 0x10000u)
 			sprintf(m_loadingStage.data(), "Loading instance %u / %u\0", i, numInstances);
-		const auto name = m_namePool.insert(read<StringView>());
+		const auto name = read<StringView>();
 		const u32 objId = read<u32>();
 		const u32 keyframe = read<u32>();
 		const u32 animInstId = read<u32>();
@@ -950,8 +949,8 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 }
 
 bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
-							 const std::unordered_map<StringView, mufflon::u32>& objectLods,
-							 std::unordered_map<StringView, InstanceMapping>& instanceLods,
+							 const util::FixedHashMap<StringView, mufflon::u32>& objectLods,
+							 util::FixedHashMap<StringView, InstanceMapping>& instanceLods,
 							 bool deinstance) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::load_file");
 	m_filePath = std::move(file);
@@ -998,7 +997,14 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		m_objJumpTable.resize(read<u32>());
 		for(std::size_t i = 0u; i < m_objJumpTable.size(); ++i)
 			m_objJumpTable[i] = read<u64>();
-		world_reserve_objects(m_objJumpTable.size());
+		{	// Quickly jump to the instance section to peek at their count
+			const auto currPos = m_fileStream.tellg();
+			m_fileStream.seekg(instanceStart + sizeof(u32), std::ifstream::beg);
+			const auto instanceCount = read<u32>();
+			m_fileStream.seekg(currPos, std::ifstream::beg);
+			// Since there may be implicit (default) instances, add object count to be sure
+			world_reserve_objects_instances(m_objJumpTable.size(), instanceCount + m_objJumpTable.size());
+		}
 
 		sprintf(m_loadingStage.data(), "Reading object definitions\0");
 		// Next come the objects

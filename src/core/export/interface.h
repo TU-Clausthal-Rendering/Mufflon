@@ -397,8 +397,10 @@ CORE_API Boolean CDECL instance_get_animation_frame(InstanceHdl inst, uint32_t* 
 
 // World container interface
 CORE_API void CDECL world_clear_all();
-CORE_API void CDECL world_reserve_objects(const size_t count);
-CORE_API void CDECL world_reserve_instances(const size_t count);
+CORE_API Boolean CDECL world_finalize(const char** msg);
+CORE_API Boolean CDECL world_finalize_scenario(ConstScenarioHdl, const char** msg);
+CORE_API void CDECL world_reserve_objects_instances(const size_t objects, const size_t instances);
+CORE_API void CDECL world_reserve_scenarios(const size_t scenarios);
 CORE_API ObjectHdl CDECL world_create_object(const char* name, ObjectFlags flags);
 CORE_API ObjectHdl CDECL world_get_object(const char* name);
 CORE_API const char* CDECL world_get_object_name(ObjectHdl obj);
@@ -450,7 +452,6 @@ CORE_API BackgroundType CDECL world_get_env_light_type(LightHdl hdl);
 CORE_API const char* CDECL world_get_light_name(LightHdl hdl);
 CORE_API SceneHdl CDECL world_load_scenario(ScenarioHdl scenario);
 CORE_API SceneHdl CDECL world_get_current_scene();
-CORE_API Boolean CDECL world_is_sane(const char** msg);
 CORE_API Boolean CDECL world_set_frame_current(const uint32_t animationFrame);
 CORE_API Boolean CDECL world_get_frame_current(uint32_t* animationFrame);
 CORE_API Boolean CDECL world_get_frame_start(uint32_t* animationFrame);
@@ -489,6 +490,8 @@ CORE_API LightHdl CDECL scenario_get_light_handle(ScenarioHdl scenario, IndexTyp
 CORE_API Boolean CDECL scenario_add_light(ScenarioHdl scenario, LightHdl hdl);
 CORE_API Boolean CDECL scenario_remove_light(ScenarioHdl scenario, LightHdl hdl);
 CORE_API void CDECL scenario_reserve_material_slots(ScenarioHdl scenario, size_t count);
+CORE_API void CDECL scenario_reserve_custom_object_properties(ScenarioHdl scenario, size_t instances);
+CORE_API void CDECL scenario_reserve_custom_instance_properties(ScenarioHdl scenario, size_t objects);
 CORE_API MatIdx CDECL scenario_declare_material_slot(ScenarioHdl scenario,
 													 const char* name, size_t nameLength);
 CORE_API MatIdx CDECL scenario_get_material_slot(ScenarioHdl scenario,
@@ -499,7 +502,6 @@ CORE_API MaterialHdl CDECL scenario_get_assigned_material(ScenarioHdl scenario,
 														  MatIdx index);
 CORE_API Boolean CDECL scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 												MaterialHdl handle);
-CORE_API Boolean CDECL scenario_is_sane(ConstScenarioHdl, const char** msg);
 
 // Scene interface
 CORE_API Boolean CDECL scene_get_bounding_box(SceneHdl scene, Vec3* min, Vec3* max);

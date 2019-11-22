@@ -6,12 +6,14 @@
 #include "handles.hpp"
 #include "lights/lights.hpp"
 #include "lights/background.hpp"
+#include "core/memory/hashmap.hpp"
+#include "core/renderer/renderer.hpp"
+#include "core/scene/materials/medium.hpp"
 #include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/cputexture.hpp"
-#include "core/renderer/renderer.hpp"
 #include "util/indexed_string_map.hpp"
 #include "util/string_pool.hpp"
-#include "core/scene/materials/medium.hpp"
+#include "util/fixed_hashmap.hpp"
 #include <map>
 #include <memory>
 #include <vector>
@@ -40,188 +42,140 @@ public:
 
 	static constexpr float SUGGESTED_MAX_SCENE_SIZE = 1024.f*1024.f;
 
-	// Reserves memory for objects/instances to avoid reallocations
-	// TODO: is reserving textures sensible as well?
-	void reserve_objects(const std::size_t count);
-	void reserve_instances(const std::size_t count);
+	// --------------------------------------------------------------------------------
+	// ------------------------- World container interaction --------------------------
+	// --------------------------------------------------------------------------------
+	static WorldContainer& instance();
+	// Clears the world object from all resources
+	static void clear_instance();
+	// Prepares the world for a fresh load.
+	// clear_instance() must be called before (or the world has not been changed yet).
+	// Must not be called after the world has been modified.
+	void reserve(const std::size_t objects, const std::size_t instances);
+	// Reserves scenarios. Must have no prior scenarios added
+	void reserve(const std::size_t scenarios);
+	// Performs sanity check and marks the end of a loading/modifying process
+	Sanity finalize_world() const;
+	// Performs a sanity check for a given scenario (respects object masking etc.)
+	// while also finalizing it (no more changes allowed)
+	Sanity finalize_scenario(ConstScenarioHandle hdl);
+	// Loads the specified scenario.
+	// This destroys the currently loaded scene and overwrites it with a new one.
+	// Returns nullptr if something goes wrong.
+	SceneHandle load_scene(ScenarioHandle hdl, renderer::IRenderer* renderer);
+	// Reloads the scene from the current scenario if necessary
+	void reload_scene(renderer::IRenderer* renderer);
+	// Loads a specific LoD from file, if not already present
+	bool load_lod(Object& obj, const u32 lodIndex);
+	// Discards any already applied tessellation/displacement for the current scene
+	// and re-tessellates/-displaces with the current max. tessellation level
+	void retessellate();
 
-	// Create a new object to be filled
+
+	// --------------------------------------------------------------------------------
+	// ------------------------------- Creation methods -------------------------------
+	// --------------------------------------------------------------------------------
 	ObjectHandle create_object(const StringView name, ObjectFlags flags);
-	// Finds an object by its name
-	ObjectHandle get_object(const StringView& name);
-	// Duplicates an object returns handle to the new duplicated object
 	ObjectHandle duplicate_object(ObjectHandle hdl, const StringView name);
-	// Applies transformation matrix to the object from the instance.
-	// Changes the object from the handle.
-	void apply_transformation(InstanceHandle hdl);
-	// Find an instance by name (for some objects with only one
-	// instance both names are equal, but do not need to be).
-	// The returned handle is valid over the entire lifetime of the instance.
-	InstanceHandle get_instance(std::size_t index, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
-	// Creates a new instance.
 	InstanceHandle create_instance(ObjectHandle hdl, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
-	// This is for interfacing - get the number of instances and the name of each
-	std::size_t get_highest_instance_frame() const noexcept { return m_animatedInstances.size(); }
-	std::size_t get_instance_count(const u32 frame) const noexcept {
-		if(frame == Instance::NO_ANIMATION_FRAME)
-			return m_instances.size();
-		else if(frame >= m_animatedInstances.size())
-			return 0u;
-		else
-			return m_animatedInstances[frame].size();
-	};
-	// Gets the instance name - this reference invalidates when new instances are added!
-	// Add a created scenario and take ownership
 	ScenarioHandle create_scenario(const StringView name);
-	// Finds a scenario by its name
-	ScenarioHandle get_scenario(const StringView& name);
-	// Get the scenario for which load_scene() was called last.
-	ScenarioHandle get_current_scenario() const noexcept { return m_scenario; }
-	// This is for interfacing - get the number of scenarios and the name of each
-	std::size_t get_scenario_count() const noexcept { return m_scenarios.size(); }
-	// Gets the scenario name - this reference invalidates when new scenarios are added!
-	ScenarioHandle get_scenario(std::size_t index);
-
-	/*
-	 * Add a ready to use material to the scene. The material must be loaded completely.
+	/* Add a ready to use material to the scene. The material must be loaded completely.
 	 * Only adding a material does not establish any connection with geometry.
 	 * This must be done by calling declare_material_slot (once) and assign_material
 	 * (whenever the materaial changes).
 	 * material: the complete material, ownership is taken.
 	 */
 	MaterialHandle add_material(std::unique_ptr<materials::IMaterial> material);
-
-	std::size_t get_material_count() const noexcept {
-		return m_materials.size();
-	}
-	MaterialHandle get_material(i32 index) {
-		return m_materials.at(index).get();
-	}
-
-	/*
-	 * Add a medium to the world. If another medium with the same properties
+	/* Add a medium to the world. If another medium with the same properties
 	 * exists it will be returned and the number of media will not be changed.
 	 */
 	materials::MediumHandle add_medium(const materials::Medium& medium);
-
-	const materials::Medium& get_medium(materials::MediumHandle hdl) const {
-		return m_media.at(hdl);
-	}
-
-	// Add a fully specfied camera to the pool of all cameras.
 	CameraHandle add_camera(const StringView name, std::unique_ptr<cameras::Camera> camera);
-	void remove_camera(CameraHandle hdl);
-
-	// Find a camera dependent on its name.
-	std::size_t get_camera_count() const noexcept { return m_cameras.size(); }
-	CameraHandle get_camera(StringView name);
-	CameraHandle get_camera(std::size_t index);
-
-	std::size_t get_point_light_count() const noexcept { return m_pointLights.size(); }
-	std::size_t get_spot_light_count() const noexcept { return m_spotLights.size(); }
-	std::size_t get_dir_light_count() const noexcept { return m_dirLights.size(); }
-	std::size_t get_env_light_count() const noexcept { return m_envLights.size(); }
-
-	std::size_t get_point_light_segment_count(u32 index);
-	std::size_t get_spot_light_segment_count(u32 index);
-	std::size_t get_dir_light_segment_count(u32 index);
-
-	// Adds a new light to the scene
 	std::optional<u32> add_light(std::string name, const lights::PointLight& light, const u32 count);
 	std::optional<u32> add_light(std::string name, const lights::SpotLight& light, const u32 count);
 	std::optional<u32> add_light(std::string name, const lights::DirectionalLight& light, const u32 count);
 	std::optional<u32> add_light(std::string name, lights::BackgroundType type);
-	
-	// Replaces the texture of an envmap light; also updates its summed area table
-	void replace_envlight_texture(u32 index, TextureHandle replacement);
+	TextureHandle add_texture(std::unique_ptr<textures::Texture> texture);
 
-	// Finds a light by name
-	std::optional<std::pair<u32, lights::LightType>> find_light(const StringView& name);
-	// Access the lights properties
+
+	// --------------------------------------------------------------------------------
+	// ------------------------------- Handle Accessors -------------------------------
+	// --------------------------------------------------------------------------------
+	// All returned handles remain valid over the lifetime of the world unless otherwise indicated
+	ObjectHandle get_object(const StringView name);
+	InstanceHandle get_instance(std::size_t index, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
+	ScenarioHandle get_scenario(const StringView name);
+	ScenarioHandle get_scenario(std::size_t index);
+	ScenarioHandle get_current_scenario() const noexcept;
+	SceneHandle get_current_scene();
+	MaterialHandle get_material(u32 index);
+	const materials::Medium& get_medium(materials::MediumHandle hdl) const;
+	CameraHandle get_camera(StringView name);
+	CameraHandle get_camera(std::size_t index);
 	lights::PointLight* get_point_light(u32 index, const u32 frame);
 	lights::SpotLight* get_spot_light(u32 index, const u32 frame);
 	lights::DirectionalLight* get_dir_light(u32 index, const u32 frame);
 	lights::Background* get_background(u32 index);
-	// Delete a light using its handle
-	void remove_light(u32 index, lights::LightType type);
-	// Get the name of a light
-	StringView get_light_name(u32 index, lights::LightType type) const;
-	void set_light_name(u32 index, lights::LightType type, StringView name);
-	// Functions for dirtying cameras and lights
-	bool mark_light_dirty(u32 index, lights::LightType type);
+	lights::Background& get_default_background();
 
-	// Add new textures to the scene
+	// --------------------------------------------------------------------------------
+	// ------------------------------- Count Accessors --------------------------------
+	// --------------------------------------------------------------------------------
+	std::size_t get_highest_instance_frame() const noexcept;
+	std::size_t get_instance_count(const u32 frame) const noexcept;
+	std::size_t get_scenario_count() const noexcept;
+	std::size_t get_material_count() const noexcept;
+	std::size_t get_camera_count() const noexcept { return m_cameras.size(); }
+	std::size_t get_point_light_count() const noexcept { return m_pointLights.size(); }
+	std::size_t get_spot_light_count() const noexcept { return m_spotLights.size(); }
+	std::size_t get_dir_light_count() const noexcept { return m_dirLights.size(); }
+	std::size_t get_env_light_count() const noexcept { return m_envLights.size(); }
+	std::size_t get_point_light_segment_count(u32 index);
+	std::size_t get_spot_light_segment_count(u32 index);
+	std::size_t get_dir_light_segment_count(u32 index);
+	u32 get_frame_start() const noexcept;
+	u32 get_frame_end() const noexcept;
+	u32 get_frame_current() const noexcept;
+	float get_tessellation_level() const noexcept { return m_tessLevel; }
+
+	// --------------------------------------------------------------------------------
+	// ------------------------------- Find and search --------------------------------
+	// --------------------------------------------------------------------------------
+	StringView get_light_name(u32 index, lights::LightType type) const;
+	std::optional<std::pair<u32, lights::LightType>> find_light(const StringView& name);
 	bool has_texture(StringView name) const;
 	TextureHandle find_texture(StringView name);
-	TextureHandle add_texture(std::unique_ptr<textures::Texture> texture);
+
+	// --------------------------------------------------------------------------------
+	// ---------------------------------- Modifiers -----------------------------------
+	// --------------------------------------------------------------------------------
+	// Bakes an instance into an object with its transformation applied
+	void apply_transformation(InstanceHandle hdl);
+	void set_light_name(u32 index, lights::LightType type, StringView name);
+	// Replaces the texture of an envmap light; also updates its summed area table
+	void replace_envlight_texture(u32 index, TextureHandle replacement);
 	void ref_texture(TextureHandle hdl);
 	void unref_texture(TextureHandle hdl);
-
-	
-	// Singleton, creating our global world object
-	static WorldContainer& instance() {
-		return s_container;
-	}
-
-	/**
-	 * Loads the specified scenario.
-	 * This destroys the currently loaded scene and overwrites it with a new one.
-	 * Returns nullptr if something goes wrong.
-	 */
-	SceneHandle load_scene(ScenarioHandle hdl, renderer::IRenderer* renderer);
-	// Reloads the scene from the current scenario if necessary
-	void reload_scene(renderer::IRenderer* renderer);
-
-	// Returns the currently loaded scene, if present
-	SceneHandle get_current_scene() {
-		return m_scene.get();
-	}
-
-	// Gets the current animation frame and min/max defined frames
-	u32 get_frame_start() const noexcept { return m_frameStart; }
-	u32 get_frame_end() const noexcept { return m_frameEnd; }
-	u32 get_frame_current() const noexcept { return m_frameCurrent; }
-
 	// Set the new animation frame. Caution: this invalidates the currently loaded scene
 	// which must thus be set for any active renderer!
 	bool set_frame_current(const u32 frameCurrent);
-
-	// Performs a sanity check on the current world - has lights, cameras etc.
-	Sanity is_sane_world() const;
-	// Performs a sanity check for a given scenario (respects object masking etc.)
-	Sanity is_sane_scenario(ConstScenarioHandle hdl);
-
-	// Returns a handle to the background which should be used as default
-	lights::Background& get_default_background() {
-		static lights::Background defaultBackground = lights::Background::black();
-		return defaultBackground;
-	}
-
-	// Sets the after-load function for LoDs
-	void set_lod_loader_function(std::uint32_t(CDECL*func)(ObjectHandle, u32)) {
-		m_load_lod = func;
-	}
-
-	// Loads a specific LoD from file, if not already present
-	bool load_lod(Object& obj, const u32 lodIndex);
-
-	// Clears the world object from all resources
-	static void clear_instance();
-
-	// Desired tessellation level per pixel
-	float get_tessellation_level() const noexcept { return m_tessLevel; }
+	void set_lod_loader_function(bool (CDECL*func)(ObjectHandle, u32));
 	void set_tessellation_level(const float tessLevel) { m_tessLevel = tessLevel; }
 
-	// Discards any already applied tessellation/displacement for the current scene
-	// and re-tessellates/-displaces with the current max. tessellation level
-	void retessellate();
+
+	// --------------------------------------------------------------------------------
+	// ----------------------------- Remove functionality -----------------------------
+	// --------------------------------------------------------------------------------
+	void remove_camera(CameraHandle hdl);
+	void remove_light(u32 index, lights::LightType type);
+
+
+	// --------------------------------------------------------------------------------
+	// ----------------------------- "Dirty-flag" methods -----------------------------
+	// --------------------------------------------------------------------------------
+	bool mark_light_dirty(u32 index, lights::LightType type);
 
 private:
-	struct LodMaterialRef {
-		std::size_t offset;
-		std::size_t count;
-	};
-
 	WorldContainer();
 	WorldContainer(const WorldContainer&) = delete;
 	WorldContainer(WorldContainer&&) = default;
@@ -242,14 +196,15 @@ private:
 	util::StringPool m_namePool;
 
 	// All objects of the world.
-	std::unordered_map<StringView, Object> m_objects;
+	util::FixedHashMap<StringView, Object> m_objects;
 	// All instances of the world (careful: reserve MUST have been called
 	// before adding instances)
 	std::vector<Instance> m_instances;
+
 	// TODO: for improved heap allocation, this should be a single vector/map
 	std::vector<std::vector<std::unique_ptr<Instance>>> m_animatedInstances;
 	// List of all scenarios available (mapped to their names)
-	std::unordered_map<StringView, Scenario> m_scenarios;
+	util::FixedHashMap<StringView, Scenario> m_scenarios;
 	// All materials in the scene.
 	std::vector<std::unique_ptr<materials::IMaterial>> m_materials;
 	// All media in the world (all with unique properties)

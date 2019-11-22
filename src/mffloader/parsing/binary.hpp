@@ -3,6 +3,7 @@
 #include "util/filesystem.hpp"
 #include "util/flag.hpp"
 #include "util/int_types.hpp"
+#include "util/fixed_hashmap.hpp"
 #include "core/export/interface.h"
 #include <ei/3dtypes.hpp>
 #include <atomic>
@@ -11,7 +12,6 @@
 #include "util/string_pool.hpp"
 #include "util/string_view.hpp"
 #include <vector>
-#include <unordered_map>
 
 namespace mff_loader::binary {
 
@@ -33,8 +33,8 @@ public:
 	 * this object; calling this function again will overwrite them, however.
 	 */
 	bool load_file(fs::path file, const mufflon::u32 globalLod,
-				   const std::unordered_map<mufflon::StringView, mufflon::u32>& objectLods,
-				   std::unordered_map<mufflon::StringView, InstanceMapping>& instanceLods,
+				   const mufflon::util::FixedHashMap<mufflon::StringView, mufflon::u32>& objectLods,
+				   mufflon::util::FixedHashMap<mufflon::StringView, InstanceMapping>& instanceLods,
 				   bool deinstance);
 
 	void load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod);
@@ -181,8 +181,8 @@ private:
 	void read_compressed_sphere_attributes(const ObjectState& object, const LodState& lod);
 
 	bool read_instances(const mufflon::u32 globalLod,
-						const std::unordered_map<mufflon::StringView, mufflon::u32>& objectLods,
-						std::unordered_map<mufflon::StringView, InstanceMapping>& instanceLods);
+						const mufflon::util::FixedHashMap<mufflon::StringView, mufflon::u32>& objectLods,
+						mufflon::util::FixedHashMap<mufflon::StringView, InstanceMapping>& instanceLods);
 	void deinstance();
 	void read_object();
 	mufflon::u32 read_lod(const ObjectState& object, mufflon::u32 lod);
