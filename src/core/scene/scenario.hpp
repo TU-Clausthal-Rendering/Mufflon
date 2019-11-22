@@ -40,6 +40,10 @@ public:
 	 * Add a new material entry to the table. The index of the material depends on the
 	 * order of declarations and is unchanging for a scenario.
 	 */
+	void reserve_material_slots(const std::size_t count) {
+		m_materialIndices.reserve(count);
+		m_materialIndices.reserve(count);
+	}
 	MaterialIndex declare_material_slot(StringView binaryName);
 	MaterialIndex get_num_material_slots() const noexcept { return static_cast<MaterialIndex>(m_materialAssignment.size()); }
 	// Get the index of a slot from its name.

@@ -11,12 +11,11 @@ namespace mufflon::util {
 
 class StringPool {
 public:
-	static constexpr std::size_t NODE_PAGE_COUNT = 16u; // 128KB (minus bookkeeping)
 	static constexpr std::size_t PAGE_SIZE = 0x1000u; // Most common OS page size
+	// Default is 128KB per pool - should be enough for simple scenes
+	static constexpr std::size_t DEFAULT_PAGE_COUNT = 32u;
 
-	static_assert(NODE_PAGE_COUNT > 0u, "We need at least one page");
-
-	StringPool();
+	StringPool(const std::size_t pageCount = DEFAULT_PAGE_COUNT);
 	StringPool(const StringPool&) = delete;
 	StringPool(StringPool&&);
 	StringPool& operator=(const StringPool&) = delete;
@@ -27,12 +26,16 @@ public:
 	// to add a synchronization primitive to the insertion
 	StringView insert(const StringView str);
 	void clear();
+	bool empty() const noexcept { return m_head == nullptr; }
 
 private:
 	class Node;
 
+	void allocate_head_node();
+
 	std::unique_ptr<Node> m_tree;
 	Node* m_head;
+	std::size_t m_poolSize;
 };
 
 // This string pool makes sense when you have a few unique names that you want to share.
