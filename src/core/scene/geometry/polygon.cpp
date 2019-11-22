@@ -51,8 +51,8 @@ Polygons::Polygons(const Polygons& poly) :
 	m_matIndicesHdl(m_faceAttributes.add_attribute<u16>(MAT_INDICES_NAME)),
 	m_boundingBox(poly.m_boundingBox),
 	m_triangles(poly.m_triangles),
-	m_quads(poly.m_quads),
-	m_uniqueMaterials(poly.m_uniqueMaterials) {
+	m_quads(poly.m_quads)
+{
 	m_vertexAttributes.copy(poly.m_vertexAttributes);
 	m_faceAttributes.copy(poly.m_faceAttributes);
 	// Copy the index and attribute buffers
@@ -97,8 +97,8 @@ Polygons::Polygons(Polygons&& poly) :
 	m_matIndicesHdl(std::move(poly.m_matIndicesHdl)),
 	m_boundingBox(std::move(poly.m_boundingBox)),
 	m_triangles(poly.m_triangles),
-	m_quads(poly.m_quads),
-	m_uniqueMaterials(std::move(poly.m_uniqueMaterials)) {
+	m_quads(poly.m_quads)
+{
 	// Move the index and attribute buffers
 	poly.m_indexBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
@@ -153,12 +153,6 @@ std::size_t Polygons::add_bulk(FaceAttributeHandle hdl, const FaceHandle& startF
 							   std::size_t count, util::IByteReader& attrStream) {
 	mAssert(startFace.is_valid() && static_cast<std::size_t>(startFace.idx()) < m_meshData->n_vertices());
 	std::size_t numRead = m_faceAttributes.restore(hdl, attrStream, static_cast<std::size_t>(startFace.idx()), count);
-	// Update material table in case this load was about materials
-	if(hdl == m_matIndicesHdl) {
-		MaterialIndex* materials = m_faceAttributes.acquire<Device::CPU, MaterialIndex>(hdl);
-		for(std::size_t i = startFace.idx(); i < startFace.idx() + numRead; ++i)
-			m_uniqueMaterials.emplace(materials[i]);
-	}
 	return numRead;
 }
 
@@ -216,7 +210,6 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 	TriangleHandle hdl = this->add(v0, v1, v2);
 	m_faceAttributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
 	m_faceAttributes.mark_changed(Device::CPU);
-	m_uniqueMaterials.emplace(idx);
 	return hdl;
 }
 
@@ -266,7 +259,6 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 	QuadHandle hdl = this->add(v0, v1, v2, v3);
 	m_faceAttributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
 	m_faceAttributes.mark_changed(Device::CPU);
-	m_uniqueMaterials.emplace(idx);
 	return hdl;
 }
 
@@ -588,14 +580,6 @@ void Polygons::mark_changed(Device dev) {
 		unload_index_buffer<Device::CUDA>();
 	if(dev != Device::OPENGL)
 		unload_index_buffer<Device::OPENGL>();
-}
-
-bool Polygons::has_displacement_mapping(const Scenario& scenario) const noexcept {
-	for(MaterialIndex matIdx : m_uniqueMaterials)
-		if(scenario.get_assigned_material(matIdx)->get_displacement_map() != nullptr)
-			return true;
-
-	return false;
 }
 
 template < Device dev >

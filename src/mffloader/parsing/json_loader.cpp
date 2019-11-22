@@ -820,6 +820,9 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 	assertObject(m_state, scenarios);
 	m_state.current = ParserState::Level::SCENARIOS;
 
+	if(scenarios.MemberCount() > 32u)
+		throw std::runtime_error("Too many scenarios; we are currently limited to 32 at a time");
+
 	for(auto scenarioIter = scenarios.MemberBegin(); scenarioIter != scenarios.MemberEnd(); ++scenarioIter) {
 		logPedantic("[JsonLoader::load_scenarios] Loading scenario '", scenarioIter->name.GetString(), "'");
 		if(m_abort)
@@ -1175,9 +1178,6 @@ bool JsonLoader::load_file() {
 		m_state.current = ParserState::Level::ROOT;
 		if(!load_scenarios(m_binLoader.get_material_names(), defaultInstanceLods))
 			return false;
-		sprintf(m_loadingStage.data(), "Finalize world loading\0");
-		if(!world_finalize())
-			throw std::runtime_error("Failed to finalize world loading");
 		// Load the default scenario
 		m_state.reset();
 		ScenarioHdl defScenHdl = world_find_scenario(&m_defaultScenario[0u]);

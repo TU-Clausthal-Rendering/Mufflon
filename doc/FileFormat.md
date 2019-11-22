@@ -15,6 +15,7 @@ Text which is set like `"<stuff>"` is a meta-description of the contained string
 It is not the string itself. The string can be user defined (eg. camera or light names), or depends on the content of a different section from this file format description.
 Curly brackets are used to declare a choice of different possible strings (e.g. `"{pinhole, focus}"` must be either "pinhole" or "focus").
 In the case of multiple type choices, details on further mandatory properties will be given below.
+Note that the number of scenarios is limited to 32.
 
     {
         "version": "1.4",

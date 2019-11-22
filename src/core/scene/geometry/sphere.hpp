@@ -159,16 +159,6 @@ public:
 		return m_attributes.get_attribute_elem_count();
 	}
 
-	// Get a list of all materials which are referenced by any primitive
-	const std::unordered_set<MaterialIndex>& get_unique_materials() const {
-		return m_uniqueMaterials;
-	}
-
-	// Returns whether any polygon has a displacement map associated with the given material assignment
-	bool has_displacement_mapping(const Scenario& /*scenario*/) const noexcept {
-		return false;
-	}
-
 	bool was_displacement_mapping_applied() const noexcept {
 		return true;
 	}
@@ -199,10 +189,6 @@ private:
 	// Array for aquired attribute descriptors
 	AttribBuffers m_attribBuffer;
 	ei::Box m_boundingBox;
-	// Whenever a primitive is added the table of all referenced
-	// materials will be updated. Assumption: a material reference
-	// will not change afterwards.
-	std::unordered_set<MaterialIndex> m_uniqueMaterials;
 };
 
 }}} // namespace mufflon::scene::geometry

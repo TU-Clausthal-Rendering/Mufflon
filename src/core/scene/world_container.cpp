@@ -21,11 +21,6 @@ void WorldContainer::clear_instance() {
 	s_container = WorldContainer();
 }
 
-bool WorldContainer::finalize() {
-	// TODO: set scenario flags
-	return true;
-}
-
 bool WorldContainer::set_frame_current(const u32 frameCurrent) {
 	const u32 newFrame = std::min(m_frameEnd, std::max(m_frameStart, frameCurrent));
 	if(newFrame != m_frameCurrent) {
@@ -64,9 +59,23 @@ WorldContainer::Sanity WorldContainer::is_sane_world() const {
 }
 
 
-WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl) const {
+WorldContainer::Sanity WorldContainer::is_sane_scenario(ConstScenarioHandle hdl) {
 	bool hasEmitters = false;
 	bool hasObjects = false;
+
+	// First update the flags for each LoD
+	std::unordered_set<MaterialIndex> uniqueMatIndices;
+	uniqueMatIndices.reserve(m_materials.size());
+
+	for(auto& obj : m_objects) {
+		for(u32 l = 0u; l < static_cast<u32>(obj.second.get_lod_slot_count()); ++l) {
+			if(!obj.second.has_lod_available(l))
+				continue;
+			auto& lod = obj.second.get_lod(l);
+			lod.update_flags(*hdl, uniqueMatIndices);
+		}
+	}
+
 	// Check for objects (and check for emitters as well)
 	// Gotta check both animated and stationary instances
 	for(const auto& instance : m_instances) {
@@ -221,9 +230,11 @@ InstanceHandle WorldContainer::get_instance(std::size_t index, const u32 animati
 }
 
 ScenarioHandle WorldContainer::create_scenario(const StringView name) {
+	if(m_scenarios.size() >= 32u)
+		throw std::runtime_error("Too many scenarios already exist - limit is 32 (for now)");
 	const auto pooledName = m_namePool.insert(name);
 	// TODO: switch to pointer
-	auto hdl = m_scenarios.emplace(pooledName, Scenario{ m_namePool }).first;
+	auto hdl = m_scenarios.emplace(pooledName, Scenario{ static_cast<u32>(m_scenarios.size()), m_namePool }).first;
 	hdl->second.set_name(hdl->first);
 	return &hdl->second;
 }
@@ -596,6 +607,11 @@ bool WorldContainer::load_lod(Object& obj, const u32 lodIndex) {
 	if(!obj.has_lod_available(lodIndex)) {
 		if(!m_load_lod(&obj, lodIndex))
 			return false;
+		// Update the flags for this LoD
+		std::unordered_set<MaterialIndex> uniqueMatIndices;
+		uniqueMatIndices.reserve(m_materials.size());
+		for(const auto& scenario : m_scenarios)
+			obj.get_lod(lodIndex).update_flags(scenario.second, uniqueMatIndices);
 	}
 	return true;
 }

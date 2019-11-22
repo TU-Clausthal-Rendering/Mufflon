@@ -28,8 +28,7 @@ Spheres::Spheres(const Spheres& sphere) :
 	m_attributes(sphere.m_attributes),
 	m_spheresHdl(sphere.m_spheresHdl),
 	m_matIndicesHdl(sphere.m_matIndicesHdl),
-	m_boundingBox(sphere.m_boundingBox),
-	m_uniqueMaterials(sphere.m_uniqueMaterials)
+	m_boundingBox(sphere.m_boundingBox)
 {
 	sphere.m_attribBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
@@ -48,8 +47,7 @@ Spheres::Spheres(Spheres&& sphere) :
 	m_attributes(std::move(sphere.m_attributes)),
 	m_spheresHdl(std::move(sphere.m_spheresHdl)),
 	m_matIndicesHdl(std::move(sphere.m_matIndicesHdl)),
-	m_boundingBox(std::move(sphere.m_boundingBox)),
-	m_uniqueMaterials(std::move(sphere.m_uniqueMaterials))
+	m_boundingBox(std::move(sphere.m_boundingBox))
 {
 	sphere.m_attribBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
@@ -84,7 +82,6 @@ Spheres::SphereHandle Spheres::add(const Point& point, float radius, MaterialInd
 	SphereHandle hdl = this->add(point, radius);
 	m_attributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl] = idx;
 	m_attributes.mark_changed(Device::CPU);
-	m_uniqueMaterials.emplace(idx);
 	return hdl;
 }
 
@@ -124,12 +121,6 @@ std::size_t Spheres::add_bulk(SphereAttributeHandle hdl, const SphereHandle& sta
 	if(startSphere + count > m_attributes.get_attribute_elem_count())
 		m_attributes.reserve(startSphere + count);
 	std::size_t numRead = m_attributes.restore(hdl, attrStream, startSphere, count);
-	// Update material table in case this load was about materials
-	if(hdl == m_matIndicesHdl) {
-		MaterialIndex* materials = m_attributes.acquire<Device::CPU, MaterialIndex>(hdl);
-		for(std::size_t i = startSphere; i < startSphere+numRead; ++i)
-			m_uniqueMaterials.emplace(materials[i]);
-	}
 	return numRead;
 }
 
@@ -148,9 +139,11 @@ void Spheres::transform(const ei::Mat3x4& transMat) {
 	};
 	// Transform mesh
 	ei::Sphere* spheres = m_attributes.acquire<Device::CPU, ei::Sphere>(m_spheresHdl);
-	const float scale = ei::len(ei::Vec<float, 3>(transMat, 0u, 0u));
+	const float scale = ei::len(ei::Vec3(transMat, 0u, 0u));
 	for (size_t i = 0; i < this->get_sphere_count(); i++) {
-		mAssert(scale.x == scale.y && scale.y == scale.z);
+		mAssertMsg(scale == ei::len(ei::Vec3(transMat, 0u, 1u))
+				   && scale == ei::len(ei::Vec3(transMat, 0u, 1u)),
+				   "The scales in the transformation matrix must be all equal!");
 		spheres[i].radius *= scale;
 		spheres[i].center = ei::transform(spheres[i].center, transMat);
 		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(spheres[i].center + ei::Vec3(spheres[i].radius)), m_boundingBox.max);
