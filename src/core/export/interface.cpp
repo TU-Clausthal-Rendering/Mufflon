@@ -1219,12 +1219,6 @@ void world_clear_all() {
 	CATCH_ALL(;)
 }
 
-Boolean world_finalize() {
-	TRY
-	return s_world.finalize();
-	CATCH_ALL(false)
-}
-
 void world_reserve_objects(const size_t count) {
 	TRY
 	s_world.reserve_objects(count);

@@ -7,14 +7,6 @@
 
 namespace mufflon::scene {
 
-bool Lod::is_emissive(const Scenario& scenario) const noexcept {
-	for(MaterialIndex m : m_geometry.template get<geometry::Polygons>().get_unique_materials())
-		if(scenario.get_assigned_material(m)->get_properties().is_emissive()) return true;
-	for(MaterialIndex m : m_geometry.template get<geometry::Spheres>().get_unique_materials())
-		if(scenario.get_assigned_material(m)->get_properties().is_emissive()) return true;
-	return false;
-}
-
 void Lod::clear_accel_structure() {
 	m_accelStruct.mark_invalid();
 }
@@ -38,6 +30,29 @@ LodDescriptor<dev> Lod::get_descriptor() {
 	}
 	desc.accelStruct = m_accelStruct.acquire_const<dev>();
 	return desc;
+}
+void Lod::update_flags(const Scenario& scenario, std::unordered_set<MaterialIndex>& uniqueMatCache) {
+	auto& polys = this->template get_geometry<geometry::Polygons>();
+	auto& spheres = this->template get_geometry<geometry::Spheres>();
+
+	// Collect the unique material indices of the LoD
+	const auto* polyMatIndices = polys.template acquire_const<Device::CPU, MaterialIndex>(polys.get_material_indices_hdl());
+	const auto* sphereMatIndices = spheres.template acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
+	uniqueMatCache.clear();
+	for(std::size_t i = 0u; i < polys.get_face_count(); ++i)
+		uniqueMatCache.insert(polyMatIndices[i]);
+	for(std::size_t i = 0u; i < spheres.get_sphere_count(); ++i)
+		uniqueMatCache.insert(sphereMatIndices[i]);
+
+	// Now check for each scenario if it is emissive and/or displaced
+	// and flag the LoD accordingly
+	for(const auto mat : uniqueMatCache) {
+		const auto* material = scenario.get_assigned_material(mat);
+		if(material->get_properties().is_emissive())
+			m_flags |= (1llu << static_cast<u64>(2u * scenario.get_index()));
+		if(material->get_displacement_map() != nullptr)
+			m_flags |= (1llu << static_cast<u64>(2u * scenario.get_index() + 1u));
+	}
 }
 
 void Lod::displace(tessellation::TessLevelOracle& tessellater, const Scenario& scenario) {

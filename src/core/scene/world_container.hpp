@@ -45,8 +45,6 @@ public:
 	void reserve_objects(const std::size_t count);
 	void reserve_instances(const std::size_t count);
 
-	bool finalize();
-
 	// Create a new object to be filled
 	ObjectHandle create_object(const StringView name, ObjectFlags flags);
 	// Finds an object by its name
@@ -191,7 +189,7 @@ public:
 	// Performs a sanity check on the current world - has lights, cameras etc.
 	Sanity is_sane_world() const;
 	// Performs a sanity check for a given scenario (respects object masking etc.)
-	Sanity is_sane_scenario(ConstScenarioHandle hdl) const;
+	Sanity is_sane_scenario(ConstScenarioHandle hdl);
 
 	// Returns a handle to the background which should be used as default
 	lights::Background& get_default_background() {

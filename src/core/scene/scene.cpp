@@ -433,7 +433,7 @@ bool Scene::retessellate(const float tessLevel) {
 			// Check if we have displacement or plain tessellation
 			Lod* lod = &obj.first->get_lod(mapping.first);
 
-			if(lod->has_displacement_mapping(m_scenario)) {
+			if(lod->is_displaced(m_scenario)) {
 				// First get the relevant instance transformations
 				instTrans.clear();
 				for(InstanceHandle inst : mapping.second)

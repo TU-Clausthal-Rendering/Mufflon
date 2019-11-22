@@ -29,7 +29,7 @@ public:
 
 	static constexpr u32 NO_CUSTOM_LOD = std::numeric_limits<u32>::max();
 
-	Scenario(util::StringPool& namePool);
+	Scenario(const u32 index, util::StringPool& namePool);
 	Scenario(const Scenario&) = delete;
 	Scenario(Scenario&&) = default;
 	Scenario& operator=(const Scenario&) = delete;
@@ -104,6 +104,8 @@ public:
 	void set_name(StringView name) noexcept {
 		m_name = name;
 	}
+
+	u32 get_index() const noexcept { return m_index; }
 
 	// Note: no method to change name! because it is being used as
 	// key in worldcontainer
@@ -198,6 +200,7 @@ private:
 	mutable bool m_materialAssignmentChanged = true;
 
 	StringView m_name;
+	const u32 m_index;
 	// Map from binaryName to a material index (may use string_views as keys
 	// for lookups -> uses a map).
 	util::StringPool& m_namePool;

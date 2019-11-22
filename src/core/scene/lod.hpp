@@ -1,6 +1,7 @@
 #pragma once
 
 #include "descriptors.hpp"
+#include "scenario.hpp"
 #include "accel_structs/lbvh.hpp"
 #include "geometry/polygon.hpp"
 #include "geometry/sphere.hpp"
@@ -19,8 +20,6 @@ template < Device dev >
 struct LodDescriptor;
 class Object;
 
-class Scenario;
-
 namespace tessellation {
 class TessLevelOracle;
 } // namespace tessellation
@@ -31,7 +30,10 @@ public:
 	using GeometryTuple = util::TaggedTuple<geometry::Polygons, geometry::Spheres>;
 
 	Lod(const Object* parent) :
-		m_parent{parent}
+		m_geometry{},
+		m_accelStruct{},
+		m_parent{ parent },
+		m_flags{ 0 }
 	{}
 	// Warning: implicit sync!
 	Lod(Lod&) = default;
@@ -51,9 +53,18 @@ public:
 		return m_geometry.template get<Geom>();
 	}
 
-	// Is there any emissive polygon in this object
-	// Requires the scenario for the material mapping.
-	bool is_emissive(const class Scenario& scenario) const noexcept;
+	// Updates the LoD's flags according to the given scenarios
+	// Takes an unordered_set so the scratch memmory can be shared between LoDs
+	void update_flags(const Scenario& scenario, std::unordered_set<MaterialIndex>& uniqueMatCache);
+
+	// Is there any emissive polygon/sphere in this object
+	bool is_emissive(const Scenario& scenario) const noexcept {
+		return m_flags & (1llu << static_cast<u64>(2u * scenario.get_index()));
+	}
+	// Is there any displaced polygon in this object
+	bool is_displaced(const Scenario& scenario) const noexcept {
+		return m_flags & (1llu << static_cast<u64>(2u * scenario.get_index() + 1u));
+	}
 
 	// Get the descriptor of the object (including all geometry, but without attributes)
 	// Synchronizes implicitly
@@ -102,15 +113,6 @@ public:
 		m_parent = parent;
 	}
 
-	// Returns whether any geometry has a displacement map associated with the given material assignment
-	bool has_displacement_mapping(const Scenario& scenario) const noexcept {
-		bool hasDisplacementMapping = false;
-		m_geometry.for_each([&hasDisplacementMapping, &scenario](auto& elem) {
-			hasDisplacementMapping |= elem.has_displacement_mapping(scenario);
-		});
-		return hasDisplacementMapping;
-	}
-
 	// Checks if displacement mapping was applied to all of the LoD's geometry
 	bool was_displacement_mapping_applied() const noexcept {
 		bool wasDisplacementApplied = true;
@@ -132,6 +134,7 @@ private:
 	// Acceleration structure of the geometry
 	accel_struct::LBVHBuilder m_accelStruct;
 	const Object* m_parent;
+	u64 m_flags;	// Stores flags (2 bits per-scenario)
 };
 
 }} // mufflon::scene

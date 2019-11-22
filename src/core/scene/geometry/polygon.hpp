@@ -356,11 +356,6 @@ public:
 		return m_meshData->n_faces();
 	}
 
-	// Get a list of all materials which are referenced by any primitive
-	const std::unordered_set<MaterialIndex>& get_unique_materials() const {
-		return m_uniqueMaterials;
-	}
-
 	PolygonMeshType& get_mesh() noexcept {
 		return *m_meshData;
 	}
@@ -368,9 +363,6 @@ public:
 	const PolygonMeshType& get_mesh() const noexcept {
 		return *m_meshData;
 	}
-
-	// Returns whether any polygon has a displacement map associated with the given material assignment
-	bool has_displacement_mapping(const Scenario& scenario) const noexcept;
 
 	bool was_displacement_mapping_applied() const noexcept {
 		return m_wasDisplaced;
@@ -454,11 +446,6 @@ private:
 	ei::Box m_boundingBox;
 	std::size_t m_triangles = 0u;
 	std::size_t m_quads = 0u;
-
-	// Whenever a primitive is added the table of all referenced
-	// materials will be updated. Assumption: a material reference
-	// will not change afterwards.
-	std::unordered_set<MaterialIndex> m_uniqueMaterials;
 
 	// Keeps track of whether displacement mapping was already applied or not
 	bool m_wasDisplaced = false;
