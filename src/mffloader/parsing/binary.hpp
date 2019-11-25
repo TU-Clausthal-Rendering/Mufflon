@@ -59,6 +59,25 @@ private:
 	static constexpr mufflon::u32 LOD_MAGIC = 'L' | ('O' << 8u) | ('D' << 16u) | ('_' << 24u);
 	static constexpr mufflon::u32 ATTRIBUTE_MAGIC = 'A' | ('t' << 8u) | ('t' << 16u) | ('r' << 24u);
 
+	// RAII wrapper around C file descriptor
+	class FileDescriptor {
+	public:
+		FileDescriptor() = default;
+		FileDescriptor(fs::path file, const char* mode);
+		FileDescriptor(const FileDescriptor&) = delete;
+		FileDescriptor(FileDescriptor&&);
+		FileDescriptor& operator=(const FileDescriptor&) = delete;
+		FileDescriptor& operator=(FileDescriptor&&);
+		~FileDescriptor();
+		void close() noexcept;
+		FILE* get() const noexcept { return m_desc; }
+		// Advances a C file descriptor (possibly in multiple steps)
+		FileDescriptor& seek(mufflon::u64 offset, std::ios_base::seekdir dir = std::ios_base::cur);
+
+	private:
+		FILE* m_desc = nullptr;
+	};
+
 	struct GlobalFlag : public mufflon::util::Flags<mufflon::u32> {
 		static constexpr mufflon::u32 NONE = 0;
 		static constexpr mufflon::u32 DEFLATE = 1;
@@ -194,6 +213,8 @@ private:
 	mufflon::util::StringPool m_namePool;
 	AttribState m_attribStateBuffer;
 	std::string m_nameBuffer;
+	// We need at most three file descriptors at any time, so we keep them around
+	FileDescriptor m_fileDescs[3u];
 	// Parsed data
 	// The material names are wrapped in [mat:...] for ease of use in the JSON parser
 	std::vector<std::string> m_materialNames;

@@ -14,60 +14,54 @@ namespace mff_loader::binary {
 
 using namespace mufflon;
 
-namespace {
+BinaryLoader::FileDescriptor::FileDescriptor(fs::path file, const char* mode) :
+	m_desc(std::fopen(file.string().c_str(), mode)) {
+	if(m_desc == nullptr)
+		throw std::ios_base::failure("Failed to open file '" + file.string()
+									 + "' with mode '" + mode + "'");
+}
 
-// RAII wrapper around C file descriptor
-class FileDescriptor {
-public:
-	FileDescriptor(fs::path file, const char* mode) :
-		m_desc(std::fopen(file.string().c_str(), mode))
-	{
-		if(m_desc == nullptr)
-			throw std::ios_base::failure("Failed to open file '" + file.string()
-										 + "' with mode '" + mode + "'");
+BinaryLoader::FileDescriptor::FileDescriptor(FileDescriptor&& other) :
+	m_desc{ other.m_desc } {
+	other.m_desc = nullptr;
+}
+
+BinaryLoader::FileDescriptor& BinaryLoader::FileDescriptor::operator=(FileDescriptor&& other) {
+	std::swap(m_desc, other.m_desc);
+	return *this;
+}
+
+BinaryLoader::FileDescriptor::~FileDescriptor() {
+	this->close();
+}
+
+void BinaryLoader::FileDescriptor::close() noexcept {
+	if(m_desc != nullptr) {
+		// Nothing we can do if this fails - not like we care, either
+		(void)std::fclose(m_desc);
+		m_desc = nullptr;
 	}
+}
 
-	~FileDescriptor() {
-		this->close();
+// Advances a C file descriptor (possibly in multiple steps)
+BinaryLoader::FileDescriptor& BinaryLoader::FileDescriptor::seek(u64 offset, std::ios_base::seekdir dir) {
+	int origin = 0u;
+	switch(dir) {
+		case std::ios_base::beg: origin = SEEK_SET; break;
+		case std::ios_base::end: origin = SEEK_END; break;
+		case std::ios_base::cur:
+		default: origin = SEEK_CUR;
 	}
-
-	void close() {
-		if(m_desc != nullptr) {
-			// Nothing we can do if this fails - not like we care, either
-			(void) std::fclose(m_desc);
-			m_desc = nullptr;
-		}
-	}
-
-	FILE* get() {
-		return m_desc;
-	}
-
-	// Advances a C file descriptor (possibly in multiple steps)
-	FileDescriptor& seek(u64 offset, std::ios_base::seekdir dir = std::ios_base::cur) {
-		int origin = 0u;
-		switch(dir) {
-			case std::ios_base::beg: origin = SEEK_SET; break;
-			case std::ios_base::end: origin = SEEK_END; break;
-			case std::ios_base::cur:
-			default: origin = SEEK_CUR;
-		}
-		while(offset > static_cast<u64>(std::numeric_limits<long>::max())) {
-			if(std::fseek(m_desc, std::numeric_limits<long>::max(), origin) != 0)
-				throw std::runtime_error("Failed to seek C file descriptor to desired position");
-			offset -= std::numeric_limits<long>::max();
-			origin = SEEK_CUR;
-		}
-		if(std::fseek(m_desc, static_cast<long>(offset), origin) != 0)
+	while(offset > static_cast<u64>(std::numeric_limits<long>::max())) {
+		if(std::fseek(m_desc, std::numeric_limits<long>::max(), origin) != 0)
 			throw std::runtime_error("Failed to seek C file descriptor to desired position");
-		return *this;
+		offset -= std::numeric_limits<long>::max();
+		origin = SEEK_CUR;
 	}
-
-private:
-	FILE* m_desc = nullptr;
-};
-
-} // namespace
+	if(std::fseek(m_desc, static_cast<long>(offset), origin) != 0)
+		throw std::runtime_error("Failed to seek C file descriptor to desired position");
+	return *this;
+}
 
 
 
@@ -169,18 +163,14 @@ void BinaryLoader::read_normal_compressed_vertices(const ObjectState& object, co
 	if(lod.numVertices == 0)
 		return;
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
-	FileDescriptor points{ m_filePath, "rb" };
-	FileDescriptor normals{ m_filePath, "rb" };
-	FileDescriptor uvs{ m_filePath, "rb" };
 
-	points.seek(currOffset, std::ios_base::beg);
-	normals.seek(currOffset + 3u * sizeof(float) * lod.numVertices, std::ios_base::beg);
-	uvs.seek(currOffset + (3u * sizeof(float) + sizeof(u32)) * lod.numVertices, std::ios_base::beg);
+	m_fileDescs[0u].seek(currOffset, std::ios_base::beg);
+	m_fileDescs[2u].seek(currOffset + (3u * sizeof(float) + sizeof(u32)) * lod.numVertices, std::ios_base::beg);
 	std::size_t pointsRead = 0u;
 	std::size_t uvsRead = 0u;
 
-	BulkLoader pointsBulk{ BulkLoader::BULK_FILE, { points.get() } };
-	BulkLoader uvsBulk{ BulkLoader::BULK_FILE, { uvs.get() } };
+	BulkLoader pointsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
+	BulkLoader uvsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[2u].get() } };
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
 		util::pun<Vec3>(object.aabb.max)
@@ -209,19 +199,16 @@ void BinaryLoader::read_normal_uncompressed_vertices(const ObjectState& object, 
 	if(lod.numVertices == 0)
 		return;
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
-	FileDescriptor points{ m_filePath, "rb" };
-	FileDescriptor normals{ m_filePath, "rb" };
-	FileDescriptor uvs{ m_filePath, "rb" };
 
-	points.seek(currOffset, std::ios_base::beg);
-	normals.seek(currOffset + 3u * sizeof(float) * lod.numVertices, std::ios_base::beg);
-	uvs.seek(currOffset + 2u * 3u * sizeof(float) * lod.numVertices, std::ios_base::beg);
+	m_fileDescs[0u].seek(currOffset, std::ios_base::beg);
+	m_fileDescs[1u].seek(currOffset + 3u * sizeof(float) * lod.numVertices, std::ios_base::beg);
+	m_fileDescs[2u].seek(currOffset + 2u * 3u * sizeof(float) * lod.numVertices, std::ios_base::beg);
 	std::size_t pointsRead = 0u;
 	std::size_t normalsRead = 0u;
 	std::size_t uvsRead = 0u;
-	BulkLoader pointsBulk{ BulkLoader::BULK_FILE, { points.get() } };
-	BulkLoader normalsBulk{ BulkLoader::BULK_FILE, { normals.get() } };
-	BulkLoader uvsBulk{ BulkLoader::BULK_FILE, { uvs.get() } };
+	BulkLoader pointsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
+	BulkLoader normalsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[1u].get() } };
+	BulkLoader uvsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[2u].get() } };
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
 		util::pun<Vec3>(object.aabb.max)
@@ -258,9 +245,8 @@ void BinaryLoader::read_compressed_attribute(const unsigned char*& data) {
 void BinaryLoader::read_uncompressed_vertex_attributes(const ObjectState& object, const LodState& lod) {
 	if(lod.numVertices == 0 || lod.numVertAttribs == 0)
 		return;
-	FileDescriptor attr{ m_filePath, "rb" };
-	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { attr.get() } };
+	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
@@ -285,9 +271,8 @@ void BinaryLoader::read_uncompressed_vertex_attributes(const ObjectState& object
 void BinaryLoader::read_uncompressed_face_attributes(const ObjectState& object, const LodState& lod) {
 	if((lod.numTriangles == 0 && lod.numQuads == 0) || lod.numFaceAttribs == 0)
 		return;
-	FileDescriptor attr{ m_filePath, "rb" };
-	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { attr.get() } };
+	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
@@ -312,9 +297,8 @@ void BinaryLoader::read_uncompressed_face_attributes(const ObjectState& object, 
 void BinaryLoader::read_uncompressed_sphere_attributes(const ObjectState& object, const LodState& lod) {
 	if(lod.numSpheres == 0 || lod.numSphereAttribs == 0)
 		return;
-	FileDescriptor attr{ m_filePath, "rb" };
-	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { attr.get() } };
+	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
@@ -338,9 +322,8 @@ void BinaryLoader::read_uncompressed_sphere_attributes(const ObjectState& object
 void BinaryLoader::read_uncompressed_face_materials(const ObjectState& object, const LodState& lod) {
 	if(lod.numTriangles == 0 && lod.numQuads == 0)
 		return;
-	FileDescriptor matIdxs{ m_filePath, "rb" };
-	matIdxs.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader matsBulk{ BulkLoader::BULK_FILE, { matIdxs.get() } };
+	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	BulkLoader matsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	const u32 faces = lod.numTriangles + lod.numQuads;
 	if(polygon_set_material_idx_bulk(lod.lodHdl, static_cast<FaceHdl>(0u),
@@ -356,9 +339,8 @@ void BinaryLoader::read_uncompressed_face_materials(const ObjectState& object, c
 void BinaryLoader::read_uncompressed_sphere_materials(const ObjectState& object, const LodState& lod) {
 	if(lod.numSpheres == 0)
 		return;
-	FileDescriptor matIdxs{ m_filePath, "rb" };
-	matIdxs.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader matsBulk{ BulkLoader::BULK_FILE, { matIdxs.get() } };
+	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	BulkLoader matsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(spheres_set_material_idx_bulk(lod.lodHdl, static_cast<SphereHdl>(0u),
 									 lod.numSpheres, &matsBulk) == INVALID_SIZE)
@@ -401,9 +383,8 @@ void BinaryLoader::read_uncompressed_quads(const ObjectState& object, const LodS
 void BinaryLoader::read_uncompressed_spheres(const ObjectState& object, const LodState& lod) {
 	if(lod.numSpheres == 0)
 		return;
-	FileDescriptor spheres{ m_filePath, "rb" };
-	spheres.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader spheresBulk{ BulkLoader::BULK_FILE, { spheres.get() } };
+	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	BulkLoader spheresBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
 		util::pun<Vec3>(object.aabb.max)
@@ -772,11 +753,12 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 	sprintf(m_loadingStage.data(), "Loading instances\0");
 	std::vector<uint8_t> hasInstance(m_objects.size(), false);
 	const u32 numInstances = read<u32>();
+	const u32 instDispInterval = numInstances / 100u;
 	for(u32 i = 0u; i < numInstances; ++i) {
 		if(m_abort)
 			return false;
 		// Only set the string every x instances to avoid overhead
-		if(i % 0x10000u)
+		if(i % instDispInterval == 0)
 			sprintf(m_loadingStage.data(), "Loading instance %u / %u\0", i, numInstances);
 		const auto name = read<StringView>();
 		const u32 objId = read<u32>();
@@ -824,11 +806,12 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 	sprintf(m_loadingStage.data(), "Creating default instances\0");
 	// Create identity instances for objects not having one yet
 	const auto objectCount = hasInstance.size();
+	const u32 objDispInterval = static_cast<u32>(objectCount) / 100u;
 	for(u32 i = 0u; i < static_cast<u32>(objectCount); ++i) {
 		if(m_abort)
 			return false;
 		// Only set the string every x objects to avoid overhead
-		if(i % 0x10000u)
+		if(i % objDispInterval == 0)
 			sprintf(m_loadingStage.data(), "Checking default instance for object %u / %zu\0", i, objectCount);
 		if(!hasInstance[i]) {
 			StringView objName = m_objects[i].name;
@@ -951,7 +934,7 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 							 const util::FixedHashMap<StringView, mufflon::u32>& objectLods,
 							 util::FixedHashMap<StringView, InstanceMapping>& instanceLods,
-							 bool deinstance) {
+							 const bool deinstance) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::load_file");
 	m_filePath = std::move(file);
 	if(!fs::exists(m_filePath))
@@ -968,6 +951,8 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		m_fileStream.exceptions(std::ifstream::failbit);
 		// Needed to get a C file descriptor offset
 		m_fileStart = m_fileStream.tellg();
+		for(u32 i = 0u; i < 3u; ++i)
+			m_fileDescs[i] = FileDescriptor{ m_filePath, "rb" };
 
 		if(m_abort)
 			return false;
@@ -1003,7 +988,10 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 			const auto instanceCount = read<u32>();
 			m_fileStream.seekg(currPos, std::ifstream::beg);
 			// Since there may be implicit (default) instances, add object count to be sure
-			world_reserve_objects_instances(m_objJumpTable.size(), instanceCount + m_objJumpTable.size());
+			// If we're using deinstancing, the number of objects increases by the number of instances
+			// (conservative estimate)
+			world_reserve_objects_instances(m_objJumpTable.size() + deinstance ? instanceCount : 0u,
+											instanceCount + m_objJumpTable.size());
 		}
 
 		sprintf(m_loadingStage.data(), "Reading object definitions\0");
@@ -1033,6 +1021,8 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		if(deinstance)
 			this->deinstance();
 		this->clear_state();
+		for(u32 i = 0u; i < 3u; ++i)
+			m_fileDescs[i].close();
 	} catch(const std::exception&) {
 		// Clean up before leaving throwing
 		this->clear_state();
