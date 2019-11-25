@@ -186,11 +186,12 @@ void WorldContainer::apply_transformation(InstanceHandle hdl) {
 	const ei::Mat3x4&  transMat = hdl->get_transformation_matrix();
 	ObjectHandle objectHandle = &hdl->get_object();
 	if(objectHandle->get_instance_counter() > 1) {
-		static thread_local std::string newName(objectHandle->get_name().data());
+		static thread_local std::string newName{};
+		newName.clear();
+		newName.append(objectHandle->get_name().data());
 		newName.append("###TRANSFORMED_INSTANCE");
 		newName.append(std::to_string(objectHandle->get_instance_counter()));
-		const auto pooledNewName = m_namePool.insert(newName);
-		objectHandle = duplicate_object(objectHandle, pooledNewName);
+		objectHandle = duplicate_object(objectHandle, newName);
 		hdl->set_object(*objectHandle);
 	}
 	for(size_t i = 0; i < objectHandle->get_lod_slot_count(); i++) {
