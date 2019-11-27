@@ -31,7 +31,7 @@ bool WorldContainer::set_frame_current(const u32 frameCurrent) {
 	if(newFrame != m_frameCurrent) {
 		m_frameCurrent = newFrame;
 		// Delete the current scene to make it clear to everyone that it needs to be refetched
-		m_scene.reset();
+		m_sceneValid = false;
 		return true;
 	}
 	return false;
@@ -39,7 +39,7 @@ bool WorldContainer::set_frame_current(const u32 frameCurrent) {
 
 WorldContainer::Sanity WorldContainer::finalize_world() const {
 	// Check for objects
-	if(m_instances.empty() && m_animatedInstances.empty())
+	if(m_instances.empty())
 		return Sanity::NO_INSTANCES;
 	if(m_objects.empty())
 		return Sanity::NO_OBJECTS;
@@ -102,28 +102,6 @@ WorldContainer::Sanity WorldContainer::finalize_scenario(ConstScenarioHandle hdl
 			break;
 		}
 	}
-	for(const auto& frameInstances : m_animatedInstances) {
-		// Check the animated instances
-		for(const auto& instance : frameInstances) {
-			if(hdl->is_masked(instance.get()))
-				continue;
-
-			hasObjects = true;
-			const Object& object = instance->get_object();
-			const u32 lodLevel = hdl->get_effective_lod(instance.get());
-			if(object.has_lod_available(lodLevel)) {
-				const Lod& lod = object.get_lod(lodLevel);
-				if(lod.is_emissive(*hdl)) {
-					hasEmitters = true;
-					break;
-				}
-			} else {
-				// TODO: how could we possibly check this?
-				hasEmitters = true;
-				break;
-			}
-		}
-	}
 
 	if(!hasObjects)
 		return Sanity::NO_OBJECTS;
@@ -162,6 +140,8 @@ void WorldContainer::reserve(const std::size_t scenarios) {
 
 ObjectHandle WorldContainer::create_object(const StringView name, ObjectFlags flags) {
 	const auto pooledName = m_namePool.insert(name);
+	if(m_objects.find(pooledName) != m_objects.cend())
+		throw std::runtime_error("Object with the name already exists!");
 	auto& hdl = m_objects.emplace(pooledName, Object{static_cast<u32>(m_objects.size())});
 	hdl.set_name(pooledName);
 	hdl.set_flags(flags);
@@ -211,24 +191,38 @@ InstanceHandle WorldContainer::create_instance(ObjectHandle obj, const u32 anima
 		logError("[WorldContainer::create_instance] Invalid object handle");
 		return nullptr;
 	}
+	if(m_instances.capacity() <= m_instances.size())
+		throw std::runtime_error("Instance created outside of reserved bounds; since this "
+								 "may lead to invalid instance handles, this is disallowed. "
+								 "Reserve the right number of instances beforehand");
+
 	if(animationFrame == Instance::NO_ANIMATION_FRAME) {
-		if(m_instances.capacity() <= m_instances.size())
-			throw std::runtime_error("Instance created outside of reserved bounds; since this may lead to invalid instance handles, this is disallowed. Reserve the right number of instances beforehand");
-		return &m_instances.emplace_back(*obj);
+		if(!m_frameInstanceIndices.empty())
+			throw std::runtime_error("Non-animated instances must be added before animated ones!");
 	} else {
 		// Check if it's the first instance ever and set start+end frames accordingly
-		if(m_animatedInstances.size() == 0u) {
+		if(m_frameInstanceIndices.size() == 0u) {
 			m_frameCurrent = animationFrame;
 			m_frameStart = animationFrame;
 			m_frameEnd = animationFrame;
+		} else {
+			m_frameStart = std::min(m_frameStart, animationFrame);
+			m_frameEnd = std::max(m_frameEnd, animationFrame);
 		}
-
-		if(m_animatedInstances.size() <= animationFrame)
-			m_animatedInstances.resize(animationFrame + 1u);
-		m_frameStart = std::min(m_frameStart, animationFrame);
-		m_frameEnd = std::max(m_frameEnd, animationFrame);
-		return m_animatedInstances[animationFrame].emplace_back(std::make_unique<Instance>(*obj)).get();
+		const auto index = animationFrame - m_frameStart;
+		// Check for out-of-order insert
+		if(m_frameInstanceIndices.size() == index) {
+			// New frame added
+			m_frameInstanceIndices.emplace_back(m_instances.size(), 1u);
+		} else if(m_frameInstanceIndices.size() == (index + 1u)) {
+			// Additional instance for current frame
+			++m_frameInstanceIndices.back().second;
+		} else {
+			throw std::runtime_error("Animated instances must be added in order of their frame");
+		}
 	}
+
+	return &m_instances.emplace_back(*obj);
 }
 
 InstanceHandle WorldContainer::get_instance(std::size_t index, const u32 animationFrame) {
@@ -239,25 +233,24 @@ InstanceHandle WorldContainer::get_instance(std::size_t index, const u32 animati
 			++iter;
 		if(iter != m_instances.end())
 			return &*iter;
-	} else if(animationFrame < m_animatedInstances.size()
-			  && m_animatedInstances[animationFrame].size() > index) {
-		// TODO: use index string map?
-		return m_animatedInstances[animationFrame][index].get();
+	} else if(animationFrame < m_frameInstanceIndices.size()) {
+		if(m_frameInstanceIndices[animationFrame].second > index)
+			return &m_instances[m_frameInstanceIndices[animationFrame].first + index];
 	}
 	return nullptr;
 }
 
 std::size_t WorldContainer::get_highest_instance_frame() const noexcept { 
-	return m_animatedInstances.size();
+	return m_frameInstanceIndices.size();
 }
 
 std::size_t WorldContainer::get_instance_count(const u32 frame) const noexcept {
 	if(frame == Instance::NO_ANIMATION_FRAME)
 		return m_instances.size();
-	else if(frame >= m_animatedInstances.size())
+	else if(frame >= m_frameInstanceIndices.size())
 		return 0u;
 	else
-		return m_animatedInstances[frame].size();
+		return m_frameInstanceIndices[frame].second;
 };
 
 ScenarioHandle WorldContainer::create_scenario(const StringView name) {
@@ -283,6 +276,10 @@ ScenarioHandle WorldContainer::get_current_scenario() const noexcept {
 
 SceneHandle WorldContainer::get_current_scene() {
 	return m_scene.get();
+}
+
+bool WorldContainer::is_current_scene_valid() const noexcept {
+	return m_sceneValid && m_scene != nullptr;
 }
 
 ScenarioHandle WorldContainer::get_scenario(std::size_t index) {
@@ -576,7 +573,7 @@ void WorldContainer::set_light_name(u32 index, lights::LightType type, StringVie
 }
 
 bool WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
-	if(m_scenario != nullptr) {
+	if(m_scenario != nullptr && m_sceneValid) {
 		switch(type) {
 			case lights::LightType::POINT_LIGHT:
 				// Check if the light is part of the active scenario/scene
@@ -726,16 +723,17 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 	};
 
 	// Reserve the (likely and maximum) number of instances
-	const bool hasAnimatedInsts = m_animatedInstances.size() > m_frameCurrent;
-	const std::size_t animatedInstCount = hasAnimatedInsts ? m_animatedInstances[m_frameCurrent].size() : 0u;
+	const auto frameIndex = m_frameCurrent - m_frameStart;
+	const bool hasAnimatedInsts = m_frameInstanceIndices.size() > frameIndex;
+	const std::size_t animatedInstCount = hasAnimatedInsts ? m_frameInstanceIndices[frameIndex].second : 0u;
+	const std::size_t regInstCount = m_frameInstanceIndices.empty() ? m_instances.size() : m_frameInstanceIndices.front().first;
 	m_scene->reserve_objects(m_objects.size());
 	m_scene->reserve_instances(m_instances.size() + animatedInstCount);
 	// Load non-animated and animated instances
-	for(auto& instance : m_instances)
-		addObjAndInstance(instance);
-	if(hasAnimatedInsts)
-		for(auto& instance : m_animatedInstances[m_frameCurrent])
-			addObjAndInstance(*instance);
+	for(std::size_t i = 0u; i < regInstCount; ++i)
+		addObjAndInstance(m_instances[i]);
+	for(std::size_t i = 0u; i < animatedInstCount; ++i)
+		addObjAndInstance(m_instances[m_frameInstanceIndices[frameIndex].first + i]);
 
 	// Check if the resulting scene has issues with size
 	if(ei::len(m_scene->get_bounding_box().min) >= SUGGESTED_MAX_SCENE_SIZE
@@ -756,6 +754,7 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		renderer->on_scenario_changed(&scenario);
 
 	// Assign the newly created scene and destroy the old one?
+	m_sceneValid = true;
 	return m_scene.get();
 }
 
@@ -769,7 +768,7 @@ void WorldContainer::reload_scene(renderer::IRenderer* renderer) {
 	mAssert(m_scenario != nullptr);
 
 	// TODO: better differentiate what needs to be reloaded on animation change
-	if(m_scene == nullptr) {
+	if(m_scene == nullptr || !m_sceneValid) {
 		(void) load_scene(*m_scenario, renderer);
 		return;
 	}
@@ -935,7 +934,7 @@ void WorldContainer::set_lod_loader_function(bool (CDECL*func)(ObjectHandle, u32
 void WorldContainer::retessellate() {
 	// Basically we need to find out which LoDs are part of the scene, re-tessellate them, and then
 	// rebuild the light tree
-	if(m_scene == nullptr || m_scenario == nullptr)
+	if(m_scene == nullptr || m_scenario == nullptr || !m_sceneValid)
 		return;
 
 	if(m_scene->retessellate(m_tessLevel)) {

@@ -411,6 +411,9 @@ However, there is a specification for a few predefined possible attributes (with
 
 Finally, there are the instances.
 Objects which are not instanced explicitly will have one instance with the identity transformation.
+Instances are required to be stored in the order of animation keyframe: first those with 0xffffffff
+(ie. not animated), then the instances for the globally first animation frame, then the second (if present)
+and so on.
 
     <INSTANCES> = u32 'Inst'    // Type check for this section
                   u32           // Number of instances I

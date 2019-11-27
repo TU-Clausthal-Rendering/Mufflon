@@ -57,17 +57,10 @@ public:
 	}
 	void set_object(Object& object) noexcept;
 
-	u32 get_animation_frame() const noexcept {
-		return m_animationFrame;
-	}
-	void set_animation_frame(const u32 animationFrame) noexcept {
-		m_animationFrame = animationFrame;
-	}
 
 private:
 	ei::Mat3x4 m_transMat;
 	Object* m_objRef;
-	u32 m_animationFrame;
 };
 
 }} // namespace mufflon::scene

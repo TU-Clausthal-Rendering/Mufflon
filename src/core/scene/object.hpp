@@ -53,14 +53,6 @@ public:
 	ObjectFlags get_flags() const noexcept {
 		return m_flags;
 	}
-	// Returns the object's animation frame.
-	u32 get_animation_frame() const noexcept {
-		return m_animationFrame;
-	}
-	// Sets the object's animation frame.
-	void set_animation_frame(u32 frame) noexcept {
-		m_animationFrame = frame;
-	}
 
 	bool has_lod_available(u32 level) const noexcept {
 		return level < m_lods.size() && m_lods[level] != nullptr;
@@ -132,7 +124,6 @@ private:
 	std::vector<std::unique_ptr<Lod>> m_lods;
 	const u32 m_objectId;
 
-	u32 m_animationFrame = NO_ANIMATION_FRAME; // Current frame of a possible animation
 	ObjectFlags m_flags;
 
 	u32 m_instanceCounter = 0;
