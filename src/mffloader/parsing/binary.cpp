@@ -781,11 +781,12 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 		hasInstance[objId] = true;
 	}
 
-	logInfo("[BinaryLaoder::read_instances] Loaded ", numInstances, " instances");
+	logInfo("[BinaryLoader::read_instances] Loaded ", numInstances, " instances");
 	sprintf(m_loadingStage.data(), "Creating default instances\0");
 	// Create identity instances for objects not having one yet
 	const auto objectCount = hasInstance.size();
-	const u32 objDispInterval = std::max(1u, static_cast<u32>(objectCount) / 200u);
+	const u32 objDispInterval = std::max(1u, static_cast<u32>(objectCount) / 10u);
+	u32 defaultCreatedInstances = 0u;
 	for(u32 i = 0u; i < static_cast<u32>(objectCount); ++i) {
 		if(m_abort)
 			return false;
@@ -820,9 +821,10 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 				throw std::runtime_error("Failed to get bounding box for instance of object ID "
 										 + std::to_string(i));
 			m_aabb = ei::Box(m_aabb, instanceAabb);
+			++defaultCreatedInstances;
 		}
 	}
-	logInfo("[BinaryLaoder::read_instances] Created", objectCount, " default instances");
+	logInfo("[BinaryLoader::read_instances] Created ", defaultCreatedInstances, " default instances");
 	
 	return true;
 }
@@ -969,8 +971,8 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 			// Since there may be implicit (default) instances, add object count to be sure
 			// If we're using deinstancing, the number of objects increases by the number of instances
 			// (conservative estimate)
-			world_reserve_objects_instances(m_objJumpTable.size() + (deinstance ? instanceCount : 0u),
-											instanceCount + m_objJumpTable.size());
+			world_reserve_objects_instances(static_cast<u32>(m_objJumpTable.size() + (deinstance ? instanceCount : 0u)),
+											static_cast<u32>(instanceCount + m_objJumpTable.size()));
 		}
 
 		const auto objectCount = m_objJumpTable.size();

@@ -116,7 +116,7 @@ WorldContainer::Sanity WorldContainer::finalize_scenario(ConstScenarioHandle hdl
 	return Sanity::SANE;
 }
 
-void WorldContainer::reserve(const std::size_t objects, const std::size_t instances) {
+void WorldContainer::reserve(const u32 objects, const u32 instances) {
 	if(m_objects.size() > 0u || m_instances.size() > 0u)
 		throw std::runtime_error("This method may only be called on a clean world state!");
 	m_objects = util::FixedHashMap<StringView, Object>{ objects };
@@ -130,7 +130,7 @@ void WorldContainer::reserve(const std::size_t objects, const std::size_t instan
 	m_namePool = util::StringPool{ pages };
 }
 
-void WorldContainer::reserve(const std::size_t scenarios) {
+void WorldContainer::reserve(const u32 scenarios) {
 	if(m_scenarios.size() > 0u)
 		throw std::runtime_error("This method may only be called on a clean scenario state!");
 	if(scenarios > 32u)
@@ -725,14 +725,14 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 	// Reserve the (likely and maximum) number of instances
 	const auto frameIndex = m_frameCurrent - m_frameStart;
 	const bool hasAnimatedInsts = m_frameInstanceIndices.size() > frameIndex;
-	const std::size_t animatedInstCount = hasAnimatedInsts ? m_frameInstanceIndices[frameIndex].second : 0u;
+	const u32 animatedInstCount = hasAnimatedInsts ? m_frameInstanceIndices[frameIndex].second : 0u;
 	const std::size_t regInstCount = m_frameInstanceIndices.empty() ? m_instances.size() : m_frameInstanceIndices.front().first;
-	m_scene->reserve_objects(m_objects.size());
-	m_scene->reserve_instances(m_instances.size() + animatedInstCount);
+	m_scene->reserve_objects(static_cast<u32>(m_objects.size()));
+	m_scene->reserve_instances(static_cast<u32>(m_instances.size()) + animatedInstCount);
 	// Load non-animated and animated instances
 	for(std::size_t i = 0u; i < regInstCount; ++i)
 		addObjAndInstance(m_instances[i]);
-	for(std::size_t i = 0u; i < animatedInstCount; ++i)
+	for(u32 i = 0u; i < animatedInstCount; ++i)
 		addObjAndInstance(m_instances[m_frameInstanceIndices[frameIndex].first + i]);
 
 	// Check if the resulting scene has issues with size

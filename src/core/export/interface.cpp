@@ -1055,13 +1055,13 @@ void world_clear_all() {
 	CATCH_ALL(;)
 }
 
-void world_reserve_objects_instances(const size_t objects, const size_t instances) {
+void world_reserve_objects_instances(const uint32_t objects, const uint32_t instances) {
 	TRY
 	s_world.reserve(objects, instances);
 	CATCH_ALL(;)
 }
 
-void world_reserve_scenarios(const size_t scenarios) {
+void world_reserve_scenarios(const uint32_t scenarios) {
 	TRY
 	s_world.reserve(scenarios);
 	CATCH_ALL(;)
