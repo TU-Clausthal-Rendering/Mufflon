@@ -53,9 +53,9 @@ public:
 	// Prepares the world for a fresh load.
 	// clear_instance() must be called before (or the world has not been changed yet).
 	// Must not be called after the world has been modified.
-	void reserve(const std::size_t objects, const std::size_t instances);
+	void reserve(const u32 objects, const u32 instances);
 	// Reserves scenarios. Must have no prior scenarios added
-	void reserve(const std::size_t scenarios);
+	void reserve(const u32 scenarios);
 	// Performs sanity check and marks the end of a loading/modifying process
 	Sanity finalize_world() const;
 	// Performs a sanity check for a given scenario (respects object masking etc.)
@@ -205,7 +205,7 @@ private:
 	// then successively those present for concrete frames.
 	std::vector<Instance> m_instances;
 	// Stores the start/end instance indices for each frame
-	std::vector<std::pair<std::size_t, std::size_t>> m_frameInstanceIndices;
+	std::vector<std::pair<u32, u32>> m_frameInstanceIndices;
 
 	// TODO: for improved heap allocation, this should be a single vector/map
 	//std::vector<std::vector<std::unique_ptr<Instance>>> m_animatedInstances;

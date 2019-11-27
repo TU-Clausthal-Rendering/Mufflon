@@ -31,8 +31,8 @@ public:
 	// Holds offset into instance list as well as number of instances
 	// for one object
 	struct InstanceRef {
-		std::size_t offset;
-		std::size_t count;
+		u32 offset;
+		u32 count;
 	};
 
 	Scene(const Scenario& scenario, const u32 animationPathIndex) :
@@ -49,8 +49,8 @@ public:
 	~Scene() = default;
 
 	// Reserves the maximum number of objects to avoid reallocations
-	void reserve_objects(const std::size_t count);
-	void reserve_instances(const std::size_t count);
+	void reserve_objects(const u32 count);
+	void reserve_instances(const u32 count);
 	// Add an instance to be rendered
 	void add_instance(InstanceHandle hdl);
 

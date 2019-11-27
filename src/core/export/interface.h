@@ -400,8 +400,8 @@ CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Ve
 CORE_API void CDECL world_clear_all();
 CORE_API Boolean CDECL world_finalize(const char** msg);
 CORE_API Boolean CDECL world_finalize_scenario(ConstScenarioHdl, const char** msg);
-CORE_API void CDECL world_reserve_objects_instances(const size_t objects, const size_t instances);
-CORE_API void CDECL world_reserve_scenarios(const size_t scenarios);
+CORE_API void CDECL world_reserve_objects_instances(const uint32_t objects, const uint32_t instances);
+CORE_API void CDECL world_reserve_scenarios(const uint32_t scenarios);
 CORE_API ObjectHdl CDECL world_create_object(const char* name, ObjectFlags flags);
 CORE_API ObjectHdl CDECL world_get_object(const char* name);
 CORE_API const char* CDECL world_get_object_name(ObjectHdl obj);

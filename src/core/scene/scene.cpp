@@ -35,12 +35,12 @@ bool Scene::is_sane() const noexcept {
 	return true;
 }
 
-void Scene::reserve_objects(const std::size_t count) {
+void Scene::reserve_objects(const u32 count) {
 	if(!m_objects.empty())
 		throw std::runtime_error("No objects must have been added before calling this");
 	m_objects = util::FixedHashMap<ObjectHandle, InstanceRef>(count);
 }
-void Scene::reserve_instances(const std::size_t count) {
+void Scene::reserve_instances(const u32 count) {
 	m_instances.reserve(count);
 }
 
@@ -48,7 +48,7 @@ void Scene::add_instance(InstanceHandle hdl) {
 	auto iter = m_objects.find(&hdl->get_object());
 	if(iter == m_objects.end()) {
 		// A new object: reserve the maximum amount of instance handles this can have
-		const std::size_t offset = m_instances.size();
+		const u32 offset = static_cast<u32>(m_instances.size());
 		m_objects.emplace(&hdl->get_object(), InstanceRef{ offset, 1u });
 		m_instances.resize(m_instances.size() + hdl->get_object().get_instance_counter());
 		m_instances[offset] = hdl;

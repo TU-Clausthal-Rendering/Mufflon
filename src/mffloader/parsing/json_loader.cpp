@@ -821,7 +821,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 	assertObject(m_state, scenarios);
 	m_state.current = ParserState::Level::SCENARIOS;
 
-	world_reserve_scenarios(scenarios.MemberCount());
+	world_reserve_scenarios(static_cast<u32>(scenarios.MemberCount()));
 	for(auto scenarioIter = scenarios.MemberBegin(); scenarioIter != scenarios.MemberEnd(); ++scenarioIter) {
 		logPedantic("[JsonLoader::load_scenarios] Loading scenario '", scenarioIter->name.GetString(), "'");
 		if(m_abort)
@@ -1102,7 +1102,7 @@ bool JsonLoader::load_file() {
 	logInfo("[JsonLoader::load_file] Detected default scenario '", m_defaultScenario, "'");
 	const Value& defScen = get(m_state, m_scenarios->value, &m_defaultScenario[0u])->value;
 	const u32 defaultGlobalLod = read_opt<u32>(m_state, defScen, "lod", 0u);
-	logInfo("[JsonLoader::load_file] Detected global LoD '", m_defaultScenario, "'");
+	logInfo("[JsonLoader::load_file] Detected global LoD '", defaultGlobalLod, "'");
 
 	sprintf(m_loadingStage.data(), "Parsing object properties\0");
 	// First parse binary file
