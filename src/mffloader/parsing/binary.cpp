@@ -732,7 +732,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 	sprintf(m_loadingStage.data(), "Loading instances\0");
 	std::vector<uint8_t> hasInstance(m_objects.size(), false);
 	const u32 numInstances = read<u32>();
-	const u32 instDispInterval = std::max(1u, numInstances / 100u);
+	const u32 instDispInterval = std::max(1u, numInstances / 200u);
 	for(u32 i = 0u; i < numInstances; ++i) {
 		if(m_abort)
 			return false;
@@ -785,7 +785,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 	sprintf(m_loadingStage.data(), "Creating default instances\0");
 	// Create identity instances for objects not having one yet
 	const auto objectCount = hasInstance.size();
-	const u32 objDispInterval = std::max(1u, static_cast<u32>(objectCount) / 100u);
+	const u32 objDispInterval = std::max(1u, static_cast<u32>(objectCount) / 200u);
 	for(u32 i = 0u; i < static_cast<u32>(objectCount); ++i) {
 		if(m_abort)
 			return false;
@@ -969,15 +969,20 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 			// Since there may be implicit (default) instances, add object count to be sure
 			// If we're using deinstancing, the number of objects increases by the number of instances
 			// (conservative estimate)
-			world_reserve_objects_instances(m_objJumpTable.size() + deinstance ? instanceCount : 0u,
+			world_reserve_objects_instances(m_objJumpTable.size() + (deinstance ? instanceCount : 0u),
 											instanceCount + m_objJumpTable.size());
 		}
 
-		sprintf(m_loadingStage.data(), "Reading object definitions\0");
+		const auto objectCount = m_objJumpTable.size();
+		const std::size_t objDispInterval = std::max<std::size_t>(1u, objectCount / 200u);
 		// Next come the objects
-		for(std::size_t i = 0u; i < m_objJumpTable.size(); ++i) {
+		for(std::size_t i = 0u; i < objectCount; ++i) {
 			if(m_abort)
 				return false;
+			if(i % objDispInterval == 0u)
+				sprintf(m_loadingStage.data(), "Reading object definition %zu / %zu\0",
+						i, objectCount);
+
 			m_objects.push_back(ObjectState{});
 			// Jump to the right position in file
 			m_fileStream.seekg(m_objJumpTable[i], std::ifstream::beg);
@@ -989,7 +994,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 				throw std::runtime_error("Invalid object magic constant (object " + std::to_string(i) + ")");
 			read_object();
 		}
-		logInfo("[BinaryLaoder::load_file] Parsed ", m_objJumpTable.size(), " objects");
+		logInfo("[BinaryLoader::load_file] Parsed ", objectCount, " objects");
 
 		// Now come instances
 		m_fileStream.seekg(instanceStart, std::ios_base::beg);
