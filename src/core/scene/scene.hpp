@@ -146,9 +146,9 @@ public:
 	 * );
 	 */
 	template < Device dev >
-	const SceneDescriptor<dev>& get_descriptor(const std::vector<const char*>& vertexAttribs,
-											   const std::vector<const char*>& faceAttribs,
-											   const std::vector<const char*>& sphereAttribs);
+	const SceneDescriptor<dev>& get_descriptor(const std::vector<AttributeIdentifier>& vertexAttribs,
+											   const std::vector<AttributeIdentifier>& faceAttribs,
+											   const std::vector<AttributeIdentifier>& sphereAttribs);
 
 	// Get access to the existing objects in the scene (subset from the world)
 	const util::FixedHashMap<ObjectHandle, InstanceRef>& get_objects() const noexcept {
@@ -178,9 +178,9 @@ private:
 
 	template < Device dev >
 	struct AttributeNames {
-		std::vector<const char*> lastVertexAttribs;
-		std::vector<const char*> lastFaceAttribs;
-		std::vector<const char*> lastSphereAttribs;
+		std::vector<AttributeIdentifier> lastVertexAttribs;
+		std::vector<AttributeIdentifier> lastFaceAttribs;
+		std::vector<AttributeIdentifier> lastSphereAttribs;
 	};
 
 	template < Device dev >

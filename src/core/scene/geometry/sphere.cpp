@@ -9,8 +9,8 @@ namespace mufflon::scene::geometry {
 
 Spheres::Spheres() :
 	m_attributes(),
-	m_spheresHdl(m_attributes.add_attribute<ei::Sphere>("spheres")),
-	m_matIndicesHdl(m_attributes.add_attribute<MaterialIndex>("materialIdx")) {
+	m_spheresHdl(this->template add_attribute<ei::Sphere>("spheres")),
+	m_matIndicesHdl(this->template add_attribute<MaterialIndex>("materials")) {
 	// Invalidate bounding box
 	m_boundingBox.min = {
 		std::numeric_limits<float>::max(),
@@ -108,12 +108,6 @@ Spheres::BulkReturn Spheres::add_bulk(std::size_t count, util::IByteReader& radP
 	return { hdl, readRadPos };
 }
 
-std::size_t Spheres::add_bulk(StringView name, const SphereHandle& startSphere,
-							  std::size_t count, util::IByteReader& attrStream) {
-	return this->add_bulk(m_attributes.get_attribute_handle(name), startSphere,
-						  count, attrStream);
-}
-
 std::size_t Spheres::add_bulk(SphereAttributeHandle hdl, const SphereHandle& startSphere,
 							  std::size_t count, util::IByteReader& attrStream) {
 	if(startSphere >= m_attributes.get_attribute_elem_count())
@@ -167,8 +161,9 @@ SpheresDescriptor<dev> Spheres::get_descriptor() {
 // Updates the descriptor with the given set of attributes
 template < Device dev >
 void Spheres::update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
-										  const std::vector<const char*>& attribs) {
+										  const std::vector<AttributeIdentifier>& attribs) {
 	this->synchronize<dev>();
+
 	// Collect the attributes; for that, we iterate the given Attributes and
 	// gather them on CPU side (or rather, their device pointers); then
 	// we copy it to the actual device
@@ -179,15 +174,16 @@ void Spheres::update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
 			if(attribBuffer.size == 0)
 				attribBuffer.buffer = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(attribs.size());
 			else
-				attribBuffer.buffer = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, attribBuffer.size,
-																	   attribs.size());
+				attribBuffer.buffer = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer,
+																									attribBuffer.size,
+																									attribs.size());
 			attribBuffer.size = attribs.size();
 		}
 
 		std::vector<ArrayDevHandle_t<dev, void>> cpuAttribs(attribs.size());
-		for(const char* name : attribs)
-			cpuAttribs.push_back(m_attributes.acquire<dev, void>(name));
-		copy<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, cpuAttribs.data(), sizeof(const char*) * attribs.size());
+		for(const auto& ident : attribs)
+			cpuAttribs.push_back(this->template acquire<dev, void>(ident));
+		copy<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, cpuAttribs.data(), sizeof(cpuAttribs.front()) * attribs.size());
 	} else if(attribBuffer.size != 0) {
 		attribBuffer.buffer = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, attribBuffer.size);
 	}
@@ -211,9 +207,9 @@ template SpheresDescriptor<Device::CPU> Spheres::get_descriptor<Device::CPU>();
 template SpheresDescriptor<Device::CUDA> Spheres::get_descriptor<Device::CUDA>();
 template SpheresDescriptor<Device::OPENGL> Spheres::get_descriptor<Device::OPENGL>();
 template void Spheres::update_attribute_descriptor<Device::CPU>(SpheresDescriptor<Device::CPU>& descriptor,
-																 const std::vector<const char*>&);
+																const std::vector<AttributeIdentifier>&);
 template void Spheres::update_attribute_descriptor<Device::CUDA>(SpheresDescriptor<Device::CUDA>& descriptor,
-																 const std::vector<const char*>&);
+																 const std::vector<AttributeIdentifier>&);
 template void Spheres::update_attribute_descriptor<Device::OPENGL>(SpheresDescriptor<Device::OPENGL>& descriptor,
-																 const std::vector<const char*>&);
+																 const std::vector<AttributeIdentifier>&);
 } // namespace mufflon::scene::geometry

@@ -86,6 +86,8 @@ public:
 		m_cameraChanged = true;
 	}
 
+	// Returns if there is either an object or instance marked as masked
+	bool has_masked_properties() const noexcept { return m_hasMasking; }
 	// Getter/setter for per-object and per-instance properties
 	bool is_masked(ConstObjectHandle hdl) const noexcept;
 	bool is_masked(ConstInstanceHandle hdl) const noexcept;
@@ -228,6 +230,7 @@ private:
 	// Object blacklisting and other custom traits
 	util::FixedHashMap<ConstObjectHandle, CustomObjectProperty> m_perObjectCustomization;
 	util::FixedHashMap<ConstInstanceHandle, CustomInstanceProperty> m_perInstanceCustomization;
+	bool m_hasMasking = false;
 };
 
 }} // namespace mufflon::scene

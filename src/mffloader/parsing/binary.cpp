@@ -133,29 +133,8 @@ void BinaryLoader::clear_state() {
 	m_namePool.clear();
 }
 
-AttribDesc BinaryLoader::map_bin_attrib_type(AttribType type) {
-	switch(type) {
-		case AttribType::CHAR: return AttribDesc{ AttributeType::ATTR_CHAR, 1u };
-		case AttribType::UCHAR: return AttribDesc{ AttributeType::ATTR_UCHAR, 1u };
-		case AttribType::SHORT: return AttribDesc{ AttributeType::ATTR_SHORT, 1u };
-		case AttribType::USHORT: return AttribDesc{ AttributeType::ATTR_USHORT, 1u };
-		case AttribType::INT: return AttribDesc{ AttributeType::ATTR_INT, 1u };
-		case AttribType::UINT: return AttribDesc{ AttributeType::ATTR_UINT, 1u };
-		case AttribType::LONG: return AttribDesc{ AttributeType::ATTR_LONG, 1u };
-		case AttribType::ULONG: return AttribDesc{ AttributeType::ATTR_ULONG, 1u };
-		case AttribType::FLOAT: return AttribDesc{ AttributeType::ATTR_FLOAT, 1u };
-		case AttribType::DOUBLE: return AttribDesc{ AttributeType::ATTR_DOUBLE, 1u };
-		case AttribType::UCHAR2: return AttribDesc{ AttributeType::ATTR_UCHAR, 2u };
-		case AttribType::UCHAR3: return AttribDesc{ AttributeType::ATTR_UCHAR, 3u };
-		case AttribType::UCHAR4: return AttribDesc{ AttributeType::ATTR_UCHAR, 4u };
-		case AttribType::INT2: return AttribDesc{ AttributeType::ATTR_INT, 2u };
-		case AttribType::INT3: return AttribDesc{ AttributeType::ATTR_INT, 3u };
-		case AttribType::INT4: return AttribDesc{ AttributeType::ATTR_INT, 4u };
-		case AttribType::FLOAT2: return AttribDesc{ AttributeType::ATTR_FLOAT, 2u };
-		case AttribType::FLOAT3: return AttribDesc{ AttributeType::ATTR_FLOAT, 3u };
-		case AttribType::FLOAT4: return AttribDesc{ AttributeType::ATTR_FLOAT, 4u };
-		default: return AttribDesc{ AttributeType::ATTR_COUNT, 0u };
-	}
+GeomAttributeType BinaryLoader::map_bin_attrib_type(AttribType type) {
+	return static_cast<GeomAttributeType>(type);
 }
 
 // Read vertices with applied normal compression, but no deflating
@@ -254,9 +233,9 @@ void BinaryLoader::read_uncompressed_vertex_attributes(const ObjectState& object
 		read_uncompressed_attribute(object, lod);
 		auto attrHdl = polygon_request_vertex_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 														m_attribStateBuffer.type);
-		if(attrHdl.index == INVALID_INDEX)
+		if(attrHdl.name == nullptr)
 			throw std::runtime_error("Failed to add vertex attribute to object '" + std::string(object.name) + "'");
-		if(polygon_set_vertex_attribute_bulk(lod.lodHdl, &attrHdl, 0u,
+		if(polygon_set_vertex_attribute_bulk(lod.lodHdl, attrHdl, 0u,
 											 lod.numVertices,
 											 &attrBulk) == INVALID_SIZE)
 			throw std::runtime_error("Failed to set vertex attribute data for object '" + std::string(object.name) + "'");
@@ -280,9 +259,9 @@ void BinaryLoader::read_uncompressed_face_attributes(const ObjectState& object, 
 		read_uncompressed_attribute(object, lod);
 		auto attrHdl = polygon_request_face_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 													  m_attribStateBuffer.type);
-		if(attrHdl.index == INVALID_INDEX)
+		if(attrHdl.name == nullptr)
 			throw std::runtime_error("Failed to add face attribute to object '" + std::string(object.name) + "'");
-		if(polygon_set_face_attribute_bulk(lod.lodHdl, &attrHdl, 0u,
+		if(polygon_set_face_attribute_bulk(lod.lodHdl, attrHdl, 0u,
 										   lod.numTriangles + lod.numQuads,
 										   &attrBulk) == INVALID_SIZE)
 			throw std::runtime_error("Failed to set face attribute data for object '" + std::string(object.name) + "'");
@@ -306,9 +285,9 @@ void BinaryLoader::read_uncompressed_sphere_attributes(const ObjectState& object
 		read_uncompressed_attribute(object, lod);
 		auto attrHdl = spheres_request_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 												 m_attribStateBuffer.type);
-		if(attrHdl.index == INVALID_INDEX)
+		if(attrHdl.name == nullptr)
 			throw std::runtime_error("Failed to add sphere attribute to object '" + std::string(object.name) + "'");
-		if(spheres_set_attribute_bulk(lod.lodHdl, &attrHdl, 0u,
+		if(spheres_set_attribute_bulk(lod.lodHdl, attrHdl, 0u,
 									  lod.numSpheres,
 									  &attrBulk) == INVALID_SIZE)
 			throw std::runtime_error("Failed to set sphere attribute data for object '" + std::string(object.name) + "'");
@@ -567,10 +546,10 @@ void BinaryLoader::read_compressed_vertex_attributes(const ObjectState& object, 
 		read_compressed_attribute(attributes);
 		auto attrHdl = polygon_request_vertex_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 														m_attribStateBuffer.type);
-		if(attrHdl.index == INVALID_INDEX)
+		if(attrHdl.name == nullptr)
 			throw std::runtime_error("Failed to add vertex attribute to object '" + std::string(object.name) + "'");
 
-		if(polygon_set_vertex_attribute_bulk(lod.lodHdl, &attrHdl, 0, lod.numVertices, &attrBulk) == INVALID_SIZE)
+		if(polygon_set_vertex_attribute_bulk(lod.lodHdl, attrHdl, 0, lod.numVertices, &attrBulk) == INVALID_SIZE)
 			throw std::runtime_error("Failed to set vertex attribute data for object '" + std::string(object.name) + "'");
 		
 		attrBulk.descriptor.bytes += m_attribStateBuffer.bytes;
@@ -597,10 +576,10 @@ void BinaryLoader::read_compressed_face_attributes(const ObjectState& object, co
 		read_compressed_attribute(attributes);
 		auto attrHdl = polygon_request_face_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 													  m_attribStateBuffer.type);
-		if(attrHdl.index == INVALID_INDEX)
+		if(attrHdl.name == nullptr)
 			throw std::runtime_error("Failed to add face attribute to object '" + std::string(object.name) + "'");
 
-		if(polygon_set_face_attribute_bulk(lod.lodHdl, &attrHdl, 0, lod.numTriangles + lod.numQuads, &attrBulk) == INVALID_SIZE)
+		if(polygon_set_face_attribute_bulk(lod.lodHdl, attrHdl, 0, lod.numTriangles + lod.numQuads, &attrBulk) == INVALID_SIZE)
 			throw std::runtime_error("Failed to set face attribute data for object '" + std::string(object.name) + "'");
 
 		attrBulk.descriptor.bytes += m_attribStateBuffer.bytes;
@@ -641,10 +620,10 @@ void BinaryLoader::read_compressed_sphere_attributes(const ObjectState& object, 
 		read_compressed_attribute(attributes);
 		auto attrHdl = spheres_request_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 												 m_attribStateBuffer.type);
-		if(attrHdl.index == INVALID_INDEX)
+		if(attrHdl.name == nullptr)
 			throw std::runtime_error("Failed to add sphere attribute to object '" + std::string(object.name) + "'");
 
-		if(spheres_set_attribute_bulk(lod.lodHdl, &attrHdl, 0, lod.numSpheres, &attrBulk) == INVALID_SIZE)
+		if(spheres_set_attribute_bulk(lod.lodHdl, attrHdl, 0, lod.numSpheres, &attrBulk) == INVALID_SIZE)
 			throw std::runtime_error("Failed to set sphere attribute data for object '" + std::string(object.name) + "'");
 
 		attrBulk.descriptor.bytes += m_attribStateBuffer.bytes;
@@ -753,7 +732,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 	sprintf(m_loadingStage.data(), "Loading instances\0");
 	std::vector<uint8_t> hasInstance(m_objects.size(), false);
 	const u32 numInstances = read<u32>();
-	const u32 instDispInterval = numInstances / 100u;
+	const u32 instDispInterval = std::max(1u, numInstances / 100u);
 	for(u32 i = 0u; i < numInstances; ++i) {
 		if(m_abort)
 			return false;
@@ -806,7 +785,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 	sprintf(m_loadingStage.data(), "Creating default instances\0");
 	// Create identity instances for objects not having one yet
 	const auto objectCount = hasInstance.size();
-	const u32 objDispInterval = static_cast<u32>(objectCount) / 100u;
+	const u32 objDispInterval = std::max(1u, static_cast<u32>(objectCount) / 100u);
 	for(u32 i = 0u; i < static_cast<u32>(objectCount); ++i) {
 		if(m_abort)
 			return false;

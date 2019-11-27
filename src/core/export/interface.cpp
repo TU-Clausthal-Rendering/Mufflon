@@ -117,110 +117,23 @@ std::vector<TextureLoaderPlugin> s_plugins;
 // List of renderers
 util::IndexedStringMap<std::vector<std::unique_ptr<renderer::IRenderer>>> s_renderers;
 
-constexpr PolygonAttributeHdl INVALID_POLY_VATTR_HANDLE{
-	INVALID_INDEX,
-	AttribDesc{
-		AttributeType::ATTR_COUNT,
-		0u
-	},
-	false
-};
-constexpr PolygonAttributeHdl INVALID_POLY_FATTR_HANDLE{
-	INVALID_INDEX,
-	AttribDesc{
-		AttributeType::ATTR_COUNT,
-		0u
-	},
-	true
-};
-constexpr ::SphereAttributeHdl INVALID_SPHERE_ATTR_HANDLE{
-	INVALID_INDEX,
-	AttribDesc{
-		AttributeType::ATTR_COUNT,
-		0u
-	}
-};
-
-// Dummy type, passing another type into a lambda without needing
-// to instantiate non-zero-sized data
-template < class T >
-struct TypeHolder {
-	using Type = T;
-};
-
-// Helper functions to create the proper attribute type
-template < class T, class L1, class L2 >
-inline auto switchAttributeType(unsigned int rows, L1&& regular,
-								L2&& noMatch) {
-	switch(rows) {
-		case 1u: return regular(TypeHolder<ei::Vec<T, 1u>>{});
-		case 2u: return regular(TypeHolder<ei::Vec<T, 2u>>{});
-		case 3u: return regular(TypeHolder<ei::Vec<T, 3u>>{});
-		case 4u: return regular(TypeHolder<ei::Vec<T, 4u>>{});
-		default: return noMatch();
-	}
-}
-template < class L1, class L2 >
-inline auto switchAttributeType(const AttribDesc& desc, L1&& regular,
-								L2&& noMatch) {
-	if(desc.rows == 1u) {
-		switch(desc.type) {
-			case AttributeType::ATTR_CHAR: return regular(TypeHolder<int8_t>{});
-			case AttributeType::ATTR_UCHAR: return regular(TypeHolder<uint8_t>{});
-			case AttributeType::ATTR_SHORT: return regular(TypeHolder<int16_t>{});
-			case AttributeType::ATTR_USHORT: return regular(TypeHolder<uint16_t>{});
-			case AttributeType::ATTR_INT: return regular(TypeHolder<int32_t>{});
-			case AttributeType::ATTR_UINT: return regular(TypeHolder<uint32_t>{});
-			case AttributeType::ATTR_LONG: return regular(TypeHolder<int64_t>{});
-			case AttributeType::ATTR_ULONG: return regular(TypeHolder<uint64_t>{});
-			case AttributeType::ATTR_FLOAT: return regular(TypeHolder<float>{});
-			case AttributeType::ATTR_DOUBLE: return regular(TypeHolder<double>{});
-			default: return noMatch();
-		}
-	} else {
-		switch(desc.type) {
-			case AttributeType::ATTR_UCHAR: return switchAttributeType<uint8_t>(desc.rows, std::move(regular), std::move(noMatch));
-			case AttributeType::ATTR_INT: return switchAttributeType<int32_t>(desc.rows, std::move(regular), std::move(noMatch));
-			case AttributeType::ATTR_FLOAT: return switchAttributeType<float>(desc.rows, std::move(regular), std::move(noMatch));
-			default: return noMatch();
-		}
-	}
-}
+constexpr VertexAttributeHdl INVALID_POLY_VATTR_HANDLE{ ATTRTYPE_COUNT, nullptr };
+constexpr FaceAttributeHdl INVALID_POLY_FATTR_HANDLE{ ATTRTYPE_COUNT, nullptr };
+constexpr SphereAttributeHdl INVALID_SPHERE_ATTR_HANDLE{ ATTRTYPE_COUNT, nullptr };
 
 // Convert attribute type to string for convenience
-inline std::string get_attr_type_name(const AttribDesc& desc) {
-	std::string typeName;
-	switch(desc.type) {
-		case AttributeType::ATTR_CHAR: typeName = "char"; break;
-		case AttributeType::ATTR_UCHAR: typeName = "uchar"; break;
-		case AttributeType::ATTR_SHORT: typeName = "short"; break;
-		case AttributeType::ATTR_USHORT: typeName = "ushort"; break;
-		case AttributeType::ATTR_INT: typeName = "int"; break;
-		case AttributeType::ATTR_UINT: typeName = "uint"; break;
-		case AttributeType::ATTR_LONG: typeName = "long"; break;
-		case AttributeType::ATTR_ULONG: typeName = "ulong"; break;
-		case AttributeType::ATTR_FLOAT: typeName = "float"; break;
-		case AttributeType::ATTR_DOUBLE: typeName = "double"; break;
-		default: typeName = "unknown";
-	}
-	if(desc.rows != 1u)
-		typeName = "Vec<" + typeName + ',' + std::to_string(desc.rows) + '>';
-	return typeName;
-}
-
-inline std::size_t get_attr_size(const AttribDesc& desc) {
-	switch(desc.type) {
-		case AttributeType::ATTR_CHAR: return sizeof(i8) * desc.rows;
-		case AttributeType::ATTR_UCHAR: return sizeof(u8) * desc.rows;
-		case AttributeType::ATTR_SHORT: return sizeof(i16) * desc.rows;
-		case AttributeType::ATTR_USHORT: return sizeof(u16) * desc.rows;
-		case AttributeType::ATTR_INT: return sizeof(i32) * desc.rows;
-		case AttributeType::ATTR_UINT: return sizeof(u32) * desc.rows;
-		case AttributeType::ATTR_LONG: return sizeof(i64) * desc.rows;
-		case AttributeType::ATTR_ULONG: return sizeof(u64) * desc.rows;
-		case AttributeType::ATTR_FLOAT: return sizeof(float) * desc.rows;
-		case AttributeType::ATTR_DOUBLE: return sizeof(double) * desc.rows;
-		default: return 0u;
+inline StringView get_attr_type_name(const GeomAttributeType& type) {
+	switch(type) {
+		case GeomAttributeType::ATTRTYPE_SHORT: return "short";
+		case GeomAttributeType::ATTRTYPE_USHORT: return "ushort";
+		case GeomAttributeType::ATTRTYPE_INT: return "int";
+		case GeomAttributeType::ATTRTYPE_UINT: return "uint";
+		case GeomAttributeType::ATTRTYPE_FLOAT: return "float";
+		case GeomAttributeType::ATTRTYPE_FLOAT2: return "float2";
+		case GeomAttributeType::ATTRTYPE_FLOAT3: return "float3";
+		case GeomAttributeType::ATTRTYPE_FLOAT4: return "float4";
+		case GeomAttributeType::ATTRTYPE_SPHERE: return "sphere";
+		default: return "unknown";
 	}
 }
 
@@ -405,47 +318,25 @@ Boolean polygon_reserve(LodHdl lvlDtl, size_t vertices, size_t edges, size_t tri
 	CATCH_ALL(false)
 }
 
-PolygonAttributeHdl polygon_request_vertex_attribute(LodHdl lvlDtl, const char* name,
-														AttribDesc type) {
+VertexAttributeHdl polygon_request_vertex_attribute(LodHdl lvlDtl, const char* name,
+													GeomAttributeType type) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_POLY_VATTR_HANDLE);
 	CHECK_NULLPTR(name, "attribute name", INVALID_POLY_VATTR_HANDLE);
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
-
-	return switchAttributeType(type, [name, &type, &lod](const auto& val) {
-			using Type = typename std::decay_t<decltype(val)>::Type;
-		auto attr = lod.template get_geometry<Polygons>().template add_vertex_attribute<Type>(name);
-		return PolygonAttributeHdl{
-			static_cast<int32_t>(attr.index),
-			type, false
-		};
-	}, [&type, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type ", get_attr_type_name(type));
-		return INVALID_POLY_VATTR_HANDLE;
-	});
+	auto handle = lod.template get_geometry<Polygons>().add_vertex_attribute(name, static_cast<AttributeType>(type));
+	return VertexAttributeHdl{ type, name };
 	CATCH_ALL(INVALID_POLY_VATTR_HANDLE)
 }
 
-PolygonAttributeHdl polygon_request_face_attribute(LodHdl lvlDtl,
-													  const char* name,
-													  AttribDesc type) {
+FaceAttributeHdl polygon_request_face_attribute(LodHdl lvlDtl, const char* name,
+												GeomAttributeType type) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_POLY_FATTR_HANDLE);
 	CHECK_NULLPTR(name, "attribute name", INVALID_POLY_FATTR_HANDLE);
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
-
-	return switchAttributeType(type, [name, type, &lod](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
-		auto attr = lod.template get_geometry<Polygons>().template add_face_attribute<Type>(name);
-		return PolygonAttributeHdl{
-			static_cast<int32_t>(attr.index),
-			type, true
-		};
-	}, [&type, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type", get_attr_type_name(type));
-		return INVALID_POLY_FATTR_HANDLE;
-	});
-
+	auto handle = lod.template get_geometry<Polygons>().add_face_attribute(name, static_cast<AttributeType>(type));
+	return FaceAttributeHdl{ type, name };
 	CATCH_ALL(INVALID_POLY_FATTR_HANDLE)
 }
 
@@ -596,14 +487,12 @@ VertexHdl polygon_add_vertex_bulk(LodHdl lvlDtl, size_t count, const BulkLoader*
 	CATCH_ALL(VertexHdl{ INVALID_INDEX })
 }
 
-Boolean polygon_set_vertex_attribute(LodHdl lvlDtl, const PolygonAttributeHdl* attr,
-								  VertexHdl vertex, const void* value) {
+Boolean polygon_set_vertex_attribute(LodHdl lvlDtl, const VertexAttributeHdl attr,
+									 VertexHdl vertex, const void* value) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", false);
-	CHECK_NULLPTR(attr, "attribute handle", false);
+	CHECK_NULLPTR(attr.name, "attribute name", false);
 	CHECK_NULLPTR(value, "attribute value", false);
-	CHECK(!attr->face, "Face attribute in vertex function", false);
-	CHECK_GEQ_ZERO(attr->index, "attribute index", false);
 	CHECK_GEQ_ZERO(vertex, "vertex index", false);
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	if(vertex >= static_cast<int>(lod.template get_geometry<Polygons>().get_vertex_count())) {
@@ -613,18 +502,18 @@ Boolean polygon_set_vertex_attribute(LodHdl lvlDtl, const PolygonAttributeHdl* a
 		return false;
 	}
 
-	return switchAttributeType(attr->type, [&lod, attr, vertex, value](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
-		VertexAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
-		lod.template get_geometry<Polygons>().acquire<Device::CPU, Type>(hdl)[vertex]
-			= *static_cast<const Type*>(value);
-		lod.template get_geometry<Polygons>().mark_changed(Device::CPU);
-		return true;
-	}, [attr, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type",
-				 get_attr_type_name(attr->type));
+	auto& polys = lod.template get_geometry<Polygons>();
+	const auto hdl = polys.find_vertex_attribute(attr.name, static_cast<AttributeType>(attr.type));
+	if(!hdl.has_value()) {
+		logError("[", FUNCTION_NAME, "] Could not retrieve vertex attribute handle");
 		return false;
-	});
+	}
+	const auto elemSize = get_attribute_size(static_cast<AttributeType>(attr.type));
+	char* data = polys.template acquire<Device::CPU, char>(hdl.value())
+		+ elemSize * vertex;
+	std::memcpy(data, value, elemSize);
+	lod.template get_geometry<Polygons>().mark_changed(Device::CPU);
+	return true;
 	CATCH_ALL(false)
 }
 
@@ -666,35 +555,34 @@ Boolean polygon_set_vertex_uv(LodHdl lvlDtl, VertexHdl vertex, Vec2 uv) {
 	CATCH_ALL(false)
 }
 
-Boolean polygon_set_face_attribute(LodHdl lvlDtl, const PolygonAttributeHdl* attr,
-								FaceHdl face, const void* value) {
+Boolean polygon_set_face_attribute(LodHdl lvlDtl, const FaceAttributeHdl attr,
+								   FaceHdl face, const void* value) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", false);
-	CHECK_NULLPTR(attr, "attribute handle", false);
+	CHECK_NULLPTR(attr.name, "attribute name", false);
 	CHECK_NULLPTR(value, "attribute value", false);
-	CHECK(attr->face, "Vertex attribute in face function", false);
 	CHECK_GEQ_ZERO(face, "face index", false);
-	CHECK_GEQ_ZERO(attr->index, "attribute index", false);
+
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
-	if(face >= static_cast<int>(lod.template get_geometry<Polygons>().get_face_count())) {
+	if(face >= static_cast<int>(lod.template get_geometry<Polygons>().get_vertex_count())) {
 		logError("[", FUNCTION_NAME, "] Face index out of bounds (",
-				 face, " >= ", lod.template get_geometry<Polygons>().get_face_count(),
+				 face, " >= ", lod.template get_geometry<Polygons>().get_vertex_count(),
 				 ")");
 		return false;
 	}
 
-	return switchAttributeType(attr->type, [&lod, attr, face, value](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
-		FaceAttributeHandle hdl{ static_cast<size_t>(attr->index) };
-		lod.template get_geometry<Polygons>().acquire<Device::CPU, Type>(hdl)[face]
-			= *static_cast<const Type*>(value);
-		lod.template get_geometry<Polygons>().mark_changed(Device::CPU);
-		return true;
-	}, [attr, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type",
-				 get_attr_type_name(attr->type));
+	auto& polys = lod.template get_geometry<Polygons>();
+	const auto hdl = polys.find_face_attribute(attr.name, static_cast<AttributeType>(attr.type));
+	if(!hdl.has_value()) {
+		logError("[", FUNCTION_NAME, "] Could not retrieve face attribute handle");
 		return false;
-	});
+	}
+	const auto elemSize = get_attribute_size(static_cast<AttributeType>(attr.type));
+	char* data = polys.template acquire<Device::CPU, char>(hdl.value())
+		+ elemSize * face;
+	std::memcpy(data, value, elemSize);
+	lod.template get_geometry<Polygons>().mark_changed(Device::CPU);
+	return true;
 	CATCH_ALL(false)
 }
 
@@ -719,16 +607,14 @@ Boolean polygon_set_material_idx(LodHdl lvlDtl, FaceHdl face, MatIdx idx) {
 	CATCH_ALL(false)
 }
 
-size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHdl* attr,
+size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const VertexAttributeHdl attr,
 										 VertexHdl startVertex, size_t count,
 										 const BulkLoader* stream) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_SIZE);
-	CHECK_NULLPTR(attr, "attribute handle", INVALID_SIZE);
+	CHECK_NULLPTR(attr.name, "attribute name", INVALID_SIZE);
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
-	CHECK(!attr->face, "Face attribute in vertex function", false);
 	CHECK_GEQ_ZERO(startVertex, "start vertex index", INVALID_SIZE);
-	CHECK_GEQ_ZERO(attr->index, "attribute index (OpenMesh)", INVALID_SIZE);
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	if(startVertex >= static_cast<int>(lod.template get_geometry<Polygons>().get_vertex_count())) {
 		logError("[", FUNCTION_NAME, "] Vertex index out of bounds (",
@@ -737,40 +623,38 @@ size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHd
 		return INVALID_SIZE;
 	}
 
+	const auto elemSize = get_attribute_size(static_cast<AttributeType>(attr.type));
 	std::unique_ptr<util::IByteReader> attrReader;
 	std::unique_ptr<util::ArrayStreamBuffer> attrBuffer;
 	std::unique_ptr<std::istream> attrStream;
 	if(stream->type == BulkLoader::BULK_FILE) {
 		attrReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
-		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * get_attr_size(attr->type));
+		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * elemSize);
 		attrStream = std::make_unique<std::istream>(attrBuffer.get());
 		attrReader = std::make_unique<util::StreamReader>(*attrStream);
 	}
 
-	return switchAttributeType(attr->type, [&lod, attr, startVertex, count, &attrReader](const auto& /*val*/) {
-		VertexAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
-		return lod.template get_geometry<Polygons>().add_bulk(hdl,
-										 PolyVHdl{ static_cast<int>(startVertex) },
-										 count, *attrReader);
-	}, [attr, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type",
-				 get_attr_type_name(attr->type));
-		return INVALID_SIZE;
-	});
+	auto& polys = lod.template get_geometry<Polygons>();
+	const auto hdl = polys.find_vertex_attribute(attr.name, static_cast<AttributeType>(attr.type));
+	if(!hdl.has_value()) {
+		logError("[", FUNCTION_NAME, "] Could not retrieve vertex attribute handle");
+		return false;
+	}
+	polys.add_bulk(hdl.value(), PolyVHdl{ static_cast<int>(startVertex) },
+				   count, *attrReader);
+	return true;
 	CATCH_ALL(INVALID_SIZE)
 }
 
-size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHdl* attr,
+size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const FaceAttributeHdl attr,
 									   FaceHdl startFace, size_t count,
 									   const BulkLoader* stream) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_SIZE);
-	CHECK_NULLPTR(attr, "attribute handle", INVALID_SIZE);
+	CHECK_NULLPTR(attr.name, "attribute name", INVALID_SIZE);
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
-	CHECK(attr->face, "Vertex attribute in face function", false);
 	CHECK_GEQ_ZERO(startFace, "start face index", INVALID_SIZE);
-	CHECK_GEQ_ZERO(attr->index, "attribute index (OpenMesh)", INVALID_SIZE);
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	if(startFace >= static_cast<int>(lod.template get_geometry<Polygons>().get_vertex_count())) {
 		logError("[", FUNCTION_NAME, "] Face index out of bounds (",
@@ -778,26 +662,28 @@ size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHdl*
 				 ")");
 		return INVALID_SIZE;
 	}
+
+	const auto elemSize = get_attribute_size(static_cast<AttributeType>(attr.type));
 	std::unique_ptr<util::IByteReader> attrReader;
 	std::unique_ptr<util::ArrayStreamBuffer> attrBuffer;
 	std::unique_ptr<std::istream> attrStream;
 	if(stream->type == BulkLoader::BULK_FILE) {
 		attrReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
-		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * get_attr_size(attr->type));
+		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * elemSize);
 		attrStream = std::make_unique<std::istream>(attrBuffer.get());
 		attrReader = std::make_unique<util::StreamReader>(*attrStream);
 	}
 
-	return switchAttributeType(attr->type, [&lod, attr, startFace, count, &attrReader](const auto& /*val*/) {
-		FaceAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
-		return lod.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
-																 count, *attrReader);
-	}, [attr, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type",
-				 get_attr_type_name(attr->type));
-		return INVALID_SIZE;
-	});
+	auto& polys = lod.template get_geometry<Polygons>();
+	const auto hdl = polys.find_face_attribute(attr.name, static_cast<AttributeType>(attr.type));
+	if(!hdl.has_value()) {
+		logError("[", FUNCTION_NAME, "] Could not retrieve vertex attribute handle");
+		return false;
+	}
+	polys.add_bulk(hdl.value(), PolyFHdl{ static_cast<int>(startFace) },
+				   count, *attrReader);
+	return true;
 	CATCH_ALL(INVALID_SIZE)
 }
 
@@ -895,22 +781,13 @@ Boolean spheres_reserve(LodHdl lvlDtl, size_t count) {
 }
 
 SphereAttributeHdl spheres_request_attribute(LodHdl lvlDtl, const char* name,
-												AttribDesc type) {
+											 GeomAttributeType type) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_SPHERE_ATTR_HANDLE);
 	CHECK_NULLPTR(name, "attribute name", INVALID_SPHERE_ATTR_HANDLE);
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
-
-	return switchAttributeType(type, [name, type, &lod](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
-		return SphereAttributeHdl{
-			static_cast<int32_t>(lod.template get_geometry<Spheres>().add_attribute<Type>(name).index),
-			type
-		};
-	}, [&type, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type", get_attr_type_name(type));
-		return INVALID_SPHERE_ATTR_HANDLE;
-	});
+	auto handle = lod.template get_geometry<Spheres>().add_attribute(name, static_cast<AttributeType>(type));
+	return SphereAttributeHdl{ type, name };
 	CATCH_ALL(INVALID_SPHERE_ATTR_HANDLE)
 }
 
@@ -962,14 +839,13 @@ SphereHdl spheres_add_sphere_bulk(LodHdl lvlDtl, size_t count, const BulkLoader*
 	CATCH_ALL(SphereHdl{ INVALID_INDEX })
 }
 
-Boolean spheres_set_attribute(LodHdl lvlDtl, const SphereAttributeHdl* attr,
+Boolean spheres_set_attribute(LodHdl lvlDtl, const SphereAttributeHdl attr,
 						   SphereHdl sphere, const void* value) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", false);
-	CHECK_NULLPTR(attr, "attribute handle", false);
+	CHECK_NULLPTR(attr.name, "attribute name", false);
 	CHECK_NULLPTR(value, "attribute value", false);
 	CHECK_GEQ_ZERO(sphere, "sphere index", false);
-	CHECK_GEQ_ZERO(attr->index, "attribute index", false);
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	if(sphere >= static_cast<int>(lod.template get_geometry<Spheres>().get_sphere_count())) {
 		logError("[", FUNCTION_NAME, "] Sphere index out of bounds (",
@@ -978,17 +854,19 @@ Boolean spheres_set_attribute(LodHdl lvlDtl, const SphereAttributeHdl* attr,
 		return false;
 	}
 
-	return switchAttributeType(attr->type, [&lod, attr, sphere, value](const auto& val) {
-		using Type = typename std::decay_t<decltype(val)>::Type;
-		SphereAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
-		lod.template get_geometry<Spheres>().acquire<Device::CPU, Type>(hdl)[sphere] = *static_cast<const Type*>(value);
-		lod.template get_geometry<Spheres>().mark_changed(Device::CPU);
-		return true;
-	}, [attr, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type",
-				 get_attr_type_name(attr->type));
+
+	auto& spheres = lod.template get_geometry<Spheres>();
+	const auto hdl = spheres.find_attribute(attr.name, static_cast<AttributeType>(attr.type));
+	if(!hdl.has_value()) {
+		logError("[", FUNCTION_NAME, "] Could not retrieve face attribute handle");
 		return false;
-	});
+	}
+	const auto elemSize = get_attribute_size(static_cast<AttributeType>(attr.type));
+	char* data = spheres.template acquire<Device::CPU, char>(hdl.value())
+		+ elemSize * sphere;
+	std::memcpy(data, value, elemSize);
+	lod.template get_geometry<Polygons>().mark_changed(Device::CPU);
+	return true;
 	CATCH_ALL(false)
 }
 
@@ -1013,15 +891,14 @@ Boolean spheres_set_material_idx(LodHdl lvlDtl, SphereHdl sphere, MatIdx idx) {
 	CATCH_ALL(false)
 }
 
-size_t spheres_set_attribute_bulk(LodHdl lvlDtl, const SphereAttributeHdl* attr,
+size_t spheres_set_attribute_bulk(LodHdl lvlDtl, const SphereAttributeHdl attr,
 								  SphereHdl startSphere, size_t count,
 								  const BulkLoader* stream) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_SIZE);
-	CHECK_NULLPTR(attr, "attribute handle", INVALID_SIZE);
+	CHECK_NULLPTR(attr.name, "attribute name", INVALID_SIZE);
 	CHECK_NULLPTR(stream, "attribute stream", INVALID_SIZE);
 	CHECK_GEQ_ZERO(startSphere, "start sphere index", INVALID_SIZE);
-	CHECK_GEQ_ZERO(attr->index, "attribute index", INVALID_SIZE);
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	if(startSphere >= static_cast<int>(lod.template get_geometry<Spheres>().get_sphere_count())) {
 		logError("[", FUNCTION_NAME, "] Sphere index out of bounds (",
@@ -1029,27 +906,27 @@ size_t spheres_set_attribute_bulk(LodHdl lvlDtl, const SphereAttributeHdl* attr,
 				 ")");
 		return INVALID_SIZE;
 	}
+	const auto elemSize = get_attribute_size(static_cast<AttributeType>(attr.type));
 	std::unique_ptr<util::IByteReader> attrReader;
 	std::unique_ptr<util::ArrayStreamBuffer> attrBuffer;
 	std::unique_ptr<std::istream> attrStream;
 	if(stream->type == BulkLoader::BULK_FILE) {
 		attrReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
-		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * get_attr_size(attr->type));
+		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * elemSize);
 		attrStream = std::make_unique<std::istream>(attrBuffer.get());
 		attrReader = std::make_unique<util::StreamReader>(*attrStream);
 	}
 
-	return switchAttributeType(attr->type, [&lod, attr, startSphere, count, &attrReader](const auto& /*val*/) {
-		SphereAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
-		return lod.template get_geometry<Spheres>().add_bulk(hdl,
-																SphereVHdl{ static_cast<size_t>(startSphere) },
-																count, *attrReader);
-	}, [attr, name = FUNCTION_NAME]() {
-		logError("[", name, "] Unknown/Unsupported attribute type",
-				 get_attr_type_name(attr->type));
-		return INVALID_SIZE;
-	});
+	auto& spheres = lod.template get_geometry<Spheres>();
+	const auto hdl = spheres.find_attribute(attr.name, static_cast<AttributeType>(attr.type));
+	if(!hdl.has_value()) {
+		logError("[", FUNCTION_NAME, "] Could not retrieve sphere attribute handle");
+		return false;
+	}
+	spheres.add_bulk(hdl.value(), SphereHdl{ static_cast<int>(startSphere) },
+				   count, *attrReader);
+	return true;
 	CATCH_ALL(INVALID_SIZE)
 }
 

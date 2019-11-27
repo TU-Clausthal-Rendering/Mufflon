@@ -73,9 +73,9 @@ public:
 	// Updates the given descriptor's attribute fields
 	template < Device dev >
 	void update_attribute_descriptor(LodDescriptor<dev>& descriptor,
-									 const std::vector<const char*>& vertexAttribs,
-									 const std::vector<const char*>& faceAttribs,
-									 const std::vector<const char*>& sphereAttribs);
+									 const std::vector<AttributeIdentifier>& vertexAttribs,
+									 const std::vector<AttributeIdentifier>& faceAttribs,
+									 const std::vector<AttributeIdentifier>& sphereAttribs);
 
 	// Clears the BVH of this object.
 	void clear_accel_structure();
