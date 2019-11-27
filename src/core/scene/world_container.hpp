@@ -110,6 +110,7 @@ public:
 	ScenarioHandle get_scenario(std::size_t index);
 	ScenarioHandle get_current_scenario() const noexcept;
 	SceneHandle get_current_scene();
+	bool is_current_scene_valid() const noexcept;
 	MaterialHandle get_material(u32 index);
 	const materials::Medium& get_medium(materials::MediumHandle hdl) const;
 	CameraHandle get_camera(StringView name);
@@ -200,11 +201,14 @@ private:
 	// All objects of the world.
 	util::FixedHashMap<StringView, Object> m_objects;
 	// All instances of the world (careful: reserve MUST have been called
-	// before adding instances)
+	// before adding instances). First come instances valid for all frames,
+	// then successively those present for concrete frames.
 	std::vector<Instance> m_instances;
+	// Stores the start/end instance indices for each frame
+	std::vector<std::pair<std::size_t, std::size_t>> m_frameInstanceIndices;
 
 	// TODO: for improved heap allocation, this should be a single vector/map
-	std::vector<std::vector<std::unique_ptr<Instance>>> m_animatedInstances;
+	//std::vector<std::vector<std::unique_ptr<Instance>>> m_animatedInstances;
 	// List of all scenarios available (mapped to their names)
 	util::FixedHashMap<StringView, Scenario> m_scenarios;
 	// All materials in the scene.
@@ -227,6 +231,7 @@ private:
 	// Current scene
 	ScenarioHandle m_scenario = nullptr;
 	std::unique_ptr<Scene> m_scene = nullptr;
+	bool m_sceneValid = false;
 
 	// Current animation frame and range
 	u32 m_frameStart = 0u;

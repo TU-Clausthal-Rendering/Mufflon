@@ -998,25 +998,6 @@ LodHdl object_add_lod(ObjectHdl obj, LodLevel level) {
 	CATCH_ALL(nullptr)
 }
 
-Boolean object_set_animation_frame(ObjectHdl obj, uint32_t animFrame) {
-	TRY
-	CHECK_NULLPTR(obj, "object handle", false);
-	Object& object = *static_cast<Object*>(obj);
-	object.set_animation_frame(animFrame);
-	return true;
-	CATCH_ALL(false)
-}
-
-Boolean object_get_animation_frame(ObjectHdl obj, uint32_t* animFrame) {
-	TRY
-	CHECK_NULLPTR(obj, "object handle", false);
-	const Object& object = *static_cast<const Object*>(obj);
-	if(animFrame != nullptr)
-		*animFrame = object.get_animation_frame();
-	return true;
-	CATCH_ALL(false)
-}
-
 Boolean object_get_id(ObjectHdl obj, uint32_t* id) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
@@ -1056,16 +1037,6 @@ Boolean instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max, LodLev
 		*min = util::pun<Vec3>(aabb.min);
 	if(max != nullptr)
 		*max = util::pun<Vec3>(aabb.max);
-	return true;
-	CATCH_ALL(false)
-}
-
-Boolean instance_get_animation_frame(InstanceHdl inst, uint32_t* animationFrame) {
-	TRY
-	CHECK_NULLPTR(inst, "instance handle", false);
-	const Instance& instance = *static_cast<ConstInstanceHandle>(inst);
-	if(animationFrame != nullptr)
-		*animationFrame = instance.get_animation_frame();
 	return true;
 	CATCH_ALL(false)
 }
@@ -2406,7 +2377,7 @@ Boolean scenario_set_camera(ScenarioHdl scenario, CameraHdl cam) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	static_cast<Scenario*>(scenario)->set_camera(static_cast<CameraHandle>(cam));
-	if(scenario == world_get_current_scenario())
+	if(scenario == world_get_current_scenario() && s_world.get_current_scene() != nullptr)
 		s_world.get_current_scene()->set_camera(static_cast<CameraHandle>(cam));
 	return true;
 	CATCH_ALL(false)
@@ -2848,13 +2819,15 @@ Boolean scene_rotate_active_camera(float x, float y, float z) {
 
 Boolean scene_is_sane() {
 	TRY
-	ConstSceneHandle sceneHdl = s_world.get_current_scene();
-	if(sceneHdl == nullptr) {
+	ConstSceneHandle sceneHdl = nullptr;
+	if(!s_world.is_current_scene_valid()) {
 		// Check if a rebuild was demanded
 		if(s_world.get_current_scenario() != nullptr) {
 			world_load_scenario(s_world.get_current_scenario());
 			sceneHdl = s_world.get_current_scene();
 		}
+	} else {
+		sceneHdl = s_world.get_current_scene();
 	}
 
 	if(sceneHdl != nullptr)
@@ -3443,7 +3416,7 @@ Boolean render_iterate(ProcessTime* time) {
 	s_targetsToDisable.clear();
 
 	// Check if the scene needed a reload -> reset
-	if(s_world.get_current_scene() == nullptr) {
+	if(!s_world.is_current_scene_valid()) {
 		if(s_world.get_current_scenario() == nullptr) {
 			logError("[", FUNCTION_NAME, "] Failed to load scenario");
 			return false;

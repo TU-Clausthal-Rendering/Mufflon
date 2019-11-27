@@ -389,15 +389,12 @@ CORE_API Boolean CDECL spheres_get_bounding_box(LodHdl lod, Vec3* min, Vec3* max
 // Object interface
 CORE_API Boolean CDECL object_has_lod(ObjectHdl hdl, LodLevel level);
 CORE_API LodHdl CDECL object_add_lod(ObjectHdl hdl, LodLevel level);
-CORE_API Boolean CDECL object_set_animation_frame(ObjectHdl hdl, uint32_t animFrame);
-CORE_API Boolean CDECL object_get_animation_frame(ObjectHdl hdl, uint32_t* animFrame);
 CORE_API Boolean CDECL object_get_id(ObjectHdl hdl, uint32_t* id);
 
 // Instance interface
 CORE_API Boolean CDECL instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat);
 CORE_API Boolean CDECL instance_get_transformation_matrix(InstanceHdl inst, Mat3x4* mat);
 CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max, LodLevel lod);
-CORE_API Boolean CDECL instance_get_animation_frame(InstanceHdl inst, uint32_t* animationFrame);
 
 // World container interface
 CORE_API void CDECL world_clear_all();
