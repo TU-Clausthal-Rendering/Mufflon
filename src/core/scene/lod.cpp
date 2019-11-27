@@ -72,9 +72,9 @@ void Lod::tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scen
 
 template < Device dev >
 void Lod::update_attribute_descriptor(LodDescriptor<dev>& descriptor,
-										 const std::vector<const char*>& vertexAttribs,
-										 const std::vector<const char*>& faceAttribs,
-										 const std::vector<const char*>& sphereAttribs) {
+										 const std::vector<AttributeIdentifier>& vertexAttribs,
+										 const std::vector<AttributeIdentifier>& faceAttribs,
+										 const std::vector<AttributeIdentifier>& sphereAttribs) {
 	m_geometry.get<geometry::Polygons>().update_attribute_descriptor<dev>(descriptor.polygon, vertexAttribs, faceAttribs);
 	m_geometry.get<geometry::Spheres>().update_attribute_descriptor<dev>(descriptor.spheres, sphereAttribs);
 }
@@ -83,15 +83,15 @@ template LodDescriptor<Device::CPU> Lod::get_descriptor<Device::CPU>();
 template LodDescriptor<Device::CUDA> Lod::get_descriptor<Device::CUDA>();
 template LodDescriptor<Device::OPENGL> Lod::get_descriptor<Device::OPENGL>();
 template void Lod::update_attribute_descriptor<Device::CPU>(LodDescriptor<Device::CPU>&,
-															   const std::vector<const char*>&,
-															   const std::vector<const char*>&,
-															   const std::vector<const char*>&);
+															   const std::vector<AttributeIdentifier>&,
+															   const std::vector<AttributeIdentifier>&,
+															   const std::vector<AttributeIdentifier>&);
 template void Lod::update_attribute_descriptor<Device::CUDA>(LodDescriptor<Device::CUDA>&,
-																const std::vector<const char*>&,
-																const std::vector<const char*>&,
-																const std::vector<const char*>&);
+																const std::vector<AttributeIdentifier>&,
+																const std::vector<AttributeIdentifier>&,
+																const std::vector<AttributeIdentifier>&);
 template void Lod::update_attribute_descriptor<Device::OPENGL>(LodDescriptor<Device::OPENGL>&,
-																const std::vector<const char*>&,
-																const std::vector<const char*>&,
-																const std::vector<const char*>&);
+																const std::vector<AttributeIdentifier>&,
+																const std::vector<AttributeIdentifier>&,
+																const std::vector<AttributeIdentifier>&);
 } // namespace mufflon::scene

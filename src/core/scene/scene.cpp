@@ -115,9 +115,9 @@ void Scene::load_materials() {
 }
 
 template < Device dev >
-const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>& vertexAttribs,
-												  const std::vector<const char*>& faceAttribs,
-												  const std::vector<const char*>& sphereAttribs) {
+const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIdentifier>& vertexAttribs,
+												  const std::vector<AttributeIdentifier>& faceAttribs,
+												  const std::vector<AttributeIdentifier>& sphereAttribs) {
 	synchronize<dev>();
 	SceneDescriptor<dev>& sceneDescriptor = m_descStore.template get<SceneDescriptor<dev>>();
 	if constexpr(dev == Device::OPENGL) {
@@ -132,24 +132,24 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		&& lastFaceAttribs.size() == faceAttribs.size()
 		&& lastSphereAttribs.size() == sphereAttribs.size();
 	if(sameAttribs)
-		for(auto name : vertexAttribs) {
-			if(std::find_if(lastVertexAttribs.cbegin(), lastVertexAttribs.cend(), [name](const char* n) { return std::strcmp(name, n) != 0; }) != lastVertexAttribs.cend()) {
+		for(auto ident : vertexAttribs) {
+			if(std::find_if(lastVertexAttribs.cbegin(), lastVertexAttribs.cend(), [ident](const auto& n) { return ident == n; }) != lastVertexAttribs.cend()) {
 				sameAttribs = false;
 				lastVertexAttribs = vertexAttribs;
 				break;
 			}
 		}
 	if(sameAttribs)
-		for(auto name : faceAttribs) {
-			if(std::find_if(lastFaceAttribs.cbegin(), lastFaceAttribs.cend(), [name](const char* n) { return std::strcmp(name, n) != 0; }) != lastFaceAttribs.cend()) {
+		for(auto ident : faceAttribs) {
+			if(std::find_if(lastFaceAttribs.cbegin(), lastFaceAttribs.cend(), [ident](const auto& n) { return ident == n; }) != lastFaceAttribs.cend()) {
 				sameAttribs = false;
 				lastFaceAttribs = faceAttribs;
 				break;
 			}
 		}
 	if(sameAttribs)
-		for(auto name : sphereAttribs) {
-			if(std::find_if(lastSphereAttribs.cbegin(), lastSphereAttribs.cend(), [name](const char* n) { return std::strcmp(name, n) != 0; }) != lastSphereAttribs.cend()) {
+		for(auto ident : sphereAttribs) {
+			if(std::find_if(lastSphereAttribs.cbegin(), lastSphereAttribs.cend(), [ident](const auto& n) { return ident == n; }) != lastSphereAttribs.cend()) {
 				sameAttribs = false;
 				lastSphereAttribs = sphereAttribs;
 				break;
@@ -496,13 +496,10 @@ bool Scene::retessellate(const float tessLevel) {
 
 void Scene::compute_curvature() {
 	for(auto& obj : m_objects) {
-		printf(obj.first->get_name().cbegin());
 		for(u32 level = 0; level < obj.first->get_lod_slot_count(); ++level) {
 			if(obj.first->has_lod_available(level)) {
 				Lod& lod = obj.first->get_lod(level);
 				geometry::Polygons& polygons = lod.get_geometry<geometry::Polygons>();
-				printf(" %lu lod: %llu po: %llu\n", level, u64(&lod), u64(&polygons));
-				fflush(stdout);
 				polygons.compute_curvature();
 			}
 		}
@@ -516,7 +513,7 @@ void Scene::remove_curvature() {
 				Lod& lod = obj.first->get_lod(level);
 				geometry::Polygons& polygons = lod.get_geometry<geometry::Polygons>();
 				try {
-					polygons.remove_attribute("mean_curvature");
+					polygons.remove_curvature();
 				} catch(...) {}
 			}
 		}
@@ -530,14 +527,14 @@ template void Scene::load_materials<Device::OPENGL>();
 template void Scene::update_camera_medium<Device::CPU>(SceneDescriptor<Device::CPU>& descriptor);
 template void Scene::update_camera_medium<Device::CUDA>(SceneDescriptor<Device::CUDA>& descriptor);
 template void Scene::update_camera_medium<Device::OPENGL>(SceneDescriptor<Device::OPENGL>& descriptor);
-template const SceneDescriptor<Device::CPU>& Scene::get_descriptor<Device::CPU>(const std::vector<const char*>&,
-																				const std::vector<const char*>&,
-																				const std::vector<const char*>&);
-template const SceneDescriptor<Device::CUDA>& Scene::get_descriptor<Device::CUDA>(const std::vector<const char*>&,
-																				  const std::vector<const char*>&,
-																				  const std::vector<const char*>&);
-template const SceneDescriptor<Device::OPENGL>& Scene::get_descriptor<Device::OPENGL>(const std::vector<const char*>&,
-																					  const std::vector<const char*>&,
-																					  const std::vector<const char*>&);
+template const SceneDescriptor<Device::CPU>& Scene::get_descriptor<Device::CPU>(const std::vector<AttributeIdentifier>&,
+																				const std::vector<AttributeIdentifier>&,
+																				const std::vector<AttributeIdentifier>&);
+template const SceneDescriptor<Device::CUDA>& Scene::get_descriptor<Device::CUDA>(const std::vector<AttributeIdentifier>&,
+																				  const std::vector<AttributeIdentifier>&,
+																				  const std::vector<AttributeIdentifier>&);
+template const SceneDescriptor<Device::OPENGL>& Scene::get_descriptor<Device::OPENGL>(const std::vector<AttributeIdentifier>&,
+																					  const std::vector<AttributeIdentifier>&,
+																					  const std::vector<AttributeIdentifier>&);
 
 }} // namespace mufflon::scene

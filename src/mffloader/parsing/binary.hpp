@@ -116,7 +116,7 @@ private:
 		std::string name;
 		std::string meta;
 		mufflon::u32 metaFlags;
-		AttribDesc type;
+		GeomAttributeType type;
 		mufflon::u64 bytes;
 	};
 
@@ -173,7 +173,7 @@ private:
 	// Cleans up the internal data structures
 	void clear_state();
 
-	static AttribDesc map_bin_attrib_type(AttribType type);
+	static GeomAttributeType map_bin_attrib_type(AttribType type);
 	// Uncompressed data
 	void read_uncompressed_attribute(const ObjectState& object, const LodState& lod);
 	void read_normal_compressed_vertices(const ObjectState& object, const LodState& lod);

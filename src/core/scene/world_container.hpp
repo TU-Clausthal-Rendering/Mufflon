@@ -32,6 +32,8 @@ public:
 	using DirLightHandle = std::map<std::string, lights::DirectionalLight, std::less<>>::iterator;
 	using EnvLightHandle = std::map<std::string, TextureHandle, std::less<>>::iterator;
 
+
+
 	enum class Sanity {
 		SANE,
 		NO_OBJECTS,

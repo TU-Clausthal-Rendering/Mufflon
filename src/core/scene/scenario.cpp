@@ -145,6 +145,7 @@ void Scenario::mask_object(ConstObjectHandle hdl) {
 		iter->second.masked = true;
 	else
 		m_perObjectCustomization.emplace(hdl, CustomObjectProperty{{}, true, NO_CUSTOM_LOD});
+	m_hasMasking = true;
 }
 
 void Scenario::mask_instance(ConstInstanceHandle hdl) {
@@ -152,6 +153,7 @@ void Scenario::mask_instance(ConstInstanceHandle hdl) {
 		iter->second.masked = true;
 	else
 		m_perInstanceCustomization.emplace(hdl, CustomInstanceProperty{true, NO_CUSTOM_LOD});
+	m_hasMasking = true;
 }
 
 std::optional<Scenario::TessellationInfo> Scenario::get_tessellation_info(ConstObjectHandle hdl) const noexcept {

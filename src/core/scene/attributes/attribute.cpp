@@ -13,13 +13,12 @@ OpenMeshAttributePool<face>::OpenMeshAttributePool(geometry::PolygonMeshType &me
 template < bool face >
 OpenMeshAttributePool<face>::OpenMeshAttributePool(OpenMeshAttributePool&& pool) :
 	m_mesh(pool.m_mesh),
-	m_nameMap(std::move(pool.m_nameMap)),
 	m_attribElemCount(pool.m_attribElemCount),
 	m_attribElemCapacity(pool.m_attribElemCapacity),
 	m_poolSize(pool.m_poolSize),
 	m_cudaPool(pool.m_cudaPool),
-	m_openglPool(pool.m_openglPool),
-	m_attributes(std::move(pool.m_attributes)) {
+	m_openglPool(pool.m_openglPool)
+{
 	pool.m_cudaPool = ArrayDevHandle_t<Device::CUDA, char>{};
 	pool.m_openglPool = ArrayDevHandle_t<Device::OPENGL, char>{};
 }
@@ -32,13 +31,52 @@ OpenMeshAttributePool<face>::~OpenMeshAttributePool() {
 		m_openglPool = Allocator<Device::OPENGL>::free(m_openglPool, m_poolSize);
 }
 
+// Add a new attribute. Overwrites any existing attribute with the same name
+template < bool face >
+typename OpenMeshAttributePool<face>::AttrHandle OpenMeshAttributePool<face>::add_attribute(const AttributeIdentifier& ident) {
+	std::string name{ ident.name };
+	if constexpr(IS_FACE) {
+		if(m_mesh._get_vprop(name) != nullptr)
+			throw std::runtime_error("Vertex attribute '" + name + "' already exists!");
+	} else {
+		if(m_mesh._get_fprop(name) != nullptr)
+			throw std::runtime_error("Face attribute '" + name + "' already exists!");
+	}
+
+	OM_ATTRIB_SWITCH(ident.type, {
+		PropertyHandleType<BaseType> prop;
+		m_mesh.add_property(prop, name);
+		m_poolSize += sizeof(BaseType) * m_attribElemCapacity;
+		return AttrHandle(std::move(ident), prop.idx());
+	});
+}
+
+template < bool face >
+std::optional<typename OpenMeshAttributePool<face>::AttrHandle> OpenMeshAttributePool<face>::find_attribute(const AttributeIdentifier& ident) const {
+	std::string name{ ident.name };
+	OM_ATTRIB_SWITCH(ident.type, {
+		PropertyHandleType<BaseType> prop;
+		if(m_mesh.get_property_handle(prop, name))
+			return AttrHandle(std::move(ident), prop.idx());
+		return std::nullopt;
+		m_mesh.add_property(prop, name);
+		return AttrHandle(std::move(ident), prop.idx());
+	});
+}
+
+template < bool face >
+void OpenMeshAttributePool<face>::remove_attribute(const AttrHandle& handle) {
+	OM_ATTRIB_SWITCH(handle.identifier.type, {
+		PropertyHandleType<BaseType> prop(handle.index);
+		m_mesh.remove_property(prop);
+	});
+}
+
 template < bool face >
 void OpenMeshAttributePool<face>::copy(const OpenMeshAttributePool<face>& pool) {
-	m_nameMap = pool.m_nameMap;
 	m_attribElemCount = pool.m_attribElemCount;
 	m_attribElemCapacity = pool.m_attribElemCapacity;
 	m_poolSize = pool.m_poolSize;
-	m_attributes = pool.m_attributes;
 	m_openMeshSynced = pool.m_openMeshSynced;
 
 	if(m_poolSize == 0 || pool.m_cudaPool == ArrayDevHandle_t<Device::CUDA, char>{}) {
@@ -69,12 +107,18 @@ void OpenMeshAttributePool<face>::reserve(std::size_t capacity) {
 	else
 		m_mesh.reserve(capacity, m_mesh.n_edges(), m_mesh.n_faces());
 
+	// Compute the new pool size
 	std::size_t currOffset = 0u;
-	// Adjust pool offsets for the attributes
-	for(auto& attrib : m_attributes) {
-		if(attrib.accessor) {
-			attrib.poolOffset = currOffset;
-			currOffset += attrib.elemSize * capacity;
+	for(auto& prop : *this) {
+		if(prop != nullptr) {
+			if constexpr(face) {
+				if(prop->name() == "<fprop>")
+					continue;
+			} else {
+				if(prop->name() == "<vprop>")
+					continue;
+			}
+			currOffset += capacity * prop->element_size();
 		}
 	}
 
@@ -124,15 +168,6 @@ void OpenMeshAttributePool<face>::shrink_to_fit() {
 	}
 
 	m_attribElemCapacity = m_attribElemCount;
-	// We also have to adjust the offsets
-	std::size_t currOffset = 0u;
-	// Adjust pool offsets for the attributes
-	for(auto& attrib : m_attributes) {
-		if(attrib.accessor) {
-			attrib.poolOffset = currOffset;
-			currOffset += attrib.elemSize * m_attribElemCapacity;
-		}
-	}
 }
 
 template < bool face >
@@ -140,26 +175,48 @@ template < Device dev >
 void OpenMeshAttributePool<face>::synchronize() {
 	if(m_poolSize == 0u)
 		return;
+	// If the device is out of sync, copy over each attribute from one of the
+	// synced pools
 	switch(dev) {
 		case Device::CPU: {
 			if(m_openMeshSynced)
 				return;
 			if(m_cudaPool != nullptr) {
-				// Copy over dirty attributes
-				for(auto& attrib : m_attributes) {
-					if(attrib.accessor) {
-						char* cpuData = attrib.accessor(m_mesh);
-						::mufflon::copy(cpuData, m_cudaPool + attrib.poolOffset, attrib.elemSize * m_attribElemCount);
+				std::size_t currOffset = 0u;
+				for(auto& prop : *this) {
+					if(prop == nullptr)
+						continue;
+					// Skip default properties
+					if constexpr(face) {
+						if(prop->name() == "<fprop>")
+							continue;
+					} else {
+						if(prop->name() == "<vprop>")
+							continue;
 					}
+					char* cpuData = get_attribute_cpu_data(*prop);
+					const std::size_t elemSize = get_attribute_element_size(*prop);
+					::mufflon::copy(cpuData, m_cudaPool + currOffset, elemSize * m_attribElemCount);
+					currOffset += elemSize * m_attribElemCapacity;
 				}
 				m_openMeshSynced = true;
 			} else if(m_openglPool != nullptr) {
-				// Copy over dirty attributes
-				for(auto& attrib : m_attributes) {
-					if(attrib.accessor) {
-						char* cpuData = attrib.accessor(m_mesh);
-						::mufflon::copy(cpuData, m_openglPool + attrib.poolOffset, attrib.elemSize * m_attribElemCount);
+				std::size_t currOffset = 0u;
+				for(auto& prop : *this) {
+					if(prop == nullptr)
+						continue;
+					// Skip default properties
+					if constexpr(face) {
+						if(prop->name() == "<fprop>")
+							continue;
+					} else {
+						if(prop->name() == "<vprop>")
+							continue;
 					}
+					char* cpuData = get_attribute_cpu_data(*prop);
+					const std::size_t elemSize = get_attribute_element_size(*prop);
+					::mufflon::copy(cpuData, m_openglPool + currOffset, elemSize * m_attribElemCount);
+					currOffset += elemSize * m_attribElemCapacity;
 				}
 				m_openMeshSynced = true;
 			}
@@ -169,16 +226,42 @@ void OpenMeshAttributePool<face>::synchronize() {
 				return;
 			if(m_openMeshSynced) {
 				m_cudaPool = Allocator<Device::CUDA>::alloc_array<char, false>(m_poolSize);
-				// Copy over all attributes
-				for(auto& attrib : m_attributes) {
-					if(attrib.accessor) {
-						const char* cpuData = attrib.accessor(m_mesh);
-						::mufflon::copy(m_cudaPool + attrib.poolOffset, cpuData, attrib.elemSize * m_attribElemCount);
+				std::size_t currOffset = 0u;
+				for(auto& prop : *this) {
+					if(prop == nullptr)
+						continue;
+					// Skip default properties
+					if constexpr(face) {
+						if(prop->name() == "<fprop>")
+							continue;
+					} else {
+						if(prop->name() == "<vprop>")
+							continue;
 					}
+					char* cpuData = get_attribute_cpu_data(*prop);
+					const std::size_t elemSize = get_attribute_element_size(*prop);
+					::mufflon::copy(m_cudaPool + currOffset, cpuData, elemSize * m_attribElemCount);
+					currOffset += elemSize * m_attribElemCapacity;
 				}
 			} else if(m_openglPool != nullptr) {
-				//m_cudaPool = Allocator<Device::CUDA>::alloc_array<char, false>(m_poolSize);
-				logError("Cannot synchronize from OpenGL to CUDA yet!");
+				m_cudaPool = Allocator<Device::CUDA>::alloc_array<char, false>(m_poolSize);
+				std::size_t currOffset = 0u;
+				for(auto& prop : *this) {
+					if(prop == nullptr)
+						continue;
+					// Skip default properties
+					if constexpr(face) {
+						if(prop->name() == "<fprop>")
+							continue;
+					} else {
+						if(prop->name() == "<vprop>")
+							continue;
+					}
+					const std::size_t elemSize = get_attribute_element_size(*prop);
+					::mufflon::copy_cuda_opengl(m_cudaPool + currOffset, m_openglPool.id, currOffset,
+												elemSize * m_attribElemCount);
+					currOffset += elemSize * m_attribElemCapacity;
+				}
 			}
 		}	break;
 		case Device::OPENGL:
@@ -186,16 +269,42 @@ void OpenMeshAttributePool<face>::synchronize() {
 				return;
 			if(m_openMeshSynced) {
 				m_openglPool = Allocator<Device::OPENGL>::alloc_array<char, false>(m_poolSize);
-				// Copy over all attributes
-				for(auto& attrib : m_attributes) {
-					if(attrib.accessor) {
-						const char* cpuData = attrib.accessor(m_mesh);
-						::mufflon::copy(m_openglPool + attrib.poolOffset, cpuData, attrib.elemSize * m_attribElemCount);
+				std::size_t currOffset = 0u;
+				for(auto& prop : *this) {
+					if(prop == nullptr)
+						continue;
+					// Skip default properties
+					if constexpr(face) {
+						if(prop->name() == "<fprop>")
+							continue;
+					} else {
+						if(prop->name() == "<vprop>")
+							continue;
 					}
+					char* cpuData = get_attribute_cpu_data(*prop);
+					const std::size_t elemSize = get_attribute_element_size(*prop);
+					::mufflon::copy(m_openglPool + currOffset, cpuData, elemSize * m_attribElemCount);
+					currOffset += elemSize * m_attribElemCapacity;
 				}
 			} else if(m_cudaPool != nullptr) {
-				//m_openglPool = Allocator<Device::OPENGL>::alloc_array<char, false>(m_poolSize);
-				logError("Cannot synchronize from CUDA to OpenGL yet!");
+				m_openglPool = Allocator<Device::OPENGL>::alloc_array<char, false>(m_poolSize);
+				std::size_t currOffset = 0u;
+				for(auto& prop : *this) {
+					if(prop == nullptr)
+						continue;
+					// Skip default properties
+					if constexpr(face) {
+						if(prop->name() == "<fprop>")
+							continue;
+					} else {
+						if(prop->name() == "<vprop>")
+							continue;
+					}
+					const std::size_t elemSize = get_attribute_element_size(*prop);
+					::mufflon::copy_cuda_opengl(m_openglPool.id, currOffset, m_cudaPool + currOffset,
+												elemSize * m_attribElemCount);
+					currOffset += elemSize * m_attribElemCapacity;
+				}
 			}
 			break;
 	}
@@ -229,49 +338,86 @@ void OpenMeshAttributePool<face>::mark_changed(Device dev) {
 }
 
 template < bool face >
-std::size_t OpenMeshAttributePool<face>::restore(AttributeHandle hdl, util::IByteReader& attrStream,
+std::size_t OpenMeshAttributePool<face>::restore(const AttrHandle& handle, util::IByteReader& attrStream,
 												 std::size_t start, std::size_t count) {
-	mAssert(hdl.index < m_attributes.size());
-	mAssert(m_attributes[hdl.index].accessor);
 	this->synchronize<Device::CPU>();
 	if(start + count > m_attribElemCount)
 		this->resize(start + count);
 
-	AttribInfo& attribute = m_attributes[hdl.index];
-	const std::size_t elemSize = attribute.elemSize;
-	char* mem = attribute.accessor(m_mesh) + elemSize * start;
+	char* mem = get_attribute_cpu_data(handle);
+	const std::size_t elemSize = get_attribute_element_size(handle);
 	std::size_t read = attrStream.read(mem, elemSize * count);
 	if(read > 0)
 		this->mark_changed(Device::CPU);
-	return read / attribute.elemSize;
+	return read / elemSize;
+}
+
+// If you have a handle, this is legit
+template < bool face >
+char* OpenMeshAttributePool<face>::get_attribute_cpu_data(const AttrHandle& handle) {
+	OM_ATTRIB_SWITCH(handle.identifier.type,
+					 {
+						 PropertyHandleType<BaseType> prop(handle.index);
+						 return reinterpret_cast<char*>(m_mesh.property(prop).data_vector().data());
+					 });
 }
 
 template < bool face >
-std::size_t OpenMeshAttributePool<face>::store(AttributeHandle hdl, util::IByteWriter& attrStream,
-											   std::size_t start, std::size_t count) {
-	mAssert(hdl.index < m_attributes.size());
-	mAssert(m_attributes[hdl.index].accessor);
-	this->synchronize<Device::CPU>();
-	std::size_t actualCount = count;
-	if(start + count > m_attribElemCount)
-		actualCount = m_attribElemCount - start;
-
-	AttribInfo& attribute = m_attributes[hdl.index];
-	const std::size_t elemSize = attribute.elemSize;
-	const char* mem = attribute.accessor(m_mesh) + elemSize * start;
-	return attrStream.write(mem, elemSize * actualCount) / attribute.elemSize;
+char* OpenMeshAttributePool<face>::get_attribute_cpu_data(OpenMesh::BaseProperty& prop) {
+	/* BEWARE:
+	 * This is clearly undefined behaviour, but we don't have a choice
+	 * (OpenMesh does not allow byte-access from it's BaseProperty).
+	 * The only saving grace is that we can static_assert the property
+	 * classes and (hopefully) the compiler won't be smart enough to
+	 * figure out what's going on to mess us up.
+	 */
+	static_assert(sizeof(OpenMesh::PropertyT<char>) == sizeof(OpenMesh::PropertyT<float>),
+				  "Invariant broken! Tell a dev to find a new work-around to get byte-level "
+				  "access to OpenMesh properties");
+	static_assert(sizeof(OpenMesh::PropertyT<char>) == sizeof(OpenMesh::PropertyT<ei::Vec3>),
+				  "Invariant broken! Tell a dev to find a new work-around to get byte-level "
+				  "access to OpenMesh properties");
+	static_assert(alignof(OpenMesh::PropertyT<char>) == alignof(OpenMesh::PropertyT<float>),
+				  "Invariant broken! Tell a dev to find a new work-around to get byte-level "
+				  "access to OpenMesh properties");
+	static_assert(alignof(OpenMesh::PropertyT<char>) == alignof(OpenMesh::PropertyT<ei::Vec3>),
+				  "Invariant broken! Tell a dev to find a new work-around to get byte-level "
+				  "access to OpenMesh properties");
+	return reinterpret_cast<OpenMesh::PropertyT<char>&>(prop).data_vector().data();
 }
 
 template < bool face >
-AttributeHandle OpenMeshAttributePool<face>::get_attribute_handle(StringView name) {
-	auto mapIter = m_nameMap.find(name);
-	if(mapIter == m_nameMap.end())
-		throw std::runtime_error("Could not find attribute '" + std::string(name) + "'");
-	return AttributeHandle{ mapIter->second };
+std::size_t OpenMeshAttributePool<face>::get_attribute_pool_offset(const AttrHandle& handle) {
+	std::size_t offset = 0u;
+	for(const auto& prop : *this) {
+		if(prop == nullptr)
+			continue;
+		// Skip default properties
+		if constexpr(face) {
+			if(prop->name() == "<fprop>")
+				continue;
+		} else {
+			if(prop->name() == "<vprop>")
+				continue;
+		}
+		if(handle.identifier.name.compare(prop->name()) == 0)
+			break;
+		offset += get_attribute_element_size(*prop) * m_attribElemCapacity;
+	}
+	return offset;
+}
+
+template < bool face >
+std::size_t OpenMeshAttributePool<face>::get_attribute_element_size(const AttrHandle& handle) {
+	return get_attribute_size(handle.identifier.type);
+}
+
+template < bool face >
+std::size_t OpenMeshAttributePool<face>::get_attribute_element_size(const OpenMesh::BaseProperty& prop) {
+	return prop.element_size();
 }
 
 AttributePool::AttributePool(const AttributePool& pool) :
-	m_nameMap(pool.m_nameMap),
 	m_attribElemCount(pool.m_attribElemCount),
 	m_attribElemCapacity(pool.m_attribElemCapacity),
 	m_poolSize(pool.m_poolSize),
@@ -290,7 +436,6 @@ AttributePool::AttributePool(const AttributePool& pool) :
 }
 
 AttributePool::AttributePool(AttributePool&& pool) :
-	m_nameMap(std::move(pool.m_nameMap)),
 	m_attribElemCount(pool.m_attribElemCount),
 	m_attribElemCapacity(pool.m_attribElemCapacity),
 	m_poolSize(pool.m_poolSize),
@@ -309,6 +454,52 @@ AttributePool::~AttributePool() {
 		if(elem.handle != nullptr)
 			elem.handle = Allocator<ChangedBuffer::DEVICE>::template free<char>(elem.handle, len);
 	});
+	for(auto& attrib : m_attributes)
+		util::UniqueStringPool::instance().remove(attrib.name);
+}
+SphereAttributeHandle AttributePool::add_attribute(const AttributeIdentifier& ident) {
+	this->unload<Device::CUDA>();
+	this->unload<Device::OPENGL>();
+	// Create the accessor...
+	AttribInfo info{
+		get_attribute_size(ident.type),
+		m_poolSize,
+		util::UniqueStringPool::instance().insert(ident.name)
+	};
+	m_poolSize += info.elemSize * m_attribElemCapacity;
+	// ...and map the name to the index
+	const auto index = insert_attribute_at_first_empty(std::move(info));
+	return SphereAttributeHandle{ ident, static_cast<u32>(index) };
+}
+
+std::optional<SphereAttributeHandle> AttributePool::find_attribute(const AttributeIdentifier& ident) const {
+	for(u32 i = 0u; i < static_cast<u32>(m_attributes.size()); ++i) {
+		if(!m_attributes[i].erased && m_attributes[i].name == ident.name) {
+			return SphereAttributeHandle{ ident, i };
+		}
+	}
+	return std::nullopt;
+}
+
+void AttributePool::remove(SphereAttributeHandle handle) {
+	// TODO: check out-of-bounds!
+
+	this->unload<Device::CUDA>();
+	this->unload<Device::OPENGL>();
+	// Adjust pool sizes for following attributes
+	const std::size_t segmentSize = (handle.index == m_attributes.size() - 1u)
+		? m_poolSize - m_attributes[handle.index].poolOffset
+		: m_attributes[handle.index + 1].poolOffset - m_attributes[handle.index].poolOffset;
+	for(std::size_t i = handle.index + 1; i < m_attributes.size(); ++i)
+		m_attributes[i].poolOffset -= segmentSize;
+
+	m_poolSize -= segmentSize;
+
+	// Remove the attribute from bookkeeping
+	if(handle.index == m_attributes.size() - 1u)
+		m_attributes.pop_back();
+	else
+		m_attributes[handle.index].erased = true;
 }
 
 // Causes force-unload on actual reserve
@@ -438,7 +629,7 @@ void AttributePool::unload() {
 }
 
 // Loads the attribute from a byte stream
-std::size_t AttributePool::restore(AttributeHandle hdl, util::IByteReader& attrStream,
+std::size_t AttributePool::restore(SphereAttributeHandle hdl, util::IByteReader& attrStream,
 					std::size_t start, std::size_t count) {
 	mAssert(hdl.index < m_attributes.size());
 	mAssert(!m_attributes[hdl.index].erased);
@@ -455,7 +646,7 @@ std::size_t AttributePool::restore(AttributeHandle hdl, util::IByteReader& attrS
 	return read / attribute.elemSize;
 }
 
-std::size_t AttributePool::store(AttributeHandle hdl, util::IByteWriter& attrStream,
+std::size_t AttributePool::store(SphereAttributeHandle hdl, util::IByteWriter& attrStream,
 								 std::size_t start, std::size_t count) {
 	mAssert(hdl.index < m_attributes.size());
 	mAssert(!m_attributes[hdl.index].erased);
@@ -469,12 +660,16 @@ std::size_t AttributePool::store(AttributeHandle hdl, util::IByteWriter& attrStr
 	const char* mem = m_pools.template get<PoolHandle<Device::CPU>>().handle + attribute.poolOffset + elemSize * start;
 	return attrStream.write(mem, elemSize * count) / attribute.elemSize;
 }
-// Resolves a name to an attribute
-AttributeHandle AttributePool::get_attribute_handle(StringView name) {
-	auto mapIter = m_nameMap.find(name);
-	if(mapIter == m_nameMap.end())
-		throw std::runtime_error("Could not find attribute '" + std::string(name) + "'");
-	return AttributeHandle{ mapIter->second };
+
+std::size_t AttributePool::insert_attribute_at_first_empty(AttribInfo&& info) {
+	for(std::size_t i = 0u; i < m_attributes.size(); ++i) {
+		if(m_attributes[i].erased) {
+			m_attributes[i] = info;
+			return i;
+		}
+	}
+	m_attributes.push_back(info);
+	return m_attributes.size() - 1u;
 }
 
 // Explicit instantiations

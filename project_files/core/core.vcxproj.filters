@@ -155,6 +155,9 @@
     <Filter Include="Source Files\core\renderer\debug">
       <UniqueIdentifier>{e2aea9b7-0479-4fd4-9095-77c79a6c93e8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\scene\attributes">
+      <UniqueIdentifier>{b76e2087-235c-47e9-9cc3-979ce2422d6a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -237,9 +240,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\cameras\focus.cpp">
       <Filter>Source Files\core\cameras</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\scene\attribute.cpp">
-      <Filter>Source Files\core\scene</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\util\assert.cpp">
       <Filter>Source Files\util</Filter>
@@ -345,6 +345,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\scene\lights\hosek_sky_model.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\attributes\attribute.cpp">
+      <Filter>Source Files\core\scene\attributes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -852,9 +855,6 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct_info.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\attribute.hpp">
-      <Filter>Source Files\core\scene</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\emissive.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
     </ClInclude>
@@ -1125,6 +1125,15 @@
     <ClInclude Include="..\..\src\core\scene\lights\hosek_sky_model.hpp" />
     <ClInclude Include="..\..\src\util\fixed_hashmap.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\attributes\attribute.hpp">
+      <Filter>Source Files\core\scene\attributes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\attributes\attribute_handles.hpp">
+      <Filter>Source Files\core\scene\attributes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\attributes\attribute_sizes.hpp">
+      <Filter>Source Files\core\scene\attributes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

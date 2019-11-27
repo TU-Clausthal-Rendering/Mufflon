@@ -20,9 +20,9 @@ public:
 
 	static constexpr Device DEVICE = dev;
 
-	RendererBase(std::vector<const char*> vertexAttribs = {},
-				 std::vector<const char*> faceAttribs = {},
-				 std::vector<const char*> sphereAttribs = {}) :
+	RendererBase(std::vector<::mufflon::scene::AttributeIdentifier> vertexAttribs = {},
+				 std::vector<::mufflon::scene::AttributeIdentifier> faceAttribs = {},
+				 std::vector<::mufflon::scene::AttributeIdentifier> sphereAttribs = {}) :
 		m_vertexAttribs(std::move(vertexAttribs)),
 		m_faceAttribs(std::move(faceAttribs)),
 		m_sphereAttribs(std::move(sphereAttribs))
@@ -69,9 +69,9 @@ protected:
 	RenderBufferType m_outputBuffer;
 	// Hold tables with the vertex attributes to get the required data on
 	// scene-descriptor getters.
-	std::vector<const char*> m_vertexAttribs;
-	std::vector<const char*> m_faceAttribs;
-	std::vector<const char*> m_sphereAttribs;
+	std::vector<::mufflon::scene::AttributeIdentifier> m_vertexAttribs;
+	std::vector<::mufflon::scene::AttributeIdentifier> m_faceAttribs;
+	std::vector<::mufflon::scene::AttributeIdentifier> m_sphereAttribs;
 
 	// CPU gets the descriptor directly, everyone else gets a unique_ptr
 	std::conditional_t<DEVICE == Device::CPU || DEVICE == Device::OPENGL, scene::SceneDescriptor<DEVICE>,

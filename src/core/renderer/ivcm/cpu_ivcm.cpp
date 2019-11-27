@@ -294,7 +294,9 @@ Spectrum CpuIvcm::merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& ph
 
 
 CpuIvcm::CpuIvcm() :
-	RendererBase<Device::CPU, IvcmTargets>({"mean_curvature"}, {}, {})
+	RendererBase<Device::CPU, IvcmTargets>({
+		scene::AttributeIdentifier{scene::AttributeType::FLOAT, "mean_curvature"}
+	}, {}, {})
 {}
 CpuIvcm::~CpuIvcm() {}
 

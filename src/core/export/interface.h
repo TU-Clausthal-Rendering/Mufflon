@@ -69,20 +69,6 @@ typedef struct {
 } ProcessTime;
 
 typedef enum {
-	ATTR_CHAR,
-	ATTR_UCHAR,
-	ATTR_SHORT,
-	ATTR_USHORT,
-	ATTR_INT,
-	ATTR_UINT,
-	ATTR_LONG,
-	ATTR_ULONG,
-	ATTR_FLOAT,
-	ATTR_DOUBLE,
-	ATTR_COUNT
-} AttributeType;
-
-typedef enum {
 	MAT_LAMBERT,
 	MAT_COUNT
 } MaterialType;
@@ -171,20 +157,43 @@ typedef enum {
 	OBJ_EMISSIVE = 1
 } ObjectFlags;
 
-typedef struct {
-	AttributeType type;
-	uint32_t rows;
-} AttribDesc;
+typedef enum {
+	ATTRTYPE_CHAR,
+	ATTRTYPE_UCHAR,
+	ATTRTYPE_SHORT,
+	ATTRTYPE_USHORT,
+	ATTRTYPE_INT,
+	ATTRTYPE_UINT,
+	ATTRTYPE_LONG,
+	ATTRTYPE_ULONG,
+	ATTRTYPE_FLOAT,
+	ATTRTYPE_DOUBLE,
+	ATTRTYPE_UCHAR2,
+	ATTRTYPE_UCHAR3,
+	ATTRTYPE_UCHAR4,
+	ATTRTYPE_INT2,
+	ATTRTYPE_INT3,
+	ATTRTYPE_INT4,
+	ATTRTYPE_FLOAT2,
+	ATTRTYPE_FLOAT3,
+	ATTRTYPE_FLOAT4,
+	ATTRTYPE_SPHERE,
+	ATTRTYPE_COUNT
+} GeomAttributeType;
 
 typedef struct {
-	int32_t index;
-	AttribDesc type;
-	Boolean face;
-} PolygonAttributeHdl;
+	GeomAttributeType type;
+	const char* name;
+} VertexAttributeHdl;
 
 typedef struct {
-	int32_t index;
-	AttribDesc type;
+	GeomAttributeType type;
+	const char* name;
+} FaceAttributeHdl;
+
+typedef struct {
+	GeomAttributeType type;
+	const char* name;
 } SphereAttributeHdl;
 
 typedef struct {
@@ -318,12 +327,10 @@ enum RenderDevice {
 // Polygon interface
 CORE_API Boolean CDECL CDECL polygon_reserve(LodHdl lod, size_t vertices, size_t edges,
 											size_t tris, size_t quads);
-CORE_API PolygonAttributeHdl CDECL polygon_request_vertex_attribute(LodHdl lod,
-																	const char* name,
-																	AttribDesc type);
-CORE_API PolygonAttributeHdl CDECL polygon_request_face_attribute(LodHdl lod,
-																  const char* name,
-																  AttribDesc type);
+CORE_API VertexAttributeHdl CDECL polygon_request_vertex_attribute(LodHdl lod, const char* name,
+																	GeomAttributeType type);
+CORE_API FaceAttributeHdl CDECL polygon_request_face_attribute(LodHdl lod, const char* name,
+																  GeomAttributeType type);
 CORE_API VertexHdl CDECL polygon_add_vertex(LodHdl lod, Vec3 point, Vec3 normal, Vec2 uv);
 CORE_API FaceHdl CDECL polygon_add_triangle(LodHdl lod, UVec3 vertices);
 CORE_API FaceHdl CDECL polygon_add_triangle_material(LodHdl lod, UVec3 vertices,
@@ -335,20 +342,18 @@ CORE_API VertexHdl CDECL polygon_add_vertex_bulk(LodHdl lod, size_t count, const
 												 const BulkLoader* normals, const BulkLoader* uvs,
 												 const AABB* aabb, size_t* pointsRead, size_t* normalsRead,
 												 size_t* uvsRead);
-CORE_API Boolean CDECL polygon_set_vertex_attribute(LodHdl lod, const PolygonAttributeHdl* attr,
+CORE_API Boolean CDECL polygon_set_vertex_attribute(LodHdl lod, const VertexAttributeHdl attr,
 													VertexHdl vertex, const void* value);
 CORE_API Boolean CDECL polygon_set_vertex_normal(LodHdl lod, VertexHdl vertex, Vec3 normal);
 CORE_API Boolean CDECL polygon_set_vertex_uv(LodHdl lod, VertexHdl vertex, Vec2 uv);
-CORE_API Boolean CDECL polygon_set_face_attribute(LodHdl lod, const PolygonAttributeHdl* attr,
-											FaceHdl face, const void* value);
+CORE_API Boolean CDECL polygon_set_face_attribute(LodHdl lod, const FaceAttributeHdl attr,
+												  FaceHdl face, const void* value);
 CORE_API Boolean CDECL polygon_set_material_idx(LodHdl lod, FaceHdl face, MatIdx idx);
-CORE_API size_t CDECL polygon_set_vertex_attribute_bulk(LodHdl lod,
-														const PolygonAttributeHdl* attr,
+CORE_API size_t CDECL polygon_set_vertex_attribute_bulk(LodHdl lod, const VertexAttributeHdl attr,
 														VertexHdl startVertex, size_t count,
 														const BulkLoader* stream);
-CORE_API size_t CDECL polygon_set_face_attribute_bulk(LodHdl lod,
-												   const PolygonAttributeHdl* attr,
-												   FaceHdl startFace, size_t count,
+CORE_API size_t CDECL polygon_set_face_attribute_bulk(LodHdl lod, const FaceAttributeHdl attr,
+													  FaceHdl startFace, size_t count,
 													  const BulkLoader* stream);
 CORE_API size_t CDECL polygon_set_material_idx_bulk(LodHdl lod, FaceHdl startFace, size_t count,
 													const BulkLoader* stream);
@@ -361,20 +366,19 @@ CORE_API Boolean CDECL polygon_get_bounding_box(LodHdl lod, Vec3* min, Vec3* max
 
 // Spheres interface
 CORE_API Boolean CDECL spheres_reserve(LodHdl lod, size_t count);
-CORE_API SphereAttributeHdl CDECL spheres_request_attribute(LodHdl lod,
-															const char* name,
-															AttribDesc type);
+CORE_API SphereAttributeHdl CDECL spheres_request_attribute(LodHdl lod, const char* name,
+															GeomAttributeType type);
 CORE_API SphereHdl CDECL spheres_add_sphere(LodHdl lod, Vec3 point, float radius);
 CORE_API SphereHdl CDECL spheres_add_sphere_material(LodHdl lod, Vec3 point,
 													 float radius, MatIdx idx);
 CORE_API SphereHdl CDECL spheres_add_sphere_bulk(LodHdl lod, size_t count,
 												 const BulkLoader* stream, const AABB* aabbb,
 												 size_t* readSpheres);
-CORE_API Boolean CDECL spheres_set_attribute(LodHdl lod, const SphereAttributeHdl* attr,
+CORE_API Boolean CDECL spheres_set_attribute(LodHdl lod, const SphereAttributeHdl attr,
 									   SphereHdl sphere, const void* value);
 CORE_API Boolean CDECL spheres_set_material_idx(LodHdl lod, SphereHdl sphere,
 										  MatIdx idx);
-CORE_API size_t CDECL spheres_set_attribute_bulk(LodHdl lod, const SphereAttributeHdl* attr,
+CORE_API size_t CDECL spheres_set_attribute_bulk(LodHdl lod, const SphereAttributeHdl attr,
 											  SphereHdl startSphere, size_t count,
 											  const BulkLoader* stream);
 CORE_API size_t CDECL spheres_set_material_idx_bulk(LodHdl lod, SphereHdl startSphere,
