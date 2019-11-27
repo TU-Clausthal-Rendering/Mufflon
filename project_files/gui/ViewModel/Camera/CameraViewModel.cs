@@ -8,6 +8,7 @@ using gui.Model;
 using gui.Model.Camera;
 using gui.Model.Scene;
 using gui.Dll;
+using gui.Utility;
 
 namespace gui.ViewModel.Camera
 {
@@ -101,12 +102,37 @@ namespace gui.ViewModel.Camera
             }
         }
 
-        public float PositionX => m_parent.Position.X;
-        public float PositionY => m_parent.Position.Y;
-        public float PositionZ => m_parent.Position.Z;
-        public float DirectionX => m_parent.ViewDirection.X;
-        public float DirectionY => m_parent.ViewDirection.Y;
-        public float DirectionZ => m_parent.ViewDirection.Z;
+        public float PositionX
+        {
+            get => m_parent.Position.X;
+            set => m_parent.Position = new Vec3<float>(value, m_parent.Position.Y, m_parent.Position.Z);
+        }
+        public float PositionY
+        {
+            get => m_parent.Position.Y;
+            set => m_parent.Position = new Vec3<float>(m_parent.Position.X, value, m_parent.Position.Z);
+        }
+        public float PositionZ
+        {
+            get => m_parent.Position.Z;
+            set => m_parent.Position = new Vec3<float>(m_parent.Position.X, m_parent.Position.Y, value);
+        }
+
+        public float DirectionX
+        {
+            get => m_parent.ViewDirection.X;
+            set => m_parent.ViewDirection = new Vec3<float>(value, m_parent.ViewDirection.Y, m_parent.ViewDirection.Z);
+        }
+        public float DirectionY
+        {
+            get => m_parent.ViewDirection.Y;
+            set => m_parent.ViewDirection = new Vec3<float>(m_parent.ViewDirection.X, value, m_parent.ViewDirection.Z);
+        }
+        public float DirectionZ
+        {
+            get => m_parent.ViewDirection.Z;
+            set => m_parent.ViewDirection = new Vec3<float>(m_parent.ViewDirection.X, m_parent.ViewDirection.Y, value);
+        }
 
         // TODO: couple this with a display of position/view direction
         public ResetCameraCommand ResetTransRotCommand => m_resetTransRotCommand;
