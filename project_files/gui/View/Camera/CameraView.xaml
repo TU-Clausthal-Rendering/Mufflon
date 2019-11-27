@@ -100,15 +100,15 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock
-                          Grid.Column="0"
-                          Text="{Binding PositionX, StringFormat={}{0:0.###}, UpdateSourceTrigger=PropertyChanged}"/>
-                    <TextBlock
-                          Grid.Column="1"
-                          Text="{Binding PositionY, StringFormat={}{0:0.###}, UpdateSourceTrigger=PropertyChanged}"/>
-                    <TextBlock
-                          Grid.Column="2"
-                          Text="{Binding PositionZ, StringFormat={}{0:0.###}, UpdateSourceTrigger=PropertyChanged}"/>
+                    <helper:EnterTextBox
+                        Grid.Column="0"
+                        Text="{Binding PositionX, StringFormat={}{0:0.###}}"/>
+                    <helper:EnterTextBox
+                        Grid.Column="1"
+                        Text="{Binding PositionY, StringFormat={}{0:0.###}}"/>
+                    <helper:EnterTextBox
+                        Grid.Column="2"
+                        Text="{Binding PositionZ, StringFormat={}{0:0.###}}"/>
                 </Grid>
 
                 <TextBlock
@@ -126,15 +126,15 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock
-                          Grid.Column="0"
-                          Text="{Binding DirectionX, StringFormat={}{0:0.###}, UpdateSourceTrigger=PropertyChanged}"/>
-                    <TextBlock
-                          Grid.Column="1"
-                          Text="{Binding DirectionY, StringFormat={}{0:0.###}, UpdateSourceTrigger=PropertyChanged}"/>
-                    <TextBlock
-                          Grid.Column="2"
-                          Text="{Binding DirectionZ, StringFormat={}{0:0.###}, UpdateSourceTrigger=PropertyChanged}"/>
+                    <helper:EnterTextBox
+                        Grid.Column="0"
+                        Text="{Binding DirectionX, StringFormat={}{0:0.###}}"/>
+                    <helper:EnterTextBox
+                        Grid.Column="1"
+                        Text="{Binding DirectionY, StringFormat={}{0:0.###}}"/>
+                    <helper:EnterTextBox
+                        Grid.Column="2"
+                        Text="{Binding DirectionZ, StringFormat={}{0:0.###}}"/>
                 </Grid>
             </Grid>
         </StackPanel>
