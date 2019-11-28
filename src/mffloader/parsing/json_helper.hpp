@@ -90,13 +90,20 @@ template < class T >
 inline void read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val,
 		  std::vector<T>& vals) {
 	if(!val->value.IsArray()) {
-		state.expected = ParserState::Value::ARRAY;
-		throw ParserException(state);
+		vals.push_back(read<T>(state, val->value));
+		return;
 	}
 	state.objectNames.push_back(val->name.GetString());
-	vals.reserve(vals.size() + val->value.Size());
-	for(rapidjson::SizeType i = 0u; i < val->value.Size(); ++i)
-		vals.push_back(read<T>(state, val->value[i]));
+	// We cover two cases: Array of array and only array (= single array)
+	if(val->value.Size() == 0)
+		return;
+	if(val->value[0].IsArray()) {
+		vals.reserve(vals.size() + val->value.Size());
+		for(rapidjson::SizeType i = 0u; i < val->value.Size(); ++i)
+			vals.push_back(read<T>(state, val->value[i]));
+	} else {
+		vals.push_back(read<T>(state, val));
+	}
 	state.objectNames.pop_back();
 }
 
