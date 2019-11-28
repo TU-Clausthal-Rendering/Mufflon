@@ -56,10 +56,6 @@ public:
 	static T* realloc(T* ptr, std::size_t prev, std::size_t next) {
 		static_assert(std::is_trivially_copyable<T>::value,
 					  "Must be trivially copyable");
-		static_assert(std::is_trivially_constructible<T>::value,
-					  "Must be trivially constructible");
-		static_assert(std::is_trivially_destructible<T>::value,
-					  "Must be trivially destructible");
 		(void)prev;
 		void* newPtr = std::realloc(ptr, sizeof(T) * next);
 		if(newPtr == nullptr)

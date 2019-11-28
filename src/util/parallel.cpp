@@ -16,6 +16,14 @@ int get_thread_num() {
 #endif
 }
 
+int get_max_thread_num() {
+#ifndef DEBUG_ENABLED
+	return omp_get_max_threads();
+#else
+	return 1;
+#endif
+}
+
 int get_current_thread_idx() {
 #ifndef DEBUG_ENABLED
 	return omp_get_thread_num();

@@ -11,6 +11,7 @@
 #include <cuda_runtime_api.h>
 #include <ei/3dtypes.hpp>
 #include <device_launch_parameters.h>
+#include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 #include <thrust/device_ptr.h>
 
@@ -28,7 +29,6 @@ static_assert(MAX_ACCEL_STRUCT_PARAMETER_SIZE >= sizeof(LBVH<Device::CPU>),
 
 // Sentinel to detect end of parents[] pointer hierarchy
 constexpr i32 TreeHead = 0x10000000;
-
 
 // Type trait to derive some dependent types from a descriptor.
 template<typename Desc> struct desc_info {};
@@ -577,7 +577,8 @@ __global__ void copy_to_collapsed_bvhD(
 template < typename DescType >
 void LBVHBuilder::build_lbvh(const DescType& desc,
 							 const ei::Box& currentBB,
-							 const i32 numPrimitives
+							 const i32 numPrimitives,
+							 const bool parallelize
 ) {
 	if(numPrimitives == 1) { // Not necessary to build anything - trace code will skip the BVH
 		m_primIds.resize(4); // Make sure there is some memory (needs_rebuild depends on that) TODO: store simple bool instead?
@@ -587,7 +588,8 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		// It is indeed necessary to have a zero here in case of 1 instance and 1 primitive only
 		return;
 	}
-
+	
+	const auto executionPolicy = parallelize ? thrust::host : thrust::seq;
 	const i32 numInternalNodes = numPrimitives - 1;
 	const i32 numNodes = numInternalNodes + numPrimitives;
 
@@ -644,14 +646,15 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 							  primIdsUnsorted, primIds);
 			cuda::check_error(cudaGetLastError());
 		} else {
-#pragma PARALLEL_FOR
+#pragma PARALLEL_FOR_COND(parallelize)
 			for(i32 idx = 0; idx < numPrimitives; idx++) {
 				sortedMortonCodes[idx] = calculate_morton_code<DescType>(desc, idx, currentBB);
 				primIds[idx] = idx;
 			}
 
 			// Sort based on Morton codes.
-			thrust::sort_by_key(sortedMortonCodes.get(), sortedMortonCodes.get() + numPrimitives, primIds);
+			thrust::sort_by_key(executionPolicy, sortedMortonCodes.get(),
+								sortedMortonCodes.get() + numPrimitives, primIds);
 		}
 
 		// Create BVH.
@@ -666,7 +669,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 				parents.get());
 			cuda::check_error(cudaGetLastError());
 		} else {
-#pragma PARALLEL_FOR
+#pragma PARALLEL_FOR_COND(parallelize)
 			for(i32 idx = 0; idx < numInternalNodes; idx++)
 				build_lbvh_tree<MortonCode_t<DescType>>(numPrimitives,
 														sortedMortonCodes.get(), parents.get(), idx);
@@ -698,7 +701,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		// We need to release the pointer from deviceCounters here since the deallocation is part of tmpMem for CUDA side
 		deviceCounters.release();
 	} else {
-#pragma PARALLEL_FOR
+#pragma PARALLEL_FOR_COND(parallelize)
 		for(i32 idx = 0; idx < numPrimitives; idx++) {
 			calculate_bounding_boxes(desc, idx, primIds[idx],
 									 numPrimitives, parents.get(), boundingBoxes.get(),
@@ -716,7 +719,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 															   );
 		cuda::check_error(cudaGetLastError());
 	} else {
-#pragma PARALLEL_FOR
+#pragma PARALLEL_FOR_COND(parallelize)
 		for(i32 idx = 0; idx < numPrimitives; idx++) {
 			mark_collapsed_nodes<DescType>(boundingBoxes.get(), parents.get(),
 										   idx + numInternalNodes, collapseOffsets.get());
@@ -731,7 +734,8 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		numRemovedInternalNodes = numInternalNodes - numRemovedInternalNodes;
 	} else {
 		// Scan to get values for offsets.
-		thrust::inclusive_scan(collapseOffsets.get(), collapseOffsets.get() + numInternalNodes, collapseOffsets.get());
+		thrust::inclusive_scan(executionPolicy, collapseOffsets.get(),
+							   collapseOffsets.get() + numInternalNodes, collapseOffsets.get());
 		numRemovedInternalNodes = numInternalNodes - collapseOffsets[numInternalNodes - 1];
 	}
 
@@ -749,7 +753,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 			collapseOffsets.get(), collapsedBVH);
 		cuda::check_error(cudaGetLastError());
 	} else {
-#pragma PARALLEL_FOR
+#pragma PARALLEL_FOR_COND(parallelize)
 		for(i32 idx = 1; idx < numNodes; ++idx)
 			copy_to_collapsed_bvh<DescType>(
 				boundingBoxes.get(), parents.get(), collapseOffsets.get(),
@@ -758,24 +762,25 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 }
 
 template < Device dev >
-void LBVHBuilder::build(LodDescriptor<dev>& obj, const ei::Box& currentBB) {
+void LBVHBuilder::build(LodDescriptor<dev>& obj, const ei::Box& currentBB,
+						const bool parallelize) {
 	if(dev == Device::OPENGL) return;
-	build_lbvh<LodDescriptor<dev>>(obj, currentBB, obj.numPrimitives);
+	build_lbvh<LodDescriptor<dev>>(obj, currentBB, obj.numPrimitives, parallelize);
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
 }
 
-template void LBVHBuilder::build<Device::CPU>(LodDescriptor<Device::CPU>&, const ei::Box&);
-template void LBVHBuilder::build<Device::CUDA>(LodDescriptor<Device::CUDA>&, const ei::Box&);
-//template void LBVHBuilder::build<Device::OPENGL>(LodDescriptor<Device::OPENGL>&, const ei::Box&);
-template<> void LBVHBuilder::build<Device::OPENGL>(LodDescriptor<Device::OPENGL>&, const ei::Box&) {}
+template void LBVHBuilder::build<Device::CPU>(LodDescriptor<Device::CPU>&, const ei::Box&, const bool parallelize);
+template void LBVHBuilder::build<Device::CUDA>(LodDescriptor<Device::CUDA>&, const ei::Box&, const bool parallelize);
+//template void LBVHBuilder::build<Device::OPENGL>(LodDescriptor<Device::OPENGL>&, const ei::Box&, const bool parallelize);
+template<> void LBVHBuilder::build<Device::OPENGL>(LodDescriptor<Device::OPENGL>&, const ei::Box&, const bool parallelize) {}
 
 template < Device dev >
 void LBVHBuilder::build(
 	const SceneDescriptor<dev>& scene
 ) {
 	logInfo("[LBVHBuilder::build] Building BVH for ", scene.numInstances, " instances.");
-	build_lbvh<SceneDescriptor<dev>>(scene, scene.aabb, scene.numInstances);
+	build_lbvh<SceneDescriptor<dev>>(scene, scene.aabb, scene.numInstances, true);
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
 }

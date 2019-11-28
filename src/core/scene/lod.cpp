@@ -12,7 +12,7 @@ void Lod::clear_accel_structure() {
 }
 
 template < Device dev >
-LodDescriptor<dev> Lod::get_descriptor() {
+LodDescriptor<dev> Lod::get_descriptor(const bool allowSerialBvhBuild) {
 	// TODO: LOD that shit
 	LodDescriptor<dev> desc{
 		m_geometry.get<geometry::Polygons>().get_descriptor<dev>(),
@@ -21,12 +21,17 @@ LodDescriptor<dev> Lod::get_descriptor() {
 		AccelDescriptor{}
 	};
 	desc.numPrimitives = desc.polygon.numTriangles + desc.polygon.numQuads + desc.spheres.numSpheres;
+	// If we're allowed to have a serial BVH build, we make it dependent on the number of primitives
+	const bool parallelBuild = allowSerialBvhBuild ? (desc.numPrimitives >= 1000u) : true;
+
 	// (Re)build acceleration structure if necessary
 	if(m_accelStruct.needs_rebuild()) {
-		logInfo("[Lod::get_descriptor] Building accelleration structure for object '", m_parent->get_name(),
-				"' with ", desc.numPrimitives, " primitives (", desc.polygon.numTriangles, "T / ", desc.polygon.numQuads, "Q / ", desc.spheres.numSpheres, "S).");
+		logPedantic("[Lod::get_descriptor] Building accelleration structure for object '",
+					m_parent->get_name(), "' with ", desc.numPrimitives, " primitives (",
+					desc.polygon.numTriangles, "T / ", desc.polygon.numQuads, "Q / ",
+					desc.spheres.numSpheres, "S).");
 		auto timer = Profiler::instance().start<CpuProfileState>("[Lod::get_descriptor] build object BVH.");
-		m_accelStruct.build(desc, get_bounding_box());
+		m_accelStruct.build(desc, get_bounding_box(), parallelBuild);
 	}
 	desc.accelStruct = m_accelStruct.acquire_const<dev>();
 	return desc;
@@ -79,9 +84,9 @@ void Lod::update_attribute_descriptor(LodDescriptor<dev>& descriptor,
 	m_geometry.get<geometry::Spheres>().update_attribute_descriptor<dev>(descriptor.spheres, sphereAttribs);
 }
 
-template LodDescriptor<Device::CPU> Lod::get_descriptor<Device::CPU>();
-template LodDescriptor<Device::CUDA> Lod::get_descriptor<Device::CUDA>();
-template LodDescriptor<Device::OPENGL> Lod::get_descriptor<Device::OPENGL>();
+template LodDescriptor<Device::CPU> Lod::get_descriptor<Device::CPU>(const bool allowSerialBvhBuild);
+template LodDescriptor<Device::CUDA> Lod::get_descriptor<Device::CUDA>(const bool allowSerialBvhBuild);
+template LodDescriptor<Device::OPENGL> Lod::get_descriptor<Device::OPENGL>(const bool allowSerialBvhBuild);
 template void Lod::update_attribute_descriptor<Device::CPU>(LodDescriptor<Device::CPU>&,
 															   const std::vector<AttributeIdentifier>&,
 															   const std::vector<AttributeIdentifier>&,

@@ -62,7 +62,7 @@ public:
 	}
 
 	template < Device dev >
-	void build(LodDescriptor<dev>& obj, const ei::Box& currentBB);
+	void build(LodDescriptor<dev>& obj, const ei::Box& currentBB, const bool parallelize);
 
 	template < Device dev >
 	void build(const SceneDescriptor<dev>& scene);
@@ -114,7 +114,8 @@ private:
 	template < typename DescType >
 	void build_lbvh(const DescType& desc,
 					const ei::Box& sceneBB,
-					const i32 numPrimitives);
+					const i32 numPrimitives,
+					const bool parallelize);
 };
 
 }} // namespace scene::accel_struct
