@@ -69,7 +69,7 @@ public:
 	// Get the descriptor of the object (including all geometry, but without attributes)
 	// Synchronizes implicitly
 	template < Device dev >
-	LodDescriptor<dev> get_descriptor();
+	LodDescriptor<dev> get_descriptor(const bool allowSerialBvhBuild);
 	// Updates the given descriptor's attribute fields
 	template < Device dev >
 	void update_attribute_descriptor(LodDescriptor<dev>& descriptor,

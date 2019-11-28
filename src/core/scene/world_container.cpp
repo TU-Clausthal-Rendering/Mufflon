@@ -212,7 +212,7 @@ InstanceHandle WorldContainer::create_instance(ObjectHandle obj, const u32 anima
 		// Check for out-of-order insert
 		if(m_frameInstanceIndices.size() == index) {
 			// New frame added
-			m_frameInstanceIndices.emplace_back(m_instances.size(), 1u);
+			m_frameInstanceIndices.emplace_back(static_cast<u32>(m_instances.size()), 1u);
 		} else if(m_frameInstanceIndices.size() == (index + 1u)) {
 			// Additional instance for current frame
 			++m_frameInstanceIndices.back().second;
