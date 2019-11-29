@@ -102,6 +102,9 @@ void mufflon::renderer::DebugBvhRenderer::post_reset()
 		for(int i = 0; i < sceneDesc.numInstances; ++i)
 		{
 			auto lodIdx = sceneDesc.lodIndices[i];
+			if(!sceneDesc.is_instance_present(lodIdx))
+				continue;
+			const auto& lod = sceneDesc.lods[lodIdx];
 			bbox.push_back(sceneDesc.cpuDescriptor->aabbs[lodIdx]);
 		}
 

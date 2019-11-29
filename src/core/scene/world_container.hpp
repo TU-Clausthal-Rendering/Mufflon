@@ -108,8 +108,9 @@ public:
 	// All returned handles remain valid over the lifetime of the world unless otherwise indicated
 	ObjectHandle get_object(const StringView name);
 	InstanceHandle get_instance(std::size_t index, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
-	const ei::Mat3x4& get_instance_transformation(ConstInstanceHandle instance) const;
-	void set_instance_transformation(ConstInstanceHandle instance, const ei::Mat3x4& mat);
+	const ei::Mat3x4& get_world_to_instance_transformation(ConstInstanceHandle instance) const;
+	ei::Mat3x4 compute_instance_to_world_transformation(ConstInstanceHandle instance) const;
+	void set_world_to_instance_transformation(ConstInstanceHandle instance, const ei::Mat3x4& mat);
 	ScenarioHandle get_scenario(const StringView name);
 	ScenarioHandle get_scenario(std::size_t index);
 	ScenarioHandle get_current_scenario() const noexcept;
@@ -208,7 +209,7 @@ private:
 	// before adding instances). First come instances valid for all frames,
 	// then successively those present for concrete frames.
 	std::vector<Instance> m_instances;
-	std::vector<ei::Mat3x4> m_instanceTransformations;
+	std::vector<ei::Mat3x4> m_worldToInstanceTrans;
 	// Stores the start/end instance indices for each frame
 	std::vector<std::pair<u32, u32>> m_frameInstanceIndices;
 

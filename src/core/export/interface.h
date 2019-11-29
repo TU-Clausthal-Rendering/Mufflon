@@ -392,7 +392,8 @@ CORE_API LodHdl CDECL object_add_lod(ObjectHdl hdl, LodLevel level);
 CORE_API Boolean CDECL object_get_id(ObjectHdl hdl, uint32_t* id);
 
 // Instance interface
-CORE_API Boolean CDECL instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat);
+CORE_API Boolean CDECL instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat,
+														  const bool isWorldToInst);
 CORE_API Boolean CDECL instance_get_transformation_matrix(InstanceHdl inst, Mat3x4* mat);
 CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max, LodLevel lod);
 

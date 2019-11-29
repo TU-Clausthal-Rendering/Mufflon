@@ -523,8 +523,9 @@ RayIntersectionResult first_intersection(
 		if(primId >= offsetSpheres) { // Sphere?
 			const i32 sphId = primId - offsetSpheres;
 			const ei::Vec3 hitPoint = ray.origin + hitT * ray.direction;
-			const Point center = transform(obj.spheres.spheres[sphId].center, scene.instanceToWorld[hitInstanceId]);
-			geoNormal = normalize(hitPoint - center); // Normalization required for acos() below
+			const auto localHitPoint = transform(hitPoint, scene.worldToInstance[hitInstanceId]);
+			const Point& center = obj.spheres.spheres[sphId].center;
+			geoNormal = normalize(localHitPoint - center); // Normalization required for acos() below
 
 			if(geoNormal.x == 0.0f && geoNormal.y == 0.0f)
 				tangentX = ei::Vec3(1.0f, 0.0f, 0.0f);

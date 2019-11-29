@@ -112,6 +112,10 @@ struct SceneDescriptor {
 	struct Empty {};
 	std::conditional_t < dev == Device::OPENGL, const SceneDescriptor<Device::CPU>*, Empty> cpuDescriptor;
 
+	static constexpr CUDA_FUNCTION bool is_instance_present(const u32 lodIndex) noexcept {
+		return lodIndex != std::numeric_limits<u32>::max();
+	}
+
 	inline CUDA_FUNCTION MaterialIndex get_material_index(PrimitiveHandle primitive) const {
 		const LodDescriptor<dev>& object = lods[lodIndices[primitive.instanceId]];
 		const u32 faceCount = object.polygon.numTriangles + object.polygon.numQuads;

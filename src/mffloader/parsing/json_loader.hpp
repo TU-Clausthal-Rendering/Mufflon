@@ -30,7 +30,7 @@ private:
 
 class JsonLoader {
 public:
-	static constexpr const char FILE_VERSION[] = "1.3";
+	static constexpr const char FILE_VERSION[] = "1.4";
 	static constexpr float DEFAULT_NEAR_PLANE = 1.e-4f;
 	static constexpr float DEFAULT_FAR_PLANE = 2.f;
 

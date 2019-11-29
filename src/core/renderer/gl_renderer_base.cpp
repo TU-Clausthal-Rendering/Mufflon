@@ -117,7 +117,12 @@ void GlRenderer::draw_triangles(const gl::Pipeline& pipe, Attribute attribs) {
 
 	for(size_t i = 0; i < static_cast<size_t>(sceneDesc.numInstances); ++i) {
 		const auto idx = sceneDesc.lodIndices[i];
+		if(!sceneDesc.is_instance_present(idx))
+			continue;
 		const scene::LodDescriptor<Device::OPENGL>& lod = sceneDesc.lods[idx];
+
+		printf("%u %u %u\n", idx, sceneDesc.instanceToWorld.id, sceneDesc.worldToInstance.id);
+		fflush(stdout);
 
 		if(!lod.polygon.numTriangles) continue;
 
@@ -159,6 +164,8 @@ void GlRenderer::draw_spheres(const gl::Pipeline& pipe, Attribute attribs) {
 
 	for(size_t i = 0; i < static_cast<size_t>(sceneDesc.numInstances); ++i) {
 		const auto idx = sceneDesc.lodIndices[i];
+		if(!sceneDesc.is_instance_present(idx))
+			continue;
 		const scene::LodDescriptor<Device::OPENGL>& lod = sceneDesc.lods[idx];
 
 		if(!lod.spheres.numSpheres) continue;
@@ -190,6 +197,8 @@ void GlRenderer::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 
 	for(size_t i = 0; i < static_cast<size_t>(sceneDesc.numInstances); ++i) {
 		const auto idx = sceneDesc.lodIndices[i];
+		if(!sceneDesc.is_instance_present(idx))
+			continue;
 		const scene::LodDescriptor<Device::OPENGL>& lod = sceneDesc.lods[idx];
 
 		if(!lod.polygon.numQuads) continue;

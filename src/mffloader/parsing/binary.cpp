@@ -768,7 +768,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			lod = read_lod(m_objects[objId], lod);
 		}
 
-		if(!instance_set_transformation_matrix(instHdl, &transMat))
+		if(!instance_set_transformation_matrix(instHdl, &transMat, m_loadWorldToInstTrans))
 			throw std::runtime_error("Failed to set transformation matrix for instance of object ID "
 									 + std::to_string(objId));
 
@@ -915,8 +915,9 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 							 const util::FixedHashMap<StringView, mufflon::u32>& objectLods,
 							 util::FixedHashMap<StringView, InstanceMapping>& instanceLods,
-							 const bool deinstance) {
+							 const bool deinstance, const bool loadWorldToInstTrans) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::load_file");
+	m_loadWorldToInstTrans = loadWorldToInstTrans;
 	m_filePath = std::move(file);
 	if(!fs::exists(m_filePath))
 		throw std::runtime_error("Binary file '" + m_filePath.string() + "' doesn't exist");
