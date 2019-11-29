@@ -3,15 +3,15 @@
 
 namespace mufflon::scene {
 
-Instance::Instance(Object& obj, ei::Mat3x4 trans) :
-	m_objRef(&obj)
+Instance::Instance(Object& obj, u32 index) :
+	m_objRef(&obj),
+	m_index{ index }
 {
-	this->set_transformation_matrix(std::move(trans));
 	m_objRef->increase_instance_counter();
 }
 
-ei::Box Instance::get_bounding_box(u32 lod) const noexcept {
-	return transform(m_objRef->get_lod(lod).get_bounding_box(), m_transMat);
+ei::Box Instance::get_bounding_box(u32 lod, const ei::Mat3x4& transformation) const noexcept {
+	return transform(m_objRef->get_lod(lod).get_bounding_box(), transformation);
 }
 
 void Instance::set_object(Object& object) noexcept

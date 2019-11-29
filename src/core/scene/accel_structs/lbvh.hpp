@@ -65,7 +65,7 @@ public:
 	void build(LodDescriptor<dev>& obj, const ei::Box& currentBB, const bool parallelize);
 
 	template < Device dev >
-	void build(const SceneDescriptor<dev>& scene);
+	void build(const SceneDescriptor<dev>& scene, const u32 actualInstCount = 0u);
 
 	template < Device dev >
 	AccelDescriptor acquire_const() {
@@ -115,7 +115,8 @@ private:
 	void build_lbvh(const DescType& desc,
 					const ei::Box& sceneBB,
 					const i32 numPrimitives,
-					const bool parallelize);
+					const bool parallelize,
+					const u32 actualPrimCount);
 };
 
 }} // namespace scene::accel_struct
