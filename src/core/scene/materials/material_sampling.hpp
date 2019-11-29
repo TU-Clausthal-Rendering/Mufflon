@@ -16,6 +16,7 @@
 #include "microfacet_refractive.hpp"
 #include "microfacet_full.hpp"
 #include <cuda_runtime.h>
+#include <cmath>
 
 namespace mufflon { namespace scene { namespace materials {
 
@@ -133,8 +134,8 @@ sample(const TangentSpace& tangentSpace,
 						/ (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
 	}
 
-	mAssert(!std::isnan(res.throughput.x) && !std::isnan(res.excident.x)
-			&& !std::isnan(float(res.pdf.forw)) && !std::isnan(float(res.pdf.back)));
+	mAssert(!isnan(res.throughput.x) && !isnan(res.excident.x)
+			&& !isnan(float(res.pdf.forw)) && !isnan(float(res.pdf.back)));
 
 	return res;
 }
@@ -209,8 +210,8 @@ evaluate(const TangentSpace& tangentSpace,
 
 	// Early out if result is discarded anyway
 	if(res.value == 0.0f) return math::EvalValue{};
-	mAssert(!std::isnan(res.value.x) && !std::isnan(float(res.pdf.forw))
-			&& !std::isnan(float(res.pdf.back)));
+	mAssert(!isnan(res.value.x) && !isnan(float(res.pdf.forw))
+			&& !isnan(float(res.pdf.back)));
 
 	// Shading normal caused density correction.
 	if(lightNormal != nullptr) {

@@ -165,7 +165,7 @@ source_group(deps\\stbi FILES ${STBI_SOURCE_LIST})
 source_group(bindings FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/pythonbinding/bindings.py")
 
 # Build artifacts (we include the deps sources to get them to show up in visual studio)
-add_library(core SHARED ${MUFFLON_CORE_SOURCE_LIST} ${CHINOISE_SOURCE_LIST} ${EPSILON_SOURCE_LIST})
+add_library(core SHARED ${MUFFLON_CORE_SOURCE_LIST} ${CHINOISE_SOURCE_LIST} ${EPSILON_SOURCE_LIST} ${GLAD_SOURCE_LIST} ${CUB_SOURCE_LIST})
 add_library(gliloader MODULE ${MUFFLON_GLILOADER_SOURCE_LIST} ${EPSILON_SOURCE_LIST})
 add_library(mffloader SHARED ${MUFFLON_MFFLOADER_SOURCE_LIST} ${CHINOISE_SOURCE_LIST} ${EPSILON_SOURCE_LIST} ${MINIZ_SOURCE_LIST})
 add_library(pfmloader MODULE ${MUFFLON_PFMLOADER_SOURCE_LIST} ${EPSILON_SOURCE_LIST})
@@ -462,7 +462,7 @@ if(WIN32)
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
 			"${MUFFLON_OPENMESH_DIRECTORY}/$<CONFIG>/bin/OpenMeshCore$<$<CONFIG:Debug>:d>.dll"
 			"${MUFFLON_OPENMESH_DIRECTORY}/$<CONFIG>/bin/OpenMeshTools$<$<CONFIG:Debug>:d>.dll"
-			"${MUFFLON_OPENDENOISE_DIRECTORY}/$<CONFIG>/bin/OpenImageDenoise$<$<CONFIG:Debug>:d>.dll"
+			"${MUFFLON_OPENDENOISE_DIRECTORY}/$<CONFIG>/bin/OpenImageDenoise.dll"
 			"${CMAKE_BINARY_DIR}/build/$<CONFIG>"
 	)
 else()

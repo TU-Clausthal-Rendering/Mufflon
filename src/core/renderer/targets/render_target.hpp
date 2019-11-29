@@ -6,6 +6,7 @@
 #include "core/export/api.h"
 #include "core/memory/residency.hpp"
 #include <ei/vector.hpp>
+#include <cmath>
 #include <type_traits>
 
 namespace mufflon { namespace renderer {
@@ -167,7 +168,7 @@ private:
 	// for floating-point types, one for the rest (which doesn't have NaN-checks)
 	template < class T >
 	inline CUDA_FUNCTION std::enable_if_t<std::is_floating_point<T>::value, T> check_nan(const T x) {
-		if(std::isnan(x)) {
+		if(isnan(x)) {
 			cuda::atomic_add<dev>(*m_nanCounter, 1u);
 			return T{ 0 };
 		}

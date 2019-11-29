@@ -7,6 +7,7 @@
 #include "medium.hpp"
 #include <cuda_runtime.h>
 #include <ei/vector.hpp>
+#include <cmath>
 
 namespace mufflon { namespace scene { namespace materials {
 
@@ -218,7 +219,7 @@ inline CUDA_FUNCTION ei::Vec2 sample_visible_slopes_beckmann(float sinTheta, flo
 	}
 	// sample slope Y
 	const float slopeY = math::erfInv(ei::clamp(2.0f*rnd.u1 - 1.0f, -0.99999f, 0.99999f));
-	mAssert(!std::isnan(slopeX) && !std::isnan(slopeY));
+	mAssert(!isnan(slopeX) && !isnan(slopeY));
 	return { slopeX, slopeY };
 }
 
