@@ -35,34 +35,6 @@ bool Scene::is_sane() const noexcept {
 	return true;
 }
 
-/*void Scene::reserve_objects(const u32 count) {
-	if(!m_objects.empty())
-		throw std::runtime_error("No objects must have been added before calling this");
-	m_objects = util::FixedHashMap<ObjectHandle, InstanceRef>(count);
-}
-void Scene::reserve_instances(const u32 count) {
-	m_instances.reserve(count);
-}
-
-void Scene::add_instance(InstanceHandle hdl) {
-	auto iter = m_objects.find(&hdl->get_object());
-	if(iter == m_objects.end()) {
-		// A new object: reserve the maximum amount of instance handles this can have
-		const u32 offset = static_cast<u32>(m_instances.size());
-		m_objects.emplace(&hdl->get_object(), InstanceRef{ offset, 1u });
-		m_instances.resize(m_instances.size() + hdl->get_object().get_instance_counter());
-		m_instances[offset] = hdl;
-	} else {
-		const std::size_t offset = iter->second.offset + iter->second.count;
-		mAssert(offset < m_instances.size());
-		m_instances[offset] = hdl;
-		++iter->second.count;
-	}
-	// Check if we already have the object somewhere
-	//m_boundingBox = ei::Box{ m_boundingBox, hdl->get_bounding_box(m_scenario.get_effective_lod(hdl)) };
-	clear_accel_structure();
-}*/
-
 void Scene::load_media(const std::vector<materials::Medium>& media) {
 	m_media.resize(sizeof(materials::Medium) * media.size());
 	materials::Medium* dst = as<materials::Medium>(m_media.acquire<Device::CPU>());
@@ -206,7 +178,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 		std::atomic_uint32_t lodIndex = 0u;
 
 		const auto t0 = std::chrono::high_resolution_clock::now();
-		const bool objLevelParallelism = dev != Device::CUDA && objCount >= 50;
+		const bool objLevelParallelism = dev == Device::CPU && objCount >= 50;
 #pragma PARALLEL_FOR_COND_DYNAMIC(objLevelParallelism)
 		for(int o = 0; o < objCount; ++o) {
 			auto& obj = *(m_objects.begin() + o);
