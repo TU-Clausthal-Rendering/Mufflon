@@ -169,7 +169,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 	// TODO: this currently assumes that we do not add or alter geometry, which is clearly wrong
 	// TODO: also needs to check for changed LoDs
 	const bool geometryChanged = m_accelStruct.needs_rebuild();
-	if(geometryChanged || sceneDescriptor.lodIndices == nullptr) {
+	if(geometryChanged || sceneDescriptor.lodIndices == nullptr || !sameAttribs) {
 		// Invalidate other descriptors
 		if(geometryChanged)
 			m_descStore.for_each([](auto& elem) { elem.lodIndices = {}; });
@@ -325,118 +325,6 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 		sceneDescriptor.numInstances = static_cast<i32>(m_instances.size());
 		sceneDescriptor.diagSize = len(m_boundingBox.max - m_boundingBox.min);
 		sceneDescriptor.aabb = m_boundingBox;
-		sceneDescriptor.lods = lodDevDesc.get();
-		sceneDescriptor.aabbs = lodAabbsDesc.get();
-	} else if(!sameAttribs) {
-		// We don't need to do everything, but we need to update all
-		// LoD-related data due to the possibly different execution order
-		std::unique_ptr<u32[]> lodIndices;
-		std::unique_ptr<LodDescriptor<dev>[]> lodDescs;
-		std::unique_ptr<ei::Box[]> lodAabbs;
-
-		// Create the object and instance descriptors
-		// This keeps track of instances for a given LoD
-		std::vector<std::unordered_map<u32, u32>> usedLods(get_max_thread_num());
-
-		// Preallocate the CPU-side arrays so we can multi-thread
-		lodIndices = std::make_unique<u32[]>(m_instances.size());
-		// TODO: this is a conservative estimate and wastes some memory for scenes
-		// with many LoDs
-		std::size_t descCountEstimate = 0u;
-		for(auto& obj : m_objects)
-			descCountEstimate += obj.first->get_lod_slot_count();
-		lodDescs = std::make_unique<LodDescriptor<dev>[]>(descCountEstimate);
-		lodAabbs = std::make_unique<ei::Box[]>(descCountEstimate);
-
-		// We parallelize this part for cases with many objects
-		const int objCount = static_cast<int>(m_objects.size());
-		std::atomic_uint32_t lodIndex = 0u;
-
-		const bool objLevelParallelism = dev != Device::CUDA && objCount >= 50;
-#pragma PARALLEL_FOR_COND_DYNAMIC(objLevelParallelism)
-		for(int o = 0; o < objCount; ++o) {
-			auto& obj = *(m_objects.begin() + o);
-
-			//for(auto& obj : m_objects) {
-			mAssert(obj.first != nullptr);
-			mAssert(obj.second.count != 0u);
-
-			// First gather which LoDs of this objects are used and
-			// collect the instance transformations
-			auto& currUsedLods = usedLods[get_current_thread_idx()];
-			currUsedLods.clear();
-			currUsedLods.reserve(obj.first->get_lod_slot_count());
-			const auto endIndex = obj.second.offset + obj.second.count;
-			for(std::size_t i = obj.second.offset; i < endIndex; ++i) {
-				const auto inst = m_instances[i];
-				mAssert(inst != nullptr);
-				const u32 instanceLod = m_scenario.get_effective_lod(inst);
-				mAssert(instanceLod < obj.first->get_lod_slot_count());
-				currUsedLods.emplace(instanceLod, static_cast<u32>(currUsedLods.size()));
-			}
-
-			// Reserve the proper amount of LoD descriptors
-			const auto threadLodIndex = lodIndex.fetch_add(static_cast<u32>(currUsedLods.size()));
-			auto currLodIndex = threadLodIndex;
-			// Now that we know all instances a LoD has we can create the descriptors uniquely
-			// and also perform displacement mapping if necessary
-			u32 prevLevel = std::numeric_limits<u32>::max();
-			for(const auto& currLevel : currUsedLods) {
-				// Now we can do the per-LoD things like displacement mapping and fetching descriptors
-				if(prevLevel != std::numeric_limits<u32>::max())
-					lodDescs[currLodIndex - 1u].next = currLevel.first;
-				Lod* lod = &obj.first->get_lod(currLevel.first);
-
-				// Determine if it's worth it to use a parallel build
-				lodDescs[currLodIndex] = lod->template get_descriptor<dev>(objLevelParallelism);
-				lodDescs[currLodIndex].previous = prevLevel;
-				lodAabbs[currLodIndex] = lod->get_bounding_box();
-				if(!sameAttribs)
-					lod->update_attribute_descriptor(lodDescs[currLodIndex], vertexAttribs, faceAttribs, sphereAttribs);
-				++currLodIndex;
-			}
-			if(!currUsedLods.empty())
-				lodDescs[currLodIndex - 1u].previous = prevLevel;
-
-			// Now write the proper instance indices and expand bounding box
-			for(std::size_t i = obj.second.offset; i < endIndex; ++i) {
-				const auto inst = m_instances[i];
-				const u32 instanceLod = m_scenario.get_effective_lod(inst);
-				const u32 index = currUsedLods[instanceLod];
-				lodIndices[i] = threadLodIndex + index;
-			}
-		}
-		logInfo("[Scene::get_descriptor] Build descriptors for ", lodIndex.load(), " LoDs");
-
-		// Allocate the device memory and copy over the descriptors
-		// Some of these don't need to be copied can be just taken when we're on the CPU
-		auto& lodDevDesc = m_lodDevDesc.template get<unique_device_ptr<NotGl<dev>, LodDescriptor<dev>[]>>();
-		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
-		if constexpr(dev == Device::CPU) {
-			lodDevDesc.reset(Allocator<Device::CPU>::realloc(lodDescs.release(), descCountEstimate, lodIndex.load()));
-			lodAabbsDesc.reset(Allocator<Device::CPU>::realloc(lodAabbs.release(), descCountEstimate, lodIndex.load()));
-		} else {
-			lodDevDesc = make_udevptr_array<NotGl<dev>, LodDescriptor<dev>>(lodIndex.load());
-			lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodIndex.load());
-			copy(lodDevDesc.get(), lodDescs.get(), sizeof(LodDescriptor<dev>) * lodIndex.load());
-			copy(lodAabbsDesc.get(), lodAabbs.get(), sizeof(ei::Box) * lodIndex.load());
-		}
-
-		if constexpr(dev != Device::OPENGL) {
-			auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<dev, u32[]>>();
-			if constexpr(dev == Device::CPU) {
-				instLodIndicesDesc.reset(lodIndices.release());
-			} else {
-				instLodIndicesDesc = make_udevptr_array<dev, u32>(m_instances.size());
-				copy<u32>(instLodIndicesDesc.get(), lodIndices.get(), sizeof(u32) * m_instances.size());
-			}
-			sceneDescriptor.lodIndices = instLodIndicesDesc.get();
-		} else {
-			// We cannot create a new lodIndices array here, because the type for OpenGL is the same as for the CPU side,
-			// which then overwrites the array in m_instLodIndicesDesc and leaves a dangling pointer in the CPU descriptor
-			sceneDescriptor.lodIndices = sceneDescriptor.cpuDescriptor->lodIndices;
-		}
-
 		sceneDescriptor.lods = lodDevDesc.get();
 		sceneDescriptor.aabbs = lodAabbsDesc.get();
 	}
