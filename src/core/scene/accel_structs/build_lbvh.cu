@@ -84,10 +84,21 @@ ei::Vec3 normalize_position(ei::Vec3 pos, const ei::Box& box) {
 	return sdiv(pos - box.min, span);
 }
 
+template < Device dev >
+CUDA_FUNCTION __forceinline__ bool is_masked_out(const LodDescriptor<dev>&, const i32 idx) {
+	return false;
+}
+template < Device dev >
+CUDA_FUNCTION __forceinline__ bool is_masked_out(const SceneDescriptor<dev>& desc, const i32 idx) {
+	return desc.lodIndices[idx] == std::numeric_limits<u32>::max();
+}
+
 template<typename DescType>
 CUDA_FUNCTION MortonCode_t<DescType>
 calculate_morton_code(const DescType& primitives, i32 idx,
 					  const ei::Box& sceneBB) {
+	if(is_masked_out(primitives, idx))
+		return std::numeric_limits<MortonCode_t<DescType>>::max();
 	const ei::Vec3 centroid = get_centroid(primitives, idx);
 	const ei::Vec3 normalizedPos = normalize_position(centroid, sceneBB);
 	mAssert(normalizedPos.x >= 0.0f && normalizedPos.x <= 1.0f
@@ -578,7 +589,8 @@ template < typename DescType >
 void LBVHBuilder::build_lbvh(const DescType& desc,
 							 const ei::Box& currentBB,
 							 const i32 numPrimitives,
-							 const bool parallelize
+							 const bool parallelize,
+							 const u32 actualPrimCount
 ) {
 	if(numPrimitives == 1) { // Not necessary to build anything - trace code will skip the BVH
 		m_primIds.resize(4); // Make sure there is some memory (needs_rebuild depends on that) TODO: store simple bool instead?
@@ -590,8 +602,9 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	}
 	
 	const auto executionPolicy = parallelize ? thrust::host : thrust::seq;
-	const i32 numInternalNodes = numPrimitives - 1;
-	const i32 numNodes = numInternalNodes + numPrimitives;
+	const i32 usedPrimCount = (actualPrimCount != 0u) ? actualPrimCount : numPrimitives;
+	const i32 numInternalNodes = usedPrimCount - 1;
+	const i32 numNodes = numInternalNodes + usedPrimCount;
 
 	// Device copy of descriptor
 	unique_device_ptr<DescType::DEVICE, DescType> deviceDesc;
@@ -664,14 +677,14 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 			i32 numBlocks, numThreads;
 			get_maximum_occupancy(numBlocks, numThreads, numInternalNodes, build_lbvh_treeD<MortonCode_t<DescType>>);
 			build_lbvh_treeD<MortonCode_t<DescType>> <<< numBlocks, numThreads >>> (
-				numPrimitives,
+				usedPrimCount,
 				sortedMortonCodes.get(),
 				parents.get());
 			cuda::check_error(cudaGetLastError());
 		} else {
 #pragma PARALLEL_FOR_COND(parallelize)
 			for(i32 idx = 0; idx < numInternalNodes; idx++)
-				build_lbvh_tree<MortonCode_t<DescType>>(numPrimitives,
+				build_lbvh_tree<MortonCode_t<DescType>>(usedPrimCount,
 														sortedMortonCodes.get(), parents.get(), idx);
 		}
 	}
@@ -688,11 +701,11 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		cudaFuncSetCacheConfig(calculate_bounding_boxesD<DescType>, cudaFuncCachePreferShared);
 		BoundingBoxFunctor functor;
 		i32 numBlocks, numThreads;
-		get_maximum_occupancy_variable_smem(numBlocks, numThreads, numPrimitives,
+		get_maximum_occupancy_variable_smem(numBlocks, numThreads, usedPrimCount,
 											calculate_bounding_boxesD<DescType>, functor);
 		const i32 bboxCacheSize = numThreads * sizeof(BBCache);
 		calculate_bounding_boxesD <<< numBlocks, numThreads, bboxCacheSize >>> (
-			deviceDesc.get(), numPrimitives, primIds, parents.get(),
+			deviceDesc.get(), usedPrimCount, primIds, parents.get(),
 			boundingBoxes.get(), deviceCounters.get(),
 			collapseOffsets.get()
 			);
@@ -702,9 +715,9 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		deviceCounters.release();
 	} else {
 #pragma PARALLEL_FOR_COND(parallelize)
-		for(i32 idx = 0; idx < numPrimitives; idx++) {
+		for(i32 idx = 0; idx < usedPrimCount; idx++) {
 			calculate_bounding_boxes(desc, idx, primIds[idx],
-									 numPrimitives, parents.get(), boundingBoxes.get(),
+									 usedPrimCount, parents.get(), boundingBoxes.get(),
 									 deviceCounters.get(), collapseOffsets.get());
 		}
 	}
@@ -712,7 +725,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 	// Find out which nodes can be collapsed according to SAH.
 	if (DescType::DEVICE == Device::CUDA) {
 		i32 numBlocks, numThreads;
-		get_maximum_occupancy(numBlocks, numThreads, numPrimitives, mark_nodesD<DescType>);
+		get_maximum_occupancy(numBlocks, numThreads, usedPrimCount, mark_nodesD<DescType>);
 		mark_nodesD<DescType> <<< numBlocks, numThreads >>> (numInternalNodes,
 															   boundingBoxes.get(), parents.get(),
 															   collapseOffsets.get()
@@ -720,7 +733,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		cuda::check_error(cudaGetLastError());
 	} else {
 #pragma PARALLEL_FOR_COND(parallelize)
-		for(i32 idx = 0; idx < numPrimitives; idx++) {
+		for(i32 idx = 0; idx < usedPrimCount; idx++) {
 			mark_collapsed_nodes<DescType>(boundingBoxes.get(), parents.get(),
 										   idx + numInternalNodes, collapseOffsets.get());
 		}
@@ -765,7 +778,8 @@ template < Device dev >
 void LBVHBuilder::build(LodDescriptor<dev>& obj, const ei::Box& currentBB,
 						const bool parallelize) {
 	if(dev == Device::OPENGL) return;
-	build_lbvh<LodDescriptor<dev>>(obj, currentBB, obj.numPrimitives, parallelize);
+	build_lbvh<LodDescriptor<dev>>(obj, currentBB, obj.numPrimitives, parallelize,
+								   0u);
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
 }
@@ -777,18 +791,21 @@ template<> void LBVHBuilder::build<Device::OPENGL>(LodDescriptor<Device::OPENGL>
 
 template < Device dev >
 void LBVHBuilder::build(
-	const SceneDescriptor<dev>& scene
+	const SceneDescriptor<dev>& scene,
+	const u32 actualInstCount
 ) {
 	logInfo("[LBVHBuilder::build] Building BVH for ", scene.numInstances, " instances.");
-	build_lbvh<SceneDescriptor<dev>>(scene, scene.aabb, scene.numInstances, true);
+	// Swap the actual-instance and numInstance counts to avoid specialization
+	build_lbvh<SceneDescriptor<dev>>(scene, scene.aabb, actualInstCount, true,
+									 scene.numInstances);
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
 }
 
-template void LBVHBuilder::build<Device::CPU>(const SceneDescriptor<Device::CPU>&);
-template void LBVHBuilder::build<Device::CUDA>(const SceneDescriptor<Device::CUDA>&);
+template void LBVHBuilder::build<Device::CPU>(const SceneDescriptor<Device::CPU>&, const u32 actualInstCount);
+template void LBVHBuilder::build<Device::CUDA>(const SceneDescriptor<Device::CUDA>&, const u32 actualInstCount);
 //template void LBVHBuilder::build<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>&);
-template <> void LBVHBuilder::build<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>&) {}
+template <> void LBVHBuilder::build<Device::OPENGL>(const SceneDescriptor<Device::OPENGL>&, const u32 actualInstCount) {}
 
 }
 }

@@ -15,39 +15,24 @@ public:
 	static constexpr u32 NO_ANIMATION_FRAME = std::numeric_limits<u32>::max();
 
 	// TODO: identity matrix
-	Instance(Object& obj, ei::Mat3x4 trans = {
-				1.f, 0.f, 0.f, 0.f,
-				0.f, 1.f, 0.f, 0.f,
-				0.f, 0.f, 1.f, 0.f 
-			 });
+	Instance(Object& obj, u32 index);
 	Instance(const Instance&) = default;
 	Instance(Instance&&) = default;
 	Instance& operator=(const Instance&) = delete;
 	Instance& operator=(Instance&&) = delete;
 	~Instance() = default;
 
-	void set_transformation_matrix(const ei::Mat3x4& mat) {
-		m_transMat = mat;
-		ei::Mat4x4 invRS = invert(ei::Mat4x4{mat});
-	}
+	u32 get_index() const noexcept { return m_index; }
 
-	const ei::Mat3x4& get_transformation_matrix() const noexcept {
-		return m_transMat;
-	}
-
-	ei::Mat3x4 compute_inverse_transformation_matrix() const noexcept {
-		return ei::Mat3x4{ invert(ei::Mat4x4{m_transMat}) };
-	}
-
-	ei::Vec3 extract_scale() const noexcept {
+	static ei::Vec3 extract_scale(const ei::Mat3x4& transformation) noexcept {
 		return ei::Vec3{
-			ei::len(ei::Vec<float, 3>(m_transMat, 0u, 0u)),
-			ei::len(ei::Vec<float, 3>(m_transMat, 0u, 1u)),
-			ei::len(ei::Vec<float, 3>(m_transMat, 0u, 2u))
+			ei::len(ei::Vec<float, 3>(transformation, 0u, 0u)),
+			ei::len(ei::Vec<float, 3>(transformation, 0u, 1u)),
+			ei::len(ei::Vec<float, 3>(transformation, 0u, 2u))
 		};
 	}
 
-	ei::Box get_bounding_box(u32 lod) const noexcept;
+	ei::Box get_bounding_box(u32 lod, const ei::Mat3x4& transformation) const noexcept;
 
 	Object& get_object() noexcept {
 		return *m_objRef;
@@ -59,8 +44,8 @@ public:
 
 
 private:
-	ei::Mat3x4 m_transMat;
 	Object* m_objRef;
+	u32 m_index;
 };
 
 }} // namespace mufflon::scene

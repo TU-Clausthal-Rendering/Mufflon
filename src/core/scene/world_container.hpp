@@ -69,6 +69,8 @@ public:
 	void reload_scene(renderer::IRenderer* renderer);
 	// Loads a specific LoD from file, if not already present
 	bool load_lod(Object& obj, const u32 lodIndex);
+	// Ejects a specific LoD
+	bool unload_lod(Object& obj, const u32 lodIndex);
 	// Discards any already applied tessellation/displacement for the current scene
 	// and re-tessellates/-displaces with the current max. tessellation level
 	void retessellate();
@@ -106,6 +108,8 @@ public:
 	// All returned handles remain valid over the lifetime of the world unless otherwise indicated
 	ObjectHandle get_object(const StringView name);
 	InstanceHandle get_instance(std::size_t index, const u32 animationFrame = Instance::NO_ANIMATION_FRAME);
+	const ei::Mat3x4& get_instance_transformation(ConstInstanceHandle instance) const;
+	void set_instance_transformation(ConstInstanceHandle instance, const ei::Mat3x4& mat);
 	ScenarioHandle get_scenario(const StringView name);
 	ScenarioHandle get_scenario(std::size_t index);
 	ScenarioHandle get_current_scenario() const noexcept;
@@ -204,6 +208,7 @@ private:
 	// before adding instances). First come instances valid for all frames,
 	// then successively those present for concrete frames.
 	std::vector<Instance> m_instances;
+	std::vector<ei::Mat3x4> m_instanceTransformations;
 	// Stores the start/end instance indices for each frame
 	std::vector<std::pair<u32, u32>> m_frameInstanceIndices;
 

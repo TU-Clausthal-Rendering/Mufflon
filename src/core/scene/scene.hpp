@@ -35,13 +35,18 @@ public:
 		u32 count;
 	};
 
-	Scene(const Scenario& scenario, const u32 animationPathIndex) :
+	Scene(const Scenario& scenario, const u32 animationPathIndex,
+		  util::FixedHashMap<ObjectHandle, InstanceRef>&& objects,
+		  std::vector<InstanceHandle>&& instances,
+		  const std::vector<ei::Mat3x4>& instanceTransformations,
+		  const ei::Box& aabb) :
 		m_scenario(scenario),
-		m_animationPathIndex(animationPathIndex)
-	{
-		m_boundingBox.min = ei::Vec3{std::numeric_limits<float>::max()};
-		m_boundingBox.max = ei::Vec3{-std::numeric_limits<float>::max()};
-	}
+		m_animationPathIndex(animationPathIndex),
+		m_objects{ std::move(objects) },
+		m_instances{ std::move(instances) },
+		m_instanceTransformations{ instanceTransformations },
+		m_boundingBox{ aabb }
+	{}
 	Scene(const Scene&) = delete;
 	Scene(Scene&&) = delete;
 	Scene& operator=(const Scene&) = delete;
@@ -49,10 +54,10 @@ public:
 	~Scene() = default;
 
 	// Reserves the maximum number of objects to avoid reallocations
-	void reserve_objects(const u32 count);
+	/*void reserve_objects(const u32 count);
 	void reserve_instances(const u32 count);
 	// Add an instance to be rendered
-	void add_instance(InstanceHandle hdl);
+	void add_instance(InstanceHandle hdl);*/
 
 	void load_media(const std::vector<materials::Medium>& media);
 
@@ -138,10 +143,9 @@ public:
 	 *
 	 * Usage example:
 	 * scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>(
-	 *		std::make_tuple(scene::geometry::Polygons::VAttrDesc<int>{"T1"},
-	 *						scene::geometry::Polygons::VAttrDesc<int>{"T2"}),
+	 *		{ AttributeIdentifier{AttributeType::INT3, "RGB_color"} },
 	 *		{}, // No face attributes
-	 *		std::make_tuple(scene::geometry::Spheres::AttrDesc<float>{"S1"})
+	 *		{ AttributeIdentifier{AttributeType::FLOAT, "grayscale"} }
 	 * );
 	 */
 	template < Device dev >
@@ -193,6 +197,7 @@ private:
 	util::FixedHashMap<ObjectHandle, InstanceRef> m_objects;
 	// List of instances; object list entries hold an index into this
 	std::vector<InstanceHandle> m_instances;
+	const std::vector<ei::Mat3x4>& m_instanceTransformations;
 
 	GenericResource m_media;			// Device copy of the media. It is not possible to access the world from a CUDA compiled file.
 	//ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene

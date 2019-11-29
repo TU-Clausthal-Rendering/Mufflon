@@ -38,21 +38,49 @@ std::string read_file(fs::path path) {
 
 // Reads an optional array
 template < class T >
-std::vector<T> read_opt_array(ParserState& state, const rapidjson::Value& parent, const char* name) {
-	std::vector<T> vec;
-	try {
-		read(state, get(state, parent, name), vec);
-	} catch(const ParserException& pe) {
-		(void)pe;
-		if(state.expected == ParserState::Value::NONE)
-			state.objectNames.pop_back();
-		vec = std::vector<T>{ read<T>(state, get(state, parent, name)) };
+std::enable_if_t<is_array<T>(), std::vector<T>> read_opt_array_array(ParserState& state,
+																	 const rapidjson::Value& parent,
+																	 const char* name) {
+	std::vector<T> vec{};
+	if(auto valIter = get(state, parent, name, false); valIter != parent.MemberEnd()) {
+		// Check if it's cascaded arrays
+		if(valIter->value.IsArray() && valIter->value.Size() > 0 && valIter->value[0].IsArray())
+			read(state, valIter, vec);
+		else
+			vec.push_back(read<T>(state, valIter));
 	}
 	return vec;
 }
 template < class T >
-std::vector<T> read_opt_array(ParserState& state, const rapidjson::Value& parent, const char* name, const T& optVal) {
-	std::vector<T> vec;
+std::enable_if_t<!is_array<T>(), std::vector<T>> read_opt_array(ParserState& state,
+																const rapidjson::Value& parent,
+																const char* name) {
+	std::vector<T> vec{};
+	if(auto valIter = get(state, parent, name, false); valIter != parent.MemberEnd())
+		read(state, valIter, vec);
+	return vec;
+}
+template < class T >
+std::enable_if_t<is_array<T>(), std::vector<T>> read_opt_array_array(ParserState& state,
+																	 const rapidjson::Value& parent,
+																	 const char* name, const T& optVal) {
+	std::vector<T> vec{};
+	if(auto valIter = get(state, parent, name, false); valIter != parent.MemberEnd()) {
+		// Check if it's cascaded arrays
+		if(valIter->value.IsArray() && valIter->value.Size() > 0 && valIter->value[0].IsArray())
+			read(state, valIter, vec);
+		else
+			vec.push_back(read<T>(state, valIter));
+	} else {
+		vec.push_back(optVal);
+	}
+	return vec;
+}
+template < class T >
+std::enable_if_t<!is_array<T>(), std::vector<T>> read_opt_array(ParserState& state,
+																const rapidjson::Value& parent,
+																const char* name, const T& optVal) {
+	std::vector<T> vec{};
 	if(auto valIter = get(state, parent, name, false); valIter != parent.MemberEnd())
 		read(state, valIter, vec);
 	else
@@ -487,7 +515,7 @@ bool JsonLoader::load_lights() {
 		StringView type = read<const char*>(m_state, get(m_state, light, "type"));
 		if(type.compare("point") == 0) {
 			// Point light
-			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<ei::Vec3> positions = read_opt_array_array<ei::Vec3>(m_state, light, "position");
 			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 			// For backwards compatibility, we try to read a normal array as fallback
 			std::vector<ei::Vec3> intensities;
@@ -528,8 +556,8 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add point light");
 		} else if(type.compare("spot") == 0) {
 			// Spot light
-			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
-			std::vector<ei::Vec3> directions = read_opt_array<ei::Vec3>(m_state, light, "direction");
+			std::vector<ei::Vec3> positions = read_opt_array_array<ei::Vec3>(m_state, light, "position");
+			std::vector<ei::Vec3> directions = read_opt_array_array<ei::Vec3>(m_state, light, "direction");
 			// For backwards compatibility, we try to read a normal array as fallback
 			std::vector<ei::Vec3> intensities;
 			if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
@@ -606,7 +634,7 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add spot light");
 		} else if(type.compare("directional") == 0) {
 			// Directional light
-			std::vector<ei::Vec3> directions = read_opt_array<ei::Vec3>(m_state, light, "direction");
+			std::vector<ei::Vec3> directions = read_opt_array_array<ei::Vec3>(m_state, light, "direction");
 			// For backwards compatibility, we try to read a normal array as fallback
 			std::vector<ei::Vec3> radiances;
 			if(auto radianceIter = get(m_state, light, "radiance", false); radianceIter != light.MemberEnd()) {
@@ -698,7 +726,7 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add sky light");
 		} else if(type.compare("goniometric") == 0) {
 			// TODO: Goniometric light
-			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<ei::Vec3> positions = read_opt_array_array<ei::Vec3>(m_state, light, "position");
 			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")));
 			// TODO: incorporate scale

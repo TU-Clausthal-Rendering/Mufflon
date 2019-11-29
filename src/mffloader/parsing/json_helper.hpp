@@ -55,6 +55,22 @@ private:
 	std::string m_msg;
 };
 
+// Tells us if a given type is an array or not
+template < class T >
+constexpr bool is_array() { return false; }
+template <>
+constexpr bool is_array<ei::Vec2>() { return true; }
+template <>
+constexpr bool is_array<ei::Vec3>() { return true; }
+template <>
+constexpr bool is_array<ei::Vec4>() { return true; }
+template <>
+constexpr bool is_array<ei::IVec2>() { return true; }
+template <>
+constexpr bool is_array<ei::IVec3>() { return true; }
+template <>
+constexpr bool is_array<ei::IVec4>() { return true; }
+
 // Attempts to find the given key in the value object; throws if required = true and
 // the key wasn't found
 rapidjson::Value::ConstMemberIterator get(ParserState& state,
@@ -88,21 +104,20 @@ inline T read_opt(ParserState& state, const rapidjson::Value& parent,
 // Reads an array of any size
 template < class T >
 inline void read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val,
-		  std::vector<T>& vals) {
+				 std::vector<T>& vals) {
 	if(!val->value.IsArray()) {
 		vals.push_back(read<T>(state, val->value));
 		return;
 	}
 	state.objectNames.push_back(val->name.GetString());
-	// We cover two cases: Array of array and only array (= single array)
 	if(val->value.Size() == 0)
 		return;
-	if(val->value[0].IsArray()) {
+	if(is_array<T>() && !val->value[0u].IsArray()) {
+		vals.push_back(read<T>(state, val->value));
+	} else {
 		vals.reserve(vals.size() + val->value.Size());
 		for(rapidjson::SizeType i = 0u; i < val->value.Size(); ++i)
 			vals.push_back(read<T>(state, val->value[i]));
-	} else {
-		vals.push_back(read<T>(state, val));
 	}
 	state.objectNames.pop_back();
 }
@@ -110,7 +125,7 @@ inline void read(ParserState& state, const rapidjson::Value::ConstMemberIterator
 // Reads an array of the expected size
 template < class T >
 inline void read(ParserState& state, const rapidjson::Value::ConstMemberIterator& val,
-		  std::vector<T>& vals, std::size_t expectedSize) {
+				 std::vector<T>& vals, std::size_t expectedSize) {
 	if(!val->value.IsArray()) {
 		state.expected = ParserState::Value::ARRAY;
 		state.expectedArraySize = 0u;

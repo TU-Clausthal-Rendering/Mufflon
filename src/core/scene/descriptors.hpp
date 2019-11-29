@@ -89,18 +89,19 @@ struct SceneDescriptor {
 	CameraDescriptor camera;
 	u32 numLods;
 	i32 numInstances;
+	u32 validInstanceIndex;	// An index of a valid instance which should be used for eg. medium checks
 	float diagSize;	// len(aabb.max - aabb.min)
 	ei::Box aabb;	// Scene-wide bounding box
 	// The receiver of this struct is responsible for deallocating these two arrays!
-	ArrayDevHandle_t<NotGl<dev>, LodDescriptor<dev>> lods;
+	ConstArrayDevHandle_t<NotGl<dev>, LodDescriptor<dev>> lods;
 
 	AccelDescriptor accelStruct;
 	// Per instance: transformation + pre-computed scale
 	// TODO: put some of these into one array instead of separate ones
-	ArrayDevHandle_t<dev, ei::Mat3x4> instanceToWorld;		// Full transformation Translation * Rotation * Scale
-	ArrayDevHandle_t<dev, ei::Mat3x4> worldToInstance;		// Full inverse transformation Scale⁻¹ * Rotation⁻¹ * Translation⁻¹
-	ArrayDevHandle_t<NotGl<dev>, u32> lodIndices;
-	ArrayDevHandle_t<dev, ei::Box> aabbs; // For each object.
+	ConstArrayDevHandle_t<dev, ei::Mat3x4> instanceToWorld;		// Full transformation Translation * Rotation * Scale
+	ConstArrayDevHandle_t<dev, ei::Mat3x4> worldToInstance;		// Full inverse transformation Scale⁻¹ * Rotation⁻¹ * Translation⁻¹
+	ConstArrayDevHandle_t<NotGl<dev>, u32> lodIndices;
+	ConstArrayDevHandle_t<dev, ei::Box> aabbs; // For each object.
 
 	// The receiver of this struct is responsible for deallocating this memory!
 	lights::LightTree<dev> lightTree;

@@ -121,6 +121,7 @@ void WorldContainer::reserve(const u32 objects, const u32 instances) {
 		throw std::runtime_error("This method may only be called on a clean world state!");
 	m_objects = util::FixedHashMap<StringView, Object>{ objects };
 	m_instances.reserve(instances);
+	m_instanceTransformations.reserve(instances);
 	// Set the name pool size (only objects have names anyway)
 	if(!m_namePool.empty())
 		throw std::runtime_error("Trying to set the size for a non-empty name pool; "
@@ -163,7 +164,7 @@ ObjectHandle WorldContainer::duplicate_object(ObjectHandle hdl, const StringView
 }
 
 void WorldContainer::apply_transformation(InstanceHandle hdl) {
-	const ei::Mat3x4&  transMat = hdl->get_transformation_matrix();
+	const ei::Mat3x4& transMat = get_instance_transformation(hdl);
 	ObjectHandle objectHandle = &hdl->get_object();
 	if(objectHandle->get_instance_counter() > 1) {
 		static thread_local std::string newName{};
@@ -183,7 +184,7 @@ void WorldContainer::apply_transformation(InstanceHandle hdl) {
 			spheres.transform(transMat);
 		}
 	}
-	hdl->set_transformation_matrix(ei::Mat3x4{ ei::identity4x4() });
+	set_instance_transformation(hdl, ei::Mat3x4{ ei::identity4x4() });
 }
 
 InstanceHandle WorldContainer::create_instance(ObjectHandle obj, const u32 animationFrame) {
@@ -222,7 +223,8 @@ InstanceHandle WorldContainer::create_instance(ObjectHandle obj, const u32 anima
 		}
 	}
 
-	return &m_instances.emplace_back(*obj);
+	m_instanceTransformations.push_back(ei::Mat3x4{ ei::identity4x4() });
+	return &m_instances.emplace_back(*obj, static_cast<u32>(m_instances.size()));
 }
 
 InstanceHandle WorldContainer::get_instance(std::size_t index, const u32 animationFrame) {
@@ -238,6 +240,14 @@ InstanceHandle WorldContainer::get_instance(std::size_t index, const u32 animati
 			return &m_instances[m_frameInstanceIndices[animationFrame].first + index];
 	}
 	return nullptr;
+}
+
+const ei::Mat3x4& WorldContainer::get_instance_transformation(ConstInstanceHandle instance) const {
+	return m_instanceTransformations[instance->get_index()];
+}
+
+void WorldContainer::set_instance_transformation(ConstInstanceHandle instance, const ei::Mat3x4& mat) {
+	m_instanceTransformations[instance->get_index()] = mat;
 }
 
 std::size_t WorldContainer::get_highest_instance_frame() const noexcept { 
@@ -683,57 +693,108 @@ bool WorldContainer::load_lod(Object& obj, const u32 lodIndex) {
 	return true;
 }
 
+bool WorldContainer::unload_lod(Object& obj, const u32 lodIndex) {
+	if(obj.has_lod_available(lodIndex))
+		obj.remove_lod(lodIndex);
+	return true;
+}
+
 SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* renderer) {
 	logInfo("[WorldContainer::load_scene] Loading scenario ", scenario.get_name());
 	if(renderer != nullptr)
 		renderer->on_scenario_changing();
 	m_scenario = &scenario;
-	m_scene = std::make_unique<Scene>(scenario, m_frameCurrent - m_frameStart);
-	// TODO: unload LoDs that are not needed anymore?
 
-	auto addObjAndInstance = [this, &scenario](Instance& inst) {
-		Object& obj = inst.get_object();
-		if(!scenario.is_masked(&obj) && !scenario.is_masked(&inst)) {
-			const u32 lod = scenario.get_effective_lod(&inst);
-			/* This is how tessellation should be performed:
-			tessellation::Uniform tess;
-			tess.set_inner_level(3u);
-			tess.set_outer_level(3u);
-			tess.set_phong_tessellation(true);
-			obj.get_lod(lod).template get_geometry<geometry::Polygons>().tessellate(tess);
-			*/
-			if(!load_lod(obj, lod))
-				throw std::runtime_error("Failed to after-load LoD");
-
-			// Check if the instance scaling is uniform in case of spheres
-			if(obj.get_lod(lod).get_geometry<geometry::Spheres>().get_sphere_count() > 0u) {
-				const ei::Mat3x4& transMat = inst.get_transformation_matrix();
-				const float scaleX = ei::len(ei::Vec<float, 3>(transMat, 0u, 0u));
-				const float scaleY = ei::len(ei::Vec<float, 3>(transMat, 0u, 1u));
-				const float scaleZ = ei::len(ei::Vec<float, 3>(transMat, 0u, 2u));
-				if(!(ei::approx(scaleX, scaleY) && ei::approx(scaleX, scaleZ))) {
-					logWarning("Instance of object ", obj.get_object_id(),
-							   "containing spheres with non-uniform scale detected; will be ignored");
-					return;
-				}
-			}
-
-			m_scene->add_instance(&inst);
-		}
-	};
-
-	// Reserve the (likely and maximum) number of instances
 	const auto frameIndex = m_frameCurrent - m_frameStart;
 	const bool hasAnimatedInsts = m_frameInstanceIndices.size() > frameIndex;
 	const u32 animatedInstCount = hasAnimatedInsts ? m_frameInstanceIndices[frameIndex].second : 0u;
+	const u32 animatedInstOffset = hasAnimatedInsts ? m_frameInstanceIndices[frameIndex].first : 0u;
 	const std::size_t regInstCount = m_frameInstanceIndices.empty() ? m_instances.size() : m_frameInstanceIndices.front().first;
-	m_scene->reserve_objects(static_cast<u32>(m_objects.size()));
-	m_scene->reserve_instances(static_cast<u32>(m_instances.size()) + animatedInstCount);
-	// Load non-animated and animated instances
-	for(std::size_t i = 0u; i < regInstCount; ++i)
-		addObjAndInstance(m_instances[i]);
-	for(u32 i = 0u; i < animatedInstCount; ++i)
-		addObjAndInstance(m_instances[m_frameInstanceIndices[frameIndex].first + i]);
+
+	// We need a dictionary of all instances for a given object participating in the scene
+	util::FixedHashMap<ObjectHandle, Scene::InstanceRef> objInstRef{ m_objects.size() };
+
+	// First add all participating objects and count their actual instances
+	for(std::size_t i = 0u; i < regInstCount; ++i) {
+		// Discard masked instances and objects
+		if(m_scenario->is_masked(m_instances.data() + i))
+			continue;
+		auto& obj = m_instances[i].get_object();
+		if(m_scenario->is_masked(&obj))
+			continue;
+
+		if(const auto iter = objInstRef.find(&obj); iter == objInstRef.cend())
+			objInstRef.emplace(&obj, Scene::InstanceRef{ 0u, 1u });
+		else
+			++(iter->second.count);
+	}
+	for(std::size_t i = animatedInstOffset; i < animatedInstCount; ++i) {
+		// Discard masked instances and objects
+		if(m_scenario->is_masked(m_instances.data() + i))
+			continue;
+		auto& obj = m_instances[i].get_object();
+		if(m_scenario->is_masked(&obj))
+			continue;
+
+		if(const auto iter = objInstRef.find(&obj); iter == objInstRef.cend())
+			objInstRef.emplace(&obj, Scene::InstanceRef{ 0u, 1u });
+		else
+			++(iter->second.count);
+	}
+
+	std::vector<InstanceHandle> instanceHandles;
+	{	// Now we can adjust the offsets for the instances
+		u32 currOffset = 0u;
+		for(auto& ref : objInstRef) {
+			ref.second.offset = currOffset;
+			currOffset += ref.second.count;
+			ref.second.count = 0u;
+		}
+		if(currOffset == 0u)
+			throw std::runtime_error("A scene needs at least one instance!");
+		instanceHandles.resize(currOffset);
+	}
+
+	// Next we can build the vector of instances and compute the bounding box
+	ei::Box aabb{};
+	aabb.min = ei::Vec3{ std::numeric_limits<float>::max() };
+	aabb.max = ei::Vec3{ -std::numeric_limits<float>::max() };
+	for(std::size_t i = 0u; i < regInstCount; ++i) {
+		auto& inst = m_instances[i];
+		// Discard masked instances and objects
+		if(m_scenario->is_masked(&inst))
+			continue;
+		auto& obj = inst.get_object();
+		if(m_scenario->is_masked(&obj))
+			continue;
+		// Write the instance handles to the proper (sorted by object) place
+		const auto iter = objInstRef.find(&obj);
+		const auto index = iter->second.offset + iter->second.count;
+		instanceHandles[index] = &inst;
+		++iter->second.count;
+		aabb = ei::Box{ aabb, inst.get_bounding_box(m_scenario->get_effective_lod(&inst),
+													get_instance_transformation(&inst)) };
+	}
+	for(std::size_t i = animatedInstOffset; i < animatedInstCount; ++i) {
+		auto& inst = m_instances[i];
+		// Discard masked instances and objects
+		if(m_scenario->is_masked(&inst))
+			continue;
+		auto& obj = inst.get_object();
+		if(m_scenario->is_masked(&obj))
+			continue;
+		// Write the instance handles to the proper (sorted by object) place
+		const auto iter = objInstRef.find(&obj);
+		const auto index = iter->second.offset + iter->second.count;
+		instanceHandles[index] = &inst;
+		++iter->second.count;
+		aabb = ei::Box{ aabb, inst.get_bounding_box(m_scenario->get_effective_lod(&inst),
+													get_instance_transformation(&inst)) };
+	}
+
+	m_scene = std::make_unique<Scene>(scenario, m_frameCurrent - m_frameStart,
+									  std::move(objInstRef), std::move(instanceHandles),
+									  m_instanceTransformations, aabb);
 
 	// Check if the resulting scene has issues with size
 	if(ei::len(m_scene->get_bounding_box().min) >= SUGGESTED_MAX_SCENE_SIZE
@@ -811,7 +872,6 @@ bool WorldContainer::load_scene_lights() {
 		reloaded = true;
 		std::vector<lights::PositionalLights> posLights;
 		std::vector<lights::DirectionalLight> dirLights;
-		i32 instIdx = 0;
 		for(auto& obj : m_scene->get_objects()) {
 			// Object contains area lights.
 			// Create one light source per polygone and instance
@@ -821,17 +881,16 @@ bool WorldContainer::load_scene_lights() {
 				InstanceHandle inst = instances[idx];
 				mAssertMsg(obj.first->has_lod_available(m_scenario->get_effective_lod(inst)), "Instance references LoD that doesn't exist");
 				Lod& lod = obj.first->get_lod(m_scenario->get_effective_lod(inst));
-				if(!lod.is_emissive(*m_scenario)) {
-					++instIdx;
+				if(!lod.is_emissive(*m_scenario))
 					continue;
-				}
+
 				i32 primIdx = 0;
 				// First search in polygons (PrimitiveHandle expects poly before sphere)
 				auto& polygons = lod.get_geometry<geometry::Polygons>();
 				const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex>(polygons.get_material_indices_hdl());
 				const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point>(polygons.get_points_hdl());
 				const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
-				ei::Mat3x4 instanceTransformation = inst->get_transformation_matrix();
+				const ei::Mat3x4& instanceTransformation = get_instance_transformation(inst);
 				bool isMirroring = determinant(ei::Mat3x3{instanceTransformation}) < 0.0f;
 				for(const auto& face : polygons.faces()) {
 					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
@@ -849,7 +908,7 @@ bool WorldContainer::load_scene_lights() {
 								std::swap(al.points[1], al.points[2]);
 								std::swap(al.uv[1], al.uv[2]);
 							}
-							posLights.push_back(lights::PositionalLights{ al, { instIdx, primIdx } });
+							posLights.push_back(lights::PositionalLights{ al, { (i32)inst->get_index(), primIdx } });
 						} else {
 							lights::AreaLightQuadDesc al;
 							al.material = materials[primIdx];
@@ -863,7 +922,7 @@ bool WorldContainer::load_scene_lights() {
 								std::swap(al.points[1], al.points[3]);
 								std::swap(al.uv[1], al.uv[3]);
 							}
-							posLights.push_back(lights::PositionalLights{ al, { instIdx, primIdx } });
+							posLights.push_back(lights::PositionalLights{ al, { (i32)inst->get_index(), primIdx } });
 						}
 					}
 					++primIdx;
@@ -877,18 +936,17 @@ bool WorldContainer::load_scene_lights() {
 				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
 					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[i]);
 					if(mat->get_properties().is_emissive()) {
-						const auto scale = inst->extract_scale();
+						const auto scale = Instance::extract_scale(instanceTransformation);
 						mAssert(ei::approx(scale.x, scale.y) && ei::approx(scale.x, scale.z));
 						lights::AreaLightSphereDesc al{
-							transform(spheresData[i].center, inst->get_transformation_matrix()),
+							transform(spheresData[i].center, instanceTransformation),
 							scale.x * spheresData[i].radius,
 							materials[i]
 						};
-						posLights.push_back({ al, PrimitiveHandle{instIdx, primIdx} });
+						posLights.push_back({ al, PrimitiveHandle{ (i32)inst->get_index(), primIdx } });
 					}
 					++primIdx;
 				}
-				++instIdx;
 			}
 		}
 
