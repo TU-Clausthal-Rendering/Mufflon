@@ -20,7 +20,7 @@ struct Boundary;
  *		alignof() <= 4
  *		trivially copyable
  */
-template<class T>
+template<class V>
 class MaterialSampleConcept {
 private:
 	template<class T, typename = typename std::is_same< math::BidirSampleValue,
@@ -45,11 +45,11 @@ private:
 		static constexpr bool has_albedo(int) { return true; }
 	template<class T> static constexpr bool has_albedo(...) { return false; }
 public:
-	static_assert(has_evaluate<T>(0), "Must have a function evaluate(T, Direction, Direction, Boundary&) -> math::EvalValue.");
-	static_assert(has_sample<T>(0), "Must have a function sample(T, Direction, Boundary&, math::RndSet2_1, bool) -> math::PathSample.");
-	static_assert(has_albedo<T>(0), "Must have a function get_albedo(T) -> Spectrum.");
-	static_assert(std::is_trivially_copyable<T>::value, "Material samples must be trivially copyable.");
-	static_assert(alignof(T) <= 4, "Too large alignment required.");
+	static_assert(has_evaluate<V>(0), "Must have a function evaluate(T, Direction, Direction, Boundary&) -> math::EvalValue.");
+	static_assert(has_sample<V>(0), "Must have a function sample(T, Direction, Boundary&, math::RndSet2_1, bool) -> math::PathSample.");
+	static_assert(has_albedo<V>(0), "Must have a function get_albedo(T) -> Spectrum.");
+	static_assert(std::is_trivially_copyable<V>::value, "Material samples must be trivially copyable.");
+	static_assert(alignof(V) <= 4, "Too large alignment required.");
 };
 
 /* Material management layer.
@@ -60,7 +60,7 @@ public:
  * Optional:
  *		A member compute_medium() which defines the inner medium.
  */
-template<class T>
+template<class V>
 class MaterialConcept {
 	template<class T, typename = typename std::is_same< typename T::NonTexParams,
 		decltype(std::declval<const T>().nonTexParams)>::type >
@@ -76,19 +76,19 @@ class MaterialConcept {
 	template<class T> static constexpr bool has_fetch(...) { return false; }
 public:
 	// Must define non-texture parameters
-	static_assert(std::is_trivially_copyable<typename T::NonTexParams>::value, "Must contain an internal type 'NonTexParams' which is trivially copyable.");
-	static_assert(alignof(typename T::NonTexParams) <= 4, "Must contain an internal type 'NonTexParams' which is at most 4 byte alignable.");
-	static_assert(alignof(typename T::SampleType) <= 4, "Must contain an internal type 'SampleType' which is at most 4 byte alignable.");
-	static constexpr MaterialSampleConcept<typename T::SampleType> SampleTypeOK {}; // The internal SampleType must fulfil the MaterialSampleConcept
-	static_assert(has_params<T>(0), "Must have a member get_non_texture_parameters() const -> NonTexParams.");
+	static_assert(std::is_trivially_copyable<typename V::NonTexParams>::value, "Must contain an internal type 'NonTexParams' which is trivially copyable.");
+	static_assert(alignof(typename V::NonTexParams) <= 4, "Must contain an internal type 'NonTexParams' which is at most 4 byte alignable.");
+	static_assert(alignof(typename V::SampleType) <= 4, "Must contain an internal type 'SampleType' which is at most 4 byte alignable.");
+	static constexpr MaterialSampleConcept<typename V::SampleType> SampleTypeOK {}; // The internal SampleType must fulfil the MaterialSampleConcept
+	static_assert(has_params<V>(0), "Must have a member get_non_texture_parameters() const -> NonTexParams.");
 
 	// Must define meta infomation for texture parameters
-	static_assert(std::is_enum<typename T::Textures>::value, "Must define a Textures enum.");
-	static_assert(T::Textures::TEX_COUNT >= 0, "Must define an enum member NUM for the number of textures");
-	//static_assert(T::Textures::LAST >= T::Textures::NUM, "Must define an enum member LAST for the offset of textures from the next layer.");
+	static_assert(std::is_enum<typename V::Textures>::value, "Must define a Textures enum.");
+	static_assert(V::Textures::TEX_COUNT >= 0, "Must define an enum member NUM for the number of textures");
+	//static_assert(V::Textures::LAST >= V::Textures::NUM, "Must define an enum member LAST for the offset of textures from the next layer.");
 
 	// Must define a conversion function
-	static_assert(has_fetch<T>(0), "Must have a function fetch(const ConstTextureDevHandle_t*, const ei::Vec4*, int, NonTexParams) whose return value fulfils the MaterialSampleConcept.");
+	static_assert(has_fetch<V>(0), "Must have a function fetch(const ConstTextureDevHandle_t*, const ei::Vec4*, int, NonTexParams) whose return value fulfils the MaterialSampleConcept.");
 };
 
 

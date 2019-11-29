@@ -189,18 +189,6 @@ inline auto switchAttributeType(const AttribDesc& desc, L1&& regular,
 	}
 }
 
-// Converts a polygon attribute to the C interface handle type
-template < class AttrHdl >
-inline AttrHdl convert_poly_to_attr(const PolygonAttributeHdl& hdl) {
-	using OmAttrHandle = typename AttrHdl::OmAttrHandle;
-	using CustomAttrHandle = typename AttrHdl::CustomAttrHandle;
-
-	return AttrHdl{
-		OmAttrHandle{static_cast<int>(hdl.openMeshIndex)},
-		CustomAttrHandle{static_cast<size_t>(hdl.customIndex)}
-	};
-}
-
 // Convert attribute type to string for convenience
 inline std::string get_attr_type_name(const AttribDesc& desc) {
 	std::string typeName;
@@ -339,7 +327,7 @@ Boolean core_set_log_level(LogLevel level) {
 Boolean core_set_lod_loader(Boolean(CDECL *func)(ObjectHdl, uint32_t)) {
 	TRY
 	CHECK_NULLPTR(func, "LoD loader function", false);
-	s_world.set_lod_loader_function(reinterpret_cast<bool(*)(ObjectHandle, u32)>(func));
+	s_world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(ObjectHandle, u32)>(func));
 	return true;
 	CATCH_ALL(false)
 }
@@ -379,7 +367,7 @@ Boolean core_copy_screen_texture_rgba32(Vec4* ptr, const float factor) {
 		const float* texData = s_screenTexture.get();
 #pragma PARALLEL_FOR
 		for(int i = 0; i < numPixels; ++i) {
-			Vec4 pixel { 0.0f };
+			Vec4 pixel { 0.f, 0.f, 0.f, 0.f };
 			float* dst = reinterpret_cast<float*>(&pixel);
 			int idx = i * s_screenTextureNumChannels;
 			for(int c = 0; c < s_screenTextureNumChannels; ++c)
@@ -762,7 +750,7 @@ size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHd
 		attrReader = std::make_unique<util::StreamReader>(*attrStream);
 	}
 
-	return switchAttributeType(attr->type, [&lod, attr, startVertex, count, &attrReader](const auto& val) {
+	return switchAttributeType(attr->type, [&lod, attr, startVertex, count, &attrReader](const auto& /*val*/) {
 		VertexAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return lod.template get_geometry<Polygons>().add_bulk(hdl,
 										 PolyVHdl{ static_cast<int>(startVertex) },
@@ -803,7 +791,7 @@ size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const PolygonAttributeHdl*
 		attrReader = std::make_unique<util::StreamReader>(*attrStream);
 	}
 
-	return switchAttributeType(attr->type, [&lod, attr, startFace, count, &attrReader](const auto& val) {
+	return switchAttributeType(attr->type, [&lod, attr, startFace, count, &attrReader](const auto& /*val*/) {
 		FaceAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return lod.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
 																 count, *attrReader);
@@ -1054,7 +1042,7 @@ size_t spheres_set_attribute_bulk(LodHdl lvlDtl, const SphereAttributeHdl* attr,
 		attrReader = std::make_unique<util::StreamReader>(*attrStream);
 	}
 
-	return switchAttributeType(attr->type, [&lod, attr, startSphere, count, &attrReader](const auto& val) {
+	return switchAttributeType(attr->type, [&lod, attr, startSphere, count, &attrReader](const auto& /*val*/) {
 		SphereAttributeHandle hdl{ static_cast<std::size_t>(attr->index) };
 		return lod.template get_geometry<Spheres>().add_bulk(hdl,
 																SphereVHdl{ static_cast<size_t>(startSphere) },
@@ -1475,9 +1463,9 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 }
 
 // Callback function for OpenGL debug context
-void APIENTRY opengl_callback(GLenum source, GLenum type, GLuint id,
-							  GLenum severity, GLsizei length,
-							  const GLchar* message, const void* userParam) {
+void APIENTRY opengl_callback(GLenum /*source*/, GLenum /*type*/, GLuint id,
+							  GLenum severity, GLsizei /*length*/,
+							  const GLchar* message, const void* /*userParam*/) {
 	switch(severity) {
 		case GL_DEBUG_SEVERITY_HIGH: logError(message); break;
 		case GL_DEBUG_SEVERITY_MEDIUM:
@@ -1906,7 +1894,6 @@ TextureHdl world_add_texture(const char* path, TextureSampling sampling, MipmapT
 													   texData.sRgb, false, std::unique_ptr<u8[]>(texData.data));
 	if(callback != nullptr) {
 		auto cpuTex = texture->template acquire<Device::CPU>();
-		const auto PIXELSIZE = textures::PIXEL_SIZE(static_cast<textures::Format>(texData.format));
 		for(uint32_t layer = 0u; layer < texData.layers; ++layer) {
 			for(uint32_t y = 0u; y < texData.height; ++y) {
 				for(uint32_t x = 0u; x < texData.width; ++x) {
@@ -2741,7 +2728,7 @@ LightHdl scenario_get_light_handle(ScenarioHdl scenario, IndexType index, LightT
 			return LightHdl{ LightType::LIGHT_DIRECTIONAL, scen.get_dir_lights()[index] };
 			break;
 		case LightType::LIGHT_ENVMAP:
-			if(index >= 1u) {
+			if(index >= 1) {
 				logError("[", FUNCTION_NAME, "] Background index out of bounds (", index, " >= 1)");
 				return invalid;
 			}

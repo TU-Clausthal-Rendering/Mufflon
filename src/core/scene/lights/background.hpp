@@ -73,7 +73,7 @@ public:
 					std::get<EnvmapParams>(m_params).summedAreaTable->synchronize<newDev>();
 				break;
 			case BackgroundType::SKY_HOSEK:	// Fallthrough - nothing to be done
-			case BackgroudType::COLORED:	// Fallthrough - nothing to be done
+			case BackgroundType::COLORED:	// Fallthrough - nothing to be done
 			default:
 				break;
 		}
@@ -88,13 +88,10 @@ public:
 					std::get<EnvmapParams>(m_params).summedAreaTable->unload<dev>();
 				break;
 			case BackgroundType::SKY_HOSEK:	// Fallthrough - nothing to be done
-			case BackgroudType::COLORED:	// Fallthrough - nothing to be done
+			case BackgroundType::COLORED:	// Fallthrough - nothing to be done
 			default:
 				break;
 		}
-		if(m_envLight) m_envLight->unload<dev>();
-		if(m_summedAreaTable) m_summedAreaTable->unload<dev>();
-		m_skyModel.unload<dev>();
 	}
 
 	template< Device dev >

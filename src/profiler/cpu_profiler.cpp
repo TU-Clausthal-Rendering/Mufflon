@@ -7,7 +7,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <ctime>
-#inlcude <unistd.h>
+#include <unistd.h>
 #endif // _WIN32
 
 namespace mufflon {

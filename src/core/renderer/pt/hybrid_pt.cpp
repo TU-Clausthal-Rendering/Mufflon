@@ -1,5 +1,3 @@
-#pragma once
-
 #include "hybrid_pt.hpp"
 #include "pt_common.hpp"
 #include "profiler/cpu_profiler.hpp"

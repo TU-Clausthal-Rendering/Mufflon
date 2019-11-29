@@ -9,13 +9,13 @@
 namespace mufflon { namespace math {
 
 // Evaluate PDF
-CUDA_FUNCTION constexpr AngularPdf get_uniform_dir_pdf() {
+inline CUDA_FUNCTION constexpr AngularPdf get_uniform_dir_pdf() {
 	return AngularPdf{ 1.f / (4.f * ei::PI) };
 }
-CUDA_FUNCTION constexpr AngularPdf get_uniform_cone_pdf(float cosThetaMax) {
+inline CUDA_FUNCTION constexpr AngularPdf get_uniform_cone_pdf(float cosThetaMax) {
 	return AngularPdf{ 1.f / (2.f * ei::PI * (1.f - cosThetaMax)) };
 }
-CUDA_FUNCTION constexpr AngularPdf get_cosine_dir_pdf(float cosTheta) {
+inline CUDA_FUNCTION constexpr AngularPdf get_cosine_dir_pdf(float cosTheta) {
 	return AngularPdf{ cosTheta / ei::PI };
 }
 
@@ -53,7 +53,7 @@ CUDA_FUNCTION __forceinline__ u64 percentage_of(u64 num, float p) {
 CUDA_FUNCTION __forceinline__ u64 div64_3232(u64 a, u32 b0, u32 b1) {
 	return a / b0 - ((a * b1) >> 32ull) / mul32_3232(b0, b0, b1);
 }
-CUDA_FUNCTION u64 div128_64(u64 a0, u64 a1, u64 b) {
+inline CUDA_FUNCTION u64 div128_64(u64 a0, u64 a1, u64 b) {
 	u32 b0 = b >> 32ull;
 	u32 b1 = b & 0xffffffffull;
 	u64 hi = div64_3232(a0, b0, b1);

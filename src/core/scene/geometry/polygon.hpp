@@ -169,7 +169,7 @@ public:
 		return m_faceAttributes.add_attribute<T>(std::move(name));
 	}
 
-	void remove_attribute(StringView name) {
+	void remove_attribute(StringView /*name*/) {
 		throw std::runtime_error("Operation not implemented yet");
 	}
 
@@ -324,11 +324,11 @@ public:
 	}
 	template < Device dev, class T, bool face >
 	ArrayDevHandle_t<dev, T> acquire(StringView name) {
-		return get_attributes<face>().acquire<dev, T>(name);
+		return get_attributes<face>().template acquire<dev, T>(name);
 	}
 	template < Device dev, class T, bool face >
 	ConstArrayDevHandle_t<dev, T> acquire_const(StringView name) {
-		return get_attributes<face>().acquire_const<dev, T>(name);
+		return get_attributes<face>().template acquire_const<dev, T>(name);
 	}
 
 	VertexAttributeHandle get_points_hdl() const noexcept {

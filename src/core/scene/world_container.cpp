@@ -7,8 +7,6 @@
 #include "core/scene/tessellation/cam_dist.hpp"
 #include <iostream>
 #include <ei/conversions.hpp>
-#include <windows.h>
-
 
 namespace mufflon::scene {
 

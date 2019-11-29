@@ -80,7 +80,7 @@ struct FocusParams : public CameraParams {
 	ei::Vec<u16, 2> resolution;	// Output buffer resoultion
 };
 
-CUDA_FUNCTION math::PositionSample
+inline CUDA_FUNCTION math::PositionSample
 focuscam_sample_position(const FocusParams& params, const math::RndSet2& rndSet) {
 	// First sample a point on a unit disk; for that, we project the unit square onto it (see PBRT)
 	// TODO: is this cheaper than sqrt(r) * sin/cos(theta)?
@@ -109,7 +109,7 @@ focuscam_sample_position(const FocusParams& params, const math::RndSet2& rndSet)
 	return math::PositionSample{ lensPos, lensPosPdf };
 }
 
-CUDA_FUNCTION Importon
+inline CUDA_FUNCTION Importon
 focuscam_sample_ray(const FocusParams& params, const scene::Point& exitPosWorld,
 					const Pixel& pixel, const math::RndSet2& rndSet) {
 	// First we sample the sensor position, then we use the sensor and the lens position to compute the direction
@@ -150,7 +150,7 @@ focuscam_sample_ray(const FocusParams& params, const scene::Point& exitPosWorld,
 
 // Compute pixel position and PDF
 // position: a direction in world space.
-CUDA_FUNCTION ProjectionResult
+inline CUDA_FUNCTION ProjectionResult
 focuscam_project(const FocusParams& params, const scene::Point& lensPoint,
 				 const scene::Direction& excident) {
 	const float cosTheta = ei::dot(excident, params.viewDir);
@@ -223,7 +223,7 @@ focuscam_project(const FocusParams& params, const scene::Point& lensPoint,
 
 // Compute the PDF value only
 // direction: a direction in world space.
-/*CUDA_FUNCTION float
+/*inline CUDA_FUNCTION float
 evaluate_pdf(const PinholeParams& params, const ei::Vec2& resolution, const scene::Direction& direction) {
 	// TODO: only if inside frustum
 	float aspectRatio = resolution.x / resolution.y;

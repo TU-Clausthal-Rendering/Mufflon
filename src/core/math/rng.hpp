@@ -9,7 +9,7 @@ namespace mufflon { namespace math {
 
 // Splitmix 64 to generate seeding values
 // http://dx.doi.org/10.1145/2714064.2660195
-CUDA_FUNCTION u64 scramble_seed(u32 x) {
+inline CUDA_FUNCTION u64 scramble_seed(u32 x) {
 	u64 z = x + 0x9e3779b97f4a7c15ull;
 	z = (z ^ (z >> 30u)) * 0xbf58476d1ce4e5b9ull;
 	z = (z ^ (z >> 27u)) * 0x94d049bb133111ebull;

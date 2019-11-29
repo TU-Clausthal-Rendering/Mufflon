@@ -6,7 +6,7 @@ namespace mufflon { namespace renderer { namespace output_handler_details {
 
 template < class PixelType, bool ReduceMoments >
 struct UpdateIter {
-	static CUDA_FUNCTION void
+	static inline CUDA_FUNCTION void
 	f(ConstRenderTargetBuffer<CURRENT_DEV, PixelType> iterTarget,
 	  RenderTargetBuffer<CURRENT_DEV, float> cumTarget,
 	  RenderTargetBuffer<CURRENT_DEV, float> varTarget,
@@ -32,7 +32,7 @@ struct UpdateIter {
 
 template < class PixelType >
 struct UpdateIter<PixelType, true> {
-	static CUDA_FUNCTION void
+	static inline CUDA_FUNCTION void
 	f(ConstRenderTargetBuffer<CURRENT_DEV, PixelType> iterTarget,
 	  RenderTargetBuffer<CURRENT_DEV, float> cumTarget,
 	  RenderTargetBuffer<CURRENT_DEV, float> varTarget,

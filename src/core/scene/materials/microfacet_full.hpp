@@ -9,7 +9,7 @@
 
 namespace mufflon { namespace scene { namespace materials {
 
-CUDA_FUNCTION MatSampleMicrofacet fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
+inline CUDA_FUNCTION MatSampleMicrofacet fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
 									const ei::Vec4* texValues,
 									int texOffset,
 									const typename MatMicrofacet::NonTexParams& params) {
@@ -24,13 +24,13 @@ CUDA_FUNCTION MatSampleMicrofacet fetch(const textures::ConstTextureDevHandle_t<
 	};
 }
 
-CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleMicrofacet& params,
+inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleMicrofacet& params,
 											  const Direction& incidentTS,
 											  const Direction& excidentTS,
 											  Boundary& boundary);
 
 // The importance sampling routine
-CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
+inline CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 									  const Direction& incidentTS,
 									  Boundary& boundary,
 									  const math::RndSet2_1& rndSet,
@@ -127,7 +127,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 }
 
 // The evaluation routine
-CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleMicrofacet& params,
+inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleMicrofacet& params,
 											  const Direction& incidentTS,
 											  const Direction& excidentTS,
 											  Boundary& boundary) {
@@ -187,17 +187,17 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleMicrofacet& params,
 }
 
 // The albedo routine
-CUDA_FUNCTION Spectrum albedo(const MatSampleMicrofacet& params) {
+inline CUDA_FUNCTION Spectrum albedo(const MatSampleMicrofacet& params) {
 	// Compute a pseudo value based on the absorption.
 	// The problem: the true amount of transmittance depends on the depth of the medium.
 	return 1.0f / (Spectrum{1.0f} + params.absorption);
 }
 
-CUDA_FUNCTION math::SampleValue emission(const MatSampleMicrofacet& params, const scene::Direction& geoN, const scene::Direction& excident) {
+inline CUDA_FUNCTION math::SampleValue emission(const MatSampleMicrofacet& /*params*/, const scene::Direction& /*geoN*/, const scene::Direction& /*excident*/) {
 	return math::SampleValue{};
 }
 
-CUDA_FUNCTION float pdf_max(const MatSampleMicrofacet& params) {
+inline CUDA_FUNCTION float pdf_max(const MatSampleMicrofacet& params) {
 	switch(params.ndf) {
 		case NDF::BECKMANN:
 			if(params.roughness < 1.f / std::sqrt(2.f))

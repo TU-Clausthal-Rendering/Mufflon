@@ -227,7 +227,7 @@ void BinaryLoader::read_normal_uncompressed_vertices(const ObjectState& object, 
 }
 
 // Reads the attribute parameters, but not the actual data
-BinaryLoader::AttribState BinaryLoader::read_uncompressed_attribute(const ObjectState& object, const LodState& lod) {
+BinaryLoader::AttribState BinaryLoader::read_uncompressed_attribute() {
 	return AttribState{
 		read<std::string>(),
 		read<std::string>(),
@@ -257,7 +257,7 @@ void BinaryLoader::read_uncompressed_vertex_attributes(const ObjectState& object
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + object.name + "'");
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
-		AttribState state = read_uncompressed_attribute(object, lod);
+		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_vertex_attribute(lod.lodHdl, state.name.c_str(), state.type);
 		if(attrHdl.index == INVALID_INDEX)
 			throw std::runtime_error("Failed to add vertex attribute to object '" + object.name + "'");
@@ -283,7 +283,7 @@ void BinaryLoader::read_uncompressed_face_attributes(const ObjectState& object, 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + object.name + "'");
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
-		AttribState state = read_uncompressed_attribute(object, lod);
+		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = polygon_request_face_attribute(lod.lodHdl, state.name.c_str(), state.type);
 		if(attrHdl.index == INVALID_INDEX)
 			throw std::runtime_error("Failed to add face attribute to object '" + object.name + "'");
@@ -309,7 +309,7 @@ void BinaryLoader::read_uncompressed_sphere_attributes(const ObjectState& object
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + object.name + "'");
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
-		AttribState state = read_uncompressed_attribute(object, lod);
+		AttribState state = read_uncompressed_attribute();
 		auto attrHdl = spheres_request_attribute(lod.lodHdl, state.name.c_str(), state.type);
 		if(attrHdl.index == INVALID_INDEX)
 			throw std::runtime_error("Failed to add sphere attribute to object '" + object.name + "'");
@@ -442,9 +442,9 @@ void BinaryLoader::read_compressed_normal_compressed_vertices(const ObjectState&
 	const Vec2* uvs = reinterpret_cast<const Vec2*>(vertexData.data() + lod.numVertices
 													* (3u * sizeof(float) + sizeof(u32)));
 
-	BulkLoader pointsBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader pointsBulk{ BulkLoader::BULK_ARRAY, {} };
 	pointsBulk.descriptor.bytes = reinterpret_cast<const char*>(points);
-	BulkLoader uvsBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader uvsBulk{ BulkLoader::BULK_ARRAY, {} };
 	uvsBulk.descriptor.bytes = reinterpret_cast<const char*>(uvs);
 	std::size_t pointsRead = 0u;
 	std::size_t uvsRead = 0u;
@@ -481,9 +481,9 @@ void BinaryLoader::read_compressed_normal_uncompressed_vertices(const ObjectStat
 	std::size_t pointsRead = 0u;
 	std::size_t normalsRead = 0u;
 	std::size_t uvsRead = 0u;
-	BulkLoader pointsBulk{ BulkLoader::BULK_ARRAY };
-	BulkLoader normalsBulk{ BulkLoader::BULK_ARRAY };
-	BulkLoader uvsBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader pointsBulk{ BulkLoader::BULK_ARRAY, {} };
+	BulkLoader normalsBulk{ BulkLoader::BULK_ARRAY, {} };
+	BulkLoader uvsBulk{ BulkLoader::BULK_ARRAY, {} };
 	pointsBulk.descriptor.bytes = reinterpret_cast<const char*>(points);
 	normalsBulk.descriptor.bytes = reinterpret_cast<const char*>(normals);
 	uvsBulk.descriptor.bytes = reinterpret_cast<const char*>(uvs);
@@ -539,9 +539,9 @@ void BinaryLoader::read_compressed_spheres(const ObjectState& object, const LodS
 														 * 4u * sizeof(float));
 
 	std::size_t readSpheres = 0u;
-	BulkLoader spheresBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader spheresBulk{ BulkLoader::BULK_ARRAY, {} };
 	spheresBulk.descriptor.bytes = reinterpret_cast<const char*>(spheres);
-	BulkLoader matsBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader matsBulk{ BulkLoader::BULK_ARRAY, {} };
 	matsBulk.descriptor.bytes = reinterpret_cast<const char*>(matIndices);
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
@@ -568,7 +568,7 @@ void BinaryLoader::read_compressed_vertex_attributes(const ObjectState& object, 
 
 	std::vector<unsigned char> attributeData = decompress();
 	const unsigned char* attributes = attributeData.data();
-	BulkLoader attrBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader attrBulk{ BulkLoader::BULK_ARRAY, {} };
 	attrBulk.descriptor.bytes = reinterpret_cast<const char*>(attributes);
 
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
@@ -598,7 +598,7 @@ void BinaryLoader::read_compressed_face_attributes(const ObjectState& object, co
 
 	std::vector<unsigned char> attributeData = decompress();
 	const unsigned char* attributes = attributeData.data();
-	BulkLoader attrBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader attrBulk{ BulkLoader::BULK_ARRAY, {} };
 	attrBulk.descriptor.bytes = reinterpret_cast<const char*>(attributes);
 
 	for(u32 i = 0u; i < lod.numFaceAttribs; ++i) {
@@ -623,7 +623,7 @@ void BinaryLoader::read_compressed_face_materials(const ObjectState& object, con
 
 	std::vector<unsigned char> matData = decompress();
 	const u16* matIndices = reinterpret_cast<const u16*>(matData.data());
-	BulkLoader matsBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader matsBulk{ BulkLoader::BULK_ARRAY, {} };
 	matsBulk.descriptor.bytes = reinterpret_cast<const char*>(matIndices);
 
 	if(polygon_set_material_idx_bulk(lod.lodHdl, 0, lod.numTriangles + lod.numQuads, &matsBulk) == INVALID_SIZE)
@@ -642,7 +642,7 @@ void BinaryLoader::read_compressed_sphere_attributes(const ObjectState& object, 
 								 + object.name + "'");
 	std::vector<unsigned char> attributeData = decompress();
 	const unsigned char* attributes = attributeData.data();
-	BulkLoader attrBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader attrBulk{ BulkLoader::BULK_ARRAY, {} };
 	attrBulk.descriptor.bytes = reinterpret_cast<const char*>(attributes);
 
 	for(u32 i = 0u; i < lod.numSphereAttribs; ++i) {
@@ -666,9 +666,7 @@ u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 	// Remember where we were in the file
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
 	// Jump to the object
-	const std::ifstream::off_type test0 = m_fileStream.tellg() - m_fileStart;
 	m_fileStream.seekg(object.offset + sizeof(u32), std::ifstream::beg);
-	const std::ifstream::off_type test1 = m_fileStream.tellg() - m_fileStart;
 	// Skip the object name + find the jump table
 	m_fileStream.seekg(read<u32>() + sizeof(u32) * 9u, std::ifstream::cur);
 	// Jump to the LoD

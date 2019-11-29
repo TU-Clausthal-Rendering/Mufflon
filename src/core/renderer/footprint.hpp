@@ -112,8 +112,8 @@ public:
 	}
 
 	Footprint2DCov add_segment(float pdf, bool orthographic, float mean_curvature,
-							   float prevInCos, float prevOutCos, float eta, float distance,
-							   float inCos) const {
+							   float prevInCos, float /*prevOutCos*/, float /*eta*/, float distance,
+							   float /*inCos*/) const {
 		Footprint2DCov f = *this;
 		if(orthographic) {
 			f.m_xx = 1.0f / pdf;
@@ -124,8 +124,7 @@ public:
 			f.update_travel(distance);
 		}
 	//	f.update_projection(ei::abs(inCos));
-		if(std::isnan(f.m_aa) || std::isnan(f.m_ax) || std::isnan(f.m_xx))
-			__debugbreak();
+		mAssert(!(std::isnan(f.m_aa) || std::isnan(f.m_ax) || std::isnan(f.m_xx)));
 		return f;
 	}
 private:
@@ -150,9 +149,9 @@ public:
 		return m_a * m_a / m_P;
 	}
 
-	__host__ __device__ FootprintV0 add_segment(float pdf, bool orthographic, float mean_curvature,
-							float prevInCos, float prevOutCos, float eta, float distance,
-							float inCos, float pRoulette) const {
+	__host__ __device__ FootprintV0 add_segment(float pdf, bool orthographic, float /*mean_curvature*/,
+							float /*prevInCos*/, float /*prevOutCos*/, float /*eta*/, float distance,
+							float /*inCos*/, float pRoulette) const {
 		FootprintV0 f = *this;
 		if(orthographic) {
 			f.m_x = 1.0f / sqrt(pdf);
@@ -181,9 +180,9 @@ public:
 		return m_x / m_P;
 	}
 
-	__host__ __device__ FootprintV0Sq add_segment(float pdf, bool orthographic, float mean_curvature,
-							float prevInCos, float prevOutCos, float eta, float distance,
-							float inCos, float pRoulette) const {
+	__host__ __device__ FootprintV0Sq add_segment(float pdf, bool orthographic, float /*mean_curvature*/,
+							float /*prevInCos*/, float /*prevOutCos*/, float /*eta*/, float distance,
+							float /*inCos*/, float pRoulette) const {
 		FootprintV0Sq f = *this;
 		if(orthographic) {
 			f.m_x = 1.0f / pdf;
@@ -212,8 +211,8 @@ public:
 	}
 
 	FootprintV1 add_segment(float pdf, bool orthographic, float mean_curvature,
-							float prevInCos, float prevOutCos, float eta, float distance,
-							float inCos) const {
+							float /*prevInCos*/, float /*prevOutCos*/, float /*eta*/, float distance,
+							float /*inCos*/) const {
 		FootprintV1 f = *this;
 		if(orthographic) {
 			f.m_x = 1.0f / sqrt(pdf);
@@ -317,7 +316,7 @@ public:
 			f.m_xx = 1.0f / (pdf * ei::abs(inCos));
 			//f.m_x = 1.0f / sqrt(pdf);
 		} else {
-			const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
+			//const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
 			if(prevInCos * prevOutCos < 0.0f) {
 				// Refraction
 			//	f.m_aa = f.m_aa * eta * eta + (Hs * eta - Hs) * ei::abs(Hs * eta - Hs);

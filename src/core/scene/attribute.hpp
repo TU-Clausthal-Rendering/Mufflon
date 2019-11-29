@@ -51,11 +51,11 @@ struct SphereAttributeHandle : public AttributeHandle {
  */
 template < bool IsFace >
 class OpenMeshAttributePool {
-	template < Device dev >
+	template < Device dev, class Dummy = void >
 	struct AcquireHelper {};
 
-	template <> 
-	struct AcquireHelper< Device::CPU > {
+	template <class Dummy> 
+	struct AcquireHelper< Device::CPU, Dummy > {
 		AcquireHelper(OpenMeshAttributePool<IsFace>& parent) : parent(parent) {}
 
 		template <class T>
@@ -66,8 +66,8 @@ class OpenMeshAttributePool {
 		OpenMeshAttributePool<IsFace>& parent;
 	};
 
-	template <>
-	struct AcquireHelper< Device::CUDA > {
+	template <class Dummy>
+	struct AcquireHelper< Device::CUDA, Dummy > {
 		AcquireHelper(OpenMeshAttributePool<IsFace>& parent) : parent(parent) {}
 
 		template <class T>
@@ -79,8 +79,8 @@ class OpenMeshAttributePool {
 		OpenMeshAttributePool<IsFace>& parent;
 	};
 
-	template <>
-	struct AcquireHelper< Device::OPENGL > {
+	template <class Dummy>
+	struct AcquireHelper< Device::OPENGL, Dummy > {
 		AcquireHelper(OpenMeshAttributePool<IsFace>& parent) : parent(parent) {}
 
 		template <class T>

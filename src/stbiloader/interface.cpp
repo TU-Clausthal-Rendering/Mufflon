@@ -1,5 +1,6 @@
 #include "plugin/texture_plugin_interface.h"
 #include "util/log.hpp"
+#include <cstring>
 #include <mutex>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -128,7 +129,7 @@ Boolean load_texture(const char* path, TextureData* texData) {
 			// Copy over the image data one by one
 			std::size_t bytes = perElemBytes * width * height * components;
 			texData->data = new uint8_t[bytes];
-			for(std::size_t t = 0u; t < width * height; ++t) {
+			for(std::size_t t = 0u; t < static_cast<std::size_t>(width * height); ++t) {
 				std::memcpy(&texData->data[components * perElemBytes * t],
 							&data[3u * perElemBytes * t],
 							3u * perElemBytes);

@@ -3801,11 +3801,6 @@ void bake_hosek_sky_configuration(HosekSkyModel& model) {
 	const float turbidityRem = model.turbidity - static_cast<float>(intTurbidity);
 	const float solarElevation = std::pow(2.f * model.elevation / ei::PI, 1.f / 3.f);
 
-	const int alb0LowTurb = 9 * 6 * (intTurbidity - 1);
-	const int alb1LowTurb = 9 * 6 * 10 + 9 * 6 * (intTurbidity - 1);
-	const int alb0HighTurb = 9 * 6 * intTurbidity;
-	const int alb1HighTurb = 9 * 6 * 10 + 9 * 6 * intTurbidity;
-
 	const float* rgbs[] = { datasetRGB1, datasetRGB2, datasetRGB3 };
 	const float* rads[] = { datasetRGBRad1, datasetRGBRad2, datasetRGBRad3 };
 

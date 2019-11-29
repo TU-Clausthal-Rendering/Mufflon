@@ -17,6 +17,8 @@ namespace {
 
 float prev_rel_sum(const VcmPathVertex& vertex, AngularPdf pdfBack, int numPhotons, float area);
 
+}
+
 // Extension which stores a partial result of the MIS-weight computation for speed-up.
 struct VcmVertexExt {
 	AreaPdf incidentPdf;
@@ -30,7 +32,7 @@ struct VcmVertexExt {
 	// Store 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
 	float prevConversionFactor { 0.0f };
 
-	CUDA_FUNCTION void init(const VcmPathVertex& thisVertex,
+	inline CUDA_FUNCTION void init(const VcmPathVertex& /*thisVertex*/,
 							const AreaPdf inAreaPdf,
 							const AngularPdf inDirPdf,
 							const float pChoice) {
@@ -38,14 +40,14 @@ struct VcmVertexExt {
 		this->throughput = Spectrum{1.0f};
 	}
 
-	CUDA_FUNCTION void update(const VcmPathVertex& prevVertex,
+	inline CUDA_FUNCTION void update(const VcmPathVertex& prevVertex,
 							  const VcmPathVertex& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
 							  const Spectrum& throughput,
-							  const float continuationPropability,
-							  const Spectrum& transmission,
-							  int numPhotons, float area) {
+							  const float/* continuationPropability*/,
+							  const Spectrum& /*transmission*/,
+							  int /*numPhotons*/, float /*area*/) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
@@ -59,8 +61,8 @@ struct VcmVertexExt {
 		}
 	}
 
-	CUDA_FUNCTION void update(const VcmPathVertex& thisVertex,
-							  const scene::Direction& excident,
+	inline CUDA_FUNCTION void update(const VcmPathVertex& thisVertex,
+							  const scene::Direction& /*excident*/,
 							  const VertexSample& sample,
 							  int numPhotons, float area) {
 		// Sum up all previous relative probability (cached recursion).
@@ -68,6 +70,8 @@ struct VcmVertexExt {
 		prevRelativeProbabilitySum = prev_rel_sum(thisVertex, sample.pdf.back, numPhotons, area);
 	}
 };
+
+namespace {
 
 // Compute the previous relative event sum in relation to a connection
 // between the previous and the current vertex.

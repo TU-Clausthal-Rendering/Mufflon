@@ -8,7 +8,7 @@
 
 namespace mufflon { namespace scene { namespace materials {
 
-CUDA_FUNCTION MatSampleTorrance fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
+inline CUDA_FUNCTION MatSampleTorrance fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
 									  const ei::Vec4* texValues,
 									  int texOffset,
 									  const typename MatTorrance::NonTexParams& params) {
@@ -23,11 +23,11 @@ CUDA_FUNCTION MatSampleTorrance fetch(const textures::ConstTextureDevHandle_t<CU
 
 
 // The importance sampling routine
-CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
+inline CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 									  const Direction& incidentTS,
 									  Boundary& boundary,
 									  const math::RndSet2_1& rndSet,
-									  bool) {
+									  bool /*adjoint*/) {
 	float iDotH;
 	Direction halfTS;
 	AngularPdf cavityPdf;
@@ -78,7 +78,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 }
 
 // The evaluation routine
-CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleTorrance& params,
+inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleTorrance& params,
 											  const Direction& incidentTS,
 											  const Direction& excidentTS,
 											  Boundary& boundary) {
@@ -115,15 +115,15 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleTorrance& params,
 }
 
 // The albedo routine
-CUDA_FUNCTION Spectrum albedo(const MatSampleTorrance& params) {
+inline CUDA_FUNCTION Spectrum albedo(const MatSampleTorrance& params) {
 	return params.albedo;
 }
 
-CUDA_FUNCTION math::SampleValue emission(const MatSampleTorrance& params, const scene::Direction& geoN, const scene::Direction& excident) {
+inline CUDA_FUNCTION math::SampleValue emission(const MatSampleTorrance& /*params*/, const scene::Direction& /*geoN*/, const scene::Direction& /*excident*/) {
 	return math::SampleValue{};
 }
 
-CUDA_FUNCTION float pdf_max(const MatSampleTorrance& params) {
+inline CUDA_FUNCTION float pdf_max(const MatSampleTorrance& params) {
 	switch(params.ndf) {
 		case NDF::BECKMANN:
 			if(params.roughness < 1.f / std::sqrt(2.f))

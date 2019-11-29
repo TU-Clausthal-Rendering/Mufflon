@@ -9,6 +9,7 @@
 #include "core/cuda/cuda_utils.hpp"
 #include "core/math/sample_types.hpp"
 #include "core/memory/generic_resource.hpp"
+#include "core/memory/synchronize.hpp"
 #include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/cputexture.hpp"
 #include "core/scene/textures/interface.hpp"
@@ -431,8 +432,6 @@ public:
 
 	void enable_all_render_targets(const bool includeVariance) noexcept override {
 		m_targets.for_each([includeVariance](auto& target) {
-			using Type = std::decay_t<decltype(target)>;
-			using TargetType = typename Type::TargetType;
 			target.record = true;
 			if(includeVariance)
 				target.recordVariance = true;

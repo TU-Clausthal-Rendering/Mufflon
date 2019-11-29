@@ -13,7 +13,7 @@ struct Refraction {
 
 // Dielectric-Dielectric Fresnel for unpolarized light
 // etaSq: (n_i / n_t)^2
-CUDA_FUNCTION Refraction fresnel_dielectric(float n_i, float n_t, float cosIAbs) {
+inline CUDA_FUNCTION Refraction fresnel_dielectric(float n_i, float n_t, float cosIAbs) {
 	float eta = ei::sq(n_i / n_t);
 	float cosTAbs = sqrt(ei::max(0.0f, 1.0f - eta * (1.0f - cosIAbs * cosIAbs)));
 	float rParl = sdiv(n_t * cosIAbs - n_i * cosTAbs, n_t * cosIAbs + n_i * cosTAbs);
@@ -24,7 +24,7 @@ CUDA_FUNCTION Refraction fresnel_dielectric(float n_i, float n_t, float cosIAbs)
 // Dielectric-Conductor Fresnel for unpolarized light
 // https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/#more-1921
 // TODO: compute per frequency? Requires RGB n_i and n_t
-CUDA_FUNCTION Refraction fresnel_conductor(ei::Vec2 n_i, ei::Vec2 n_t, float cosIAbs) {
+inline CUDA_FUNCTION Refraction fresnel_conductor(ei::Vec2 n_i, ei::Vec2 n_t, float cosIAbs) {
 	mAssertMsg(n_i.y == 0.0f, "Incident medium must be dielectric.");
 	ei::Vec2 etaSq = sq(n_t / n_i.x);
 	float cosISq = cosIAbs * cosIAbs;
@@ -40,13 +40,13 @@ CUDA_FUNCTION Refraction fresnel_conductor(ei::Vec2 n_i, ei::Vec2 n_t, float cos
 	return {0.5f * (rParl + rPerp), 0.0f};
 }
 
-CUDA_FUNCTION Refraction fresnel(ei::Vec2 n_i, ei::Vec2 n_t, float cosIAbs) {
+inline CUDA_FUNCTION Refraction fresnel(ei::Vec2 n_i, ei::Vec2 n_t, float cosIAbs) {
 	if(n_t.y > 0.0f) return fresnel_conductor(n_i, n_t, cosIAbs);
 	return fresnel_dielectric(n_i.x, n_t.x, cosIAbs);
 }
 
 template<class LayerA, class LayerB>
-CUDA_FUNCTION typename MatBlendFresnel<LayerA, LayerB>::SampleType
+inline CUDA_FUNCTION typename MatBlendFresnel<LayerA, LayerB>::SampleType
 fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
 	  const ei::Vec4* texValues,
 	  int texOffset,
@@ -59,7 +59,7 @@ fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
 
 // The importance sampling routine
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION math::PathSample sample(const MatSampleBlendFresnel<LayerASample, LayerBSample>& params,
+inline CUDA_FUNCTION math::PathSample sample(const MatSampleBlendFresnel<LayerASample, LayerBSample>& params,
 									  const Direction& incidentTS,
 									  Boundary& boundary,
 									  math::RndSet2_1 rndSet,
@@ -102,7 +102,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleBlendFresnel<LayerASample, 
 
 // The evaluation routine
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleBlendFresnel<LayerASample, LayerBSample>& params,
+inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleBlendFresnel<LayerASample, LayerBSample>& params,
 											  const Direction& incidentTS,
 											  const Direction& excidentTS,
 											  Boundary& boundary) {
@@ -123,7 +123,7 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleBlendFresnel<LayerA
 
 // The albedo routine
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION Spectrum albedo(const MatSampleBlendFresnel<LayerASample, LayerBSample>& params) {
+inline CUDA_FUNCTION Spectrum albedo(const MatSampleBlendFresnel<LayerASample, LayerBSample>& params) {
 	// TODO: some better approximation (I think the true albedo can only be found over
 	// numeric integration).
 	return albedo(params.a) * 0.5f
@@ -131,7 +131,7 @@ CUDA_FUNCTION Spectrum albedo(const MatSampleBlendFresnel<LayerASample, LayerBSa
 }
 
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION math::SampleValue emission(const MatSampleBlendFresnel<LayerASample, LayerBSample>& params, const scene::Direction& geoN, const scene::Direction& excident) {
+inline CUDA_FUNCTION math::SampleValue emission(const MatSampleBlendFresnel<LayerASample, LayerBSample>& params, const scene::Direction& geoN, const scene::Direction& excident) {
 	// Evaluate both sub-layers
 	auto valA = emission(params.a, geoN, excident);
 	auto valB = emission(params.b, geoN, excident);
@@ -149,7 +149,7 @@ CUDA_FUNCTION math::SampleValue emission(const MatSampleBlendFresnel<LayerASampl
 }
 
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION float pdf_max(const MatSampleBlendFresnel<LayerASample, LayerBSample>& params) {
+inline CUDA_FUNCTION float pdf_max(const MatSampleBlendFresnel<LayerASample, LayerBSample>& params) {
 	// TODO: p based blending as above?
 	return ei::max(pdf_max(params.a), pdf_max(params.b));
 }

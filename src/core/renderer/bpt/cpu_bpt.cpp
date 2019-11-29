@@ -23,28 +23,28 @@ struct BptVertexExt {
 	float prevRelativeProbabilitySum{ 0.0f };
 	Spectrum throughput{ 1.0f };	// Throughput of the path up to this point
 
-	CUDA_FUNCTION void init(const BptPathVertex& thisVertex,
+	inline CUDA_FUNCTION void init(const BptPathVertex& /*thisVertex*/,
 							const AreaPdf inAreaPdf,
 							const AngularPdf inDirPdf,
 							const float pChoice) {
 		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
 	}
 
-	CUDA_FUNCTION void update(const BptPathVertex& prevVertex,
+	inline CUDA_FUNCTION void update(const BptPathVertex& prevVertex,
 							  const BptPathVertex& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
 							  const Spectrum& throughput,
-							  const float continuationPropability,
-							  const Spectrum& transmission) {
+							  const float /*continuationPropability*/,
+							  const Spectrum& /*transmission*/) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
 		this->throughput = throughput;
 	}
 
-	CUDA_FUNCTION void update(const BptPathVertex& thisVertex,
-							  const scene::Direction& excident,
+	inline CUDA_FUNCTION void update(const BptPathVertex& thisVertex,
+							  const scene::Direction& /*excident*/,
 							  const VertexSample& sample) {
 		// Sum up all previous relative probability (cached recursion).
 		// Also see PBRT p.1015.

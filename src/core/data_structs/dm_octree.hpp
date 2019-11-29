@@ -361,7 +361,7 @@ private:
 	// intersect 7 of them, but still the distribution is one of a surface.
 	// Therefore, the factor 2 (distribute among 4 cells) gives a much better initial
 	// value.
-	void init_children(int children, int count) {
+	void init_children(int children, int /*count*/) {
 		for(int i = 0; i < 8; ++i)
 			m_nodes[children+i].store(ei::ceil(m_splitCountDensity / 4.0f));
 	}

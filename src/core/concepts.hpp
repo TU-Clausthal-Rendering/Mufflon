@@ -41,7 +41,7 @@ namespace concept_details {
  *
  * Inspired by: https://stackoverflow.com/a/37117023/1913512
  */
-template<class T>
+template<class V>
 struct DeviceManagerConcept {
 private:
 	template<class T, typename G = decltype(&T::template acquire_const<Device::CPU>)> static constexpr bool has_acquire_const(int) { return true; }
@@ -59,10 +59,10 @@ public:
 	//static_assert(std::is_member_function_pointer<decltype(&T::acquire_const)>::value
 	//	&& std::is_trivially_copyable<decltype(std::declval<T>().acquire_const())>::value,
 	//	"Manager classes must provide readable access to a copyable multi-device descriptor. The function shall not have any parameter.");
-	static_assert(has_acquire_const<T>(0), "Must have a member acquire_const<Device>().");
-	static_assert(descriptor_is_copyable<T>(0), "Descriptors returned by aquire_const<Device>() must be trivially copyable.");
-	static_assert(has_unload<T>(0), "Must have a member unload<Device>().");
-	static_assert(has_sync<T>(0), "Must have a member synchronize<Device>().");
+	static_assert(has_acquire_const<V>(0), "Must have a member acquire_const<Device>().");
+	static_assert(descriptor_is_copyable<V>(0), "Descriptors returned by aquire_const<Device>() must be trivially copyable.");
+	static_assert(has_unload<V>(0), "Must have a member unload<Device>().");
+	static_assert(has_sync<V>(0), "Must have a member synchronize<Device>().");
 };
 
 

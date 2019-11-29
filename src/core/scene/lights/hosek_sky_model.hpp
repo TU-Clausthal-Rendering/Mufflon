@@ -53,13 +53,13 @@ struct HosekSkyModel {
 // This data is taken from the sample code at https://cgg.mff.cuni.cz/projects/SkylightModelling/
 __host__ void bake_hosek_sky_configuration(HosekSkyModel& model);
 
-CUDA_FUNCTION ei::Vec3 get_hosek_sky_rgb_radiance(const HosekSkyModel& model, const ei::Vec3& direction) {
+inline CUDA_FUNCTION ei::Vec3 get_hosek_sky_rgb_radiance(const HosekSkyModel& model, const ei::Vec3& direction) {
 	// Get angle between view dir and sun
 	const auto cosGamma = ei::max(0.f, ei::min(1.f, ei::dot(model.sunDir, direction)));
 	const auto gamma = std::acos(cosGamma);
 	// Clamp theta to the horizon
 	const float cosTheta = ei::max(0.f, direction.y);
-	const auto theta = ei::min(std::acos(cosTheta), ei::PI / 2.f - 0.001f);
+	//const auto theta = ei::min(std::acos(cosTheta), ei::PI / 2.f - 0.001f);
 
 	const ei::Vec3 expM = ei::exp(model.configs[4u] * gamma);
 	const float rayM = cosGamma * cosGamma;

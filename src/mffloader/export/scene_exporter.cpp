@@ -30,7 +30,7 @@ std::string read_file(fs::path path) {
 
 	std::ifstream file(path, std::ios::binary);
 	file.read(&fileString[0u], fileSize);
-	if(file.gcount() != fileSize)
+	if(file.gcount() != static_cast<std::streamsize>(fileSize))
 		mufflon::logWarning("[read_file] File '", path.string(), "'not read completely");
 	// Finalize the string
 	fileString[file.gcount()] = '\0';

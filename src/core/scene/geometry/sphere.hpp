@@ -69,7 +69,7 @@ public:
 		return m_attributes.add_attribute<T>(std::move(name));
 	}
 
-	void remove_attribute(StringView name) {
+	void remove_attribute(StringView /*name*/) {
 		throw std::runtime_error("Operation not implemented yet");
 	}
 
@@ -165,7 +165,7 @@ public:
 	}
 
 	// Returns whether any polygon has a displacement map associated with the given material assignment
-	bool has_displacement_mapping(const Scenario& scenario) const noexcept {
+	bool has_displacement_mapping(const Scenario& /*scenario*/) const noexcept {
 		return false;
 	}
 

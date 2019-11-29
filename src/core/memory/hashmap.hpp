@@ -9,6 +9,11 @@
 #include <ei/prime.hpp>
 #include <atomic>
 
+// We need this since, even though it's marked as __device__,
+// C++ requires a declaration
+__device__ unsigned atomicInc(unsigned*, unsigned);
+__device__ unsigned atomicCAS(unsigned*, unsigned, unsigned);
+
 namespace mufflon {
 
 template < typename K > CUDA_FUNCTION __forceinline__
@@ -17,7 +22,7 @@ u32 generic_hash(K key) {
 	// Passes the most important tests of SMHasher at sufficient quality
 	u32 x = 0xa136aaadu;
 	const u32* pkey = reinterpret_cast<u32*>(&key);
-	for(int i = 0; i < sizeof(K) / 4; ++i, ++pkey) {
+	for(int i = 0; i < static_cast<int>(sizeof(K) / 4); ++i, ++pkey) {
 		x ^= *pkey * 0x11u;
 		x = (x ^ (x >> 15)) * 0x469e0db1u;
 	}
@@ -128,7 +133,7 @@ private:
 
 template < typename K, typename V >
 class HashMap<Device::CUDA, K, V> {
-	HashMap(u32 dataCapacity, u32 mapSize, char* map, char* data, std::atomic_uint32_t* counter) :
+	HashMap(u32 /*dataCapacity*/, u32 mapSize, char* map, char* data, std::atomic_uint32_t* counter) :
 		m_data(as<std::pair<K,V>>(data)),
 		m_map(as<u32>(map)),
 		m_mapSize(mapSize),

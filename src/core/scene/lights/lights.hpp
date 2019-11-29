@@ -29,7 +29,7 @@ enum class LightType : u16 {
 	NUM_LIGHTS
 };
 
-CUDA_FUNCTION bool is_hitable(LightType type) {
+inline CUDA_FUNCTION bool is_hitable(LightType type) {
 	return type == LightType::AREA_LIGHT_TRIANGLE
 		|| type == LightType::AREA_LIGHT_QUAD
 		|| type == LightType::AREA_LIGHT_SPHERE
@@ -158,8 +158,8 @@ struct alignas(16) BackgroundDesc {
 	BackgroundDesc() :
 		flux{ 0.f },
 		type{ BackgroundType::COLORED },
-		scale{ 0.f },
-		monochromParams{ Spectrum{0.f} }
+		monochromParams{ Spectrum{0.f} },
+		scale{ 0.f }
 	{}
 
 	Spectrum flux;
@@ -167,7 +167,7 @@ struct alignas(16) BackgroundDesc {
 
 	// It is important to align this to 16 bytes, otherwise it's a read-error on CUDA side
 	// due to the 8 byte-sized handles
-	union {
+	union alignas(16) {
 		struct {
 			Spectrum color;
 		} monochromParams;
@@ -229,7 +229,7 @@ CUDA_FUNCTION __forceinline__ const ei::Vec3& get_center(const AreaLightSphere<C
 CUDA_FUNCTION __forceinline__ const ei::Vec3& get_center(const DirectionalLight& light) {
 	return light.direction;
 }
-CUDA_FUNCTION __forceinline__ const ei::Vec3 get_center(const BackgroundDesc<CURRENT_DEV>& light) {
+CUDA_FUNCTION __forceinline__ const ei::Vec3 get_center(const BackgroundDesc<CURRENT_DEV>& /*light*/) {
 	return ei::Vec3{0.0f};
 }
 
@@ -293,7 +293,7 @@ evaluate_area(const scene::Direction& excident, const Spectrum& intensity,
 }
 
 CUDA_FUNCTION __forceinline__ math::EvalValue
-evaluate_dir(const Spectrum& irradiance, bool isEnvMap, float projSceneArea) {
+evaluate_dir(const Spectrum& irradiance, bool /*isEnvMap*/, float projSceneArea) {
 	return { irradiance, 1.0f, AngularPdf{ 1.0f / projSceneArea }, AngularPdf{0.0f} };
 }
 

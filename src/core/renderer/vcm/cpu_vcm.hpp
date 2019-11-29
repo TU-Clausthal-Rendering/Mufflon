@@ -16,7 +16,7 @@ namespace mufflon::renderer {
 
 template < typename ExtensionT >
 class PathVertex;
-namespace { using VcmPathVertex = PathVertex<struct VcmVertexExt>; }
+using VcmPathVertex = PathVertex<struct VcmVertexExt>;
 
 class CpuVcm final : public RendererBase<Device::CPU, VcmTargets> {
 public:

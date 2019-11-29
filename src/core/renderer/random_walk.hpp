@@ -34,7 +34,7 @@ enum class WalkResult {
  * returns: true if there is a nextHit. false if the path is canceled/misses the scene.
  */
 template < typename VertexType, typename... Args >
-CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 							  const VertexType& vertex,
 							  const math::RndSet2_1& rndSet, float u0,
 							  bool adjoint,

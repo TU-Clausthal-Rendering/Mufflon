@@ -50,7 +50,7 @@ XyzBlackBodySpectrum compute_xyz_black_body_samples(const Kelvin temperature) {
 	return spectrum;
 }
 
-XyzBlackBodySpectrum normalize_spectrum(const XyzBlackBodySpectrum& spectrum, const Kelvin temperature) {
+/*XyzBlackBodySpectrum normalize_spectrum(const XyzBlackBodySpectrum& spectrum, const Kelvin temperature) {
 	const Nanometer maxLambda{ WIEN_DISPLACEMENT * 1.0e9 / temperature.value };
 	const double maxSpectralRadiance = compute_black_body_sample(maxLambda, temperature);
 
@@ -58,7 +58,7 @@ XyzBlackBodySpectrum normalize_spectrum(const XyzBlackBodySpectrum& spectrum, co
 	for(std::size_t i = 0u; i < CIE_XYZ_SAMPLES; ++i)
 		normSpectrum.spectralRadiance[i] = spectrum.spectralRadiance[i] / maxSpectralRadiance;
 	return normSpectrum;
-}
+}*/
 
 const double CIE_X[CIE_XYZ_SAMPLES] = {
 	0.0001299000,   0.0001458470,   0.0001638021,   0.0001840037,
@@ -425,7 +425,7 @@ const double CIE_Z[CIE_XYZ_SAMPLES] = {
 
 } // namespace
 
-ei::Vec3 compute_black_body_color(const Kelvin temperature, const bool normalize) {
+ei::Vec3 compute_black_body_color(const Kelvin temperature, const bool /*normalize*/) {
 	auto spectrum = compute_xyz_black_body_samples(temperature);
 	//if(normalize)
 	//	spectrum = normalize_spectrum(spectrum, temperature);

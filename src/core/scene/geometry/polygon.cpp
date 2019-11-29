@@ -383,7 +383,7 @@ void Polygons::tessellate(tessellation::TessLevelOracle& oracle, const Scenario*
 
 	// This is necessary since we'd otherwise need to pass an accessor into the tessellater
 	tessellation::Tessellater tessellater(oracle);
-	tessellater.set_phong_tessellation(true);
+	tessellater.set_phong_tessellation(usePhong);
 
 	if(scenario != nullptr) {
 		OpenMesh::FPropHandleT<MaterialIndex> matIdxProp;
@@ -796,8 +796,8 @@ void Polygons::resizeAttribBuffer(std::size_t v, std::size_t f) {
 // Explicit instantiations
 template void Polygons::reserve_index_buffer<Device::CPU, true>(std::size_t capacity);
 template void Polygons::reserve_index_buffer<Device::CUDA, true>(std::size_t capacity);
-template void Polygons::reserve_index_buffer<Device::CPU, true>(std::size_t capacity);
-template void Polygons::reserve_index_buffer<Device::OPENGL, false>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::OPENGL, true>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::CPU, false>(std::size_t capacity);
 template void Polygons::reserve_index_buffer<Device::CUDA, false>(std::size_t capacity);
 template void Polygons::reserve_index_buffer<Device::OPENGL, false>(std::size_t capacity);
 template void Polygons::synchronize_index_buffer<Device::CPU, Device::CUDA>();

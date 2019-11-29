@@ -8,7 +8,7 @@
 
 namespace mufflon { namespace scene { namespace materials {
 
-CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::SceneDescriptor<CURRENT_DEV>& scene, const ei::Vec3& pos) {
+inline CUDA_FUNCTION scene::materials::MediumHandle get_point_medium(const scene::SceneDescriptor<CURRENT_DEV>& scene, const ei::Vec3& pos) {
 	mAssert(scene.lods[scene.lodIndices[0u]].polygon.numVertices > 0u
 		|| scene.lods[scene.lodIndices[0u]].spheres.numSpheres > 0u);
 	// Shoot a ray to a point in the scene (any surface suffices)

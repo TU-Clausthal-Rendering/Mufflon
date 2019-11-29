@@ -29,7 +29,7 @@ std::string read_file(fs::path path) {
 
 	std::ifstream file(path, std::ios::binary);
 	file.read(&fileString[0u], fileSize);
-	if(file.gcount() != fileSize)
+	if(file.gcount() != static_cast<std::streamsize>(fileSize))
 		logWarning("[read_file] File '", path.string(), "'not read completely");
 	// Finalize the string
 	fileString[file.gcount()] = '\0';
@@ -161,8 +161,8 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			}
 			m_state.objectNames.pop_back();
 		} else {
-			mat->outerMedium.absorption = Vec3{ 0.0f };
-			mat->outerMedium.refractionIndex = Vec2{ 1.0f, 0.0f };
+			mat->outerMedium.absorption = Vec3{ 0.f, 0.f, 0.f };
+			mat->outerMedium.refractionIndex = Vec2{ 1.f, 0.f };
 		}
 
 		// Read an optional alpha texture
@@ -283,9 +283,9 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 					mat->inner.emissive.radiance = load_texture(read<const char*>(m_state, radianceIter),
 																TextureSampling::SAMPLING_NEAREST, MipmapType::MIPMAP_NONE,
 																TextureFormat::FORMAT_RGBA32F,
-																[](uint32_t x, uint32_t y, uint32_t layer,
-																   TextureFormat format, Vec4 value,
-																   void* userParams) {
+																[](uint32_t /*x*/, uint32_t /*y*/, uint32_t /*layer*/,
+																   TextureFormat /*format*/, Vec4 value,
+																   void* /*userParams*/) {
 						const auto radiance = spectrum::compute_black_body_color(spectrum::Kelvin{ value.x });
 						return Vec4{ radiance.x, radiance.y, radiance.z, 0.f };
 					}, nullptr);
@@ -756,7 +756,7 @@ bool JsonLoader::load_lights() {
 			else // TODO: Preetham?
 				throw std::runtime_error("Unknown sky model '" + std::string(modelName) + "'");
 
-			if(auto hdl = world_add_background_light(lightIter->name.GetString(), BackgroundType::BACKGROUND_SKY_HOSEK);
+			if(auto hdl = world_add_background_light(lightIter->name.GetString(), type);
 			   hdl.type == LightType::LIGHT_ENVMAP) {
 				world_set_sky_light_turbidity(hdl, turbidity);
 				world_set_sky_light_albedo(hdl, albedo);
@@ -769,7 +769,7 @@ bool JsonLoader::load_lights() {
 			// TODO: Goniometric light
 			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
 			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
-			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")));
+			(void)load_texture(read<const char*>(m_state, get(m_state, light, "map")));
 			// TODO: incorporate scale
 
 			logWarning("[JsonLoader::load_lights] Scene file: Goniometric lights are not supported yet");

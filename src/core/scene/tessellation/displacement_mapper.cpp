@@ -20,8 +20,6 @@ void DisplacementMapper::set_edge_vertex(const float x, const OpenMesh::EdgeHand
 	Tessellater::set_edge_vertex(x, edge, vertex);
 	if constexpr(USE_CENTRAL_DIFFERENCE) {
 		mAssert(x >= 0.f && x <= 1.f);
-		float displacement = 0.f;
-		u32 faceCount = 0u;
 
 		if(x == 0.f) {
 			// Corner -> n materials possible
@@ -293,14 +291,14 @@ std::pair<ei::Vec3, ei::Vec3> DisplacementMapper::get_edge_vertex_tangents(const
 	return std::make_pair(ei::cross(tangentY, normal), tangentY);
 }
 
-std::tuple<ei::Vec3, ei::Vec3, ei::Vec3> DisplacementMapper::get_face_vertex_tangents(const OpenMesh::FaceHandle face,
-																					  const ei::Vec2 surfaceParams) {
+std::tuple<ei::Vec3, ei::Vec3, ei::Vec3> DisplacementMapper::get_face_vertex_tangents(const OpenMesh::FaceHandle /*face*/,
+																					  const ei::Vec2 /*surfaceParams*/) {
 	// TODO
 	return {};
 }
 
-std::pair<float, ei::Vec3> DisplacementMapper::compute_displacement(const materials::IMaterial& mat, const ei::Vec3& tX,
-																	   const ei::Vec3& tY, const ei::Vec3& normal,
+std::pair<float, ei::Vec3> DisplacementMapper::compute_displacement(const materials::IMaterial& mat, const ei::Vec3& /*tX*/,
+																	   const ei::Vec3& /*tY*/, const ei::Vec3& normal,
 																	   const ei::Vec2& uv) {
 	// Compute new point according to displacement map
 	const auto dispMap = mat.get_displacement_map();

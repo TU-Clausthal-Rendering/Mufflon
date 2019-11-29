@@ -19,25 +19,25 @@ namespace mufflon { // There is no memory namespace on purpose
  * The nice trick with overloading is that you don't need to bother with const/ref/pointer.
  */
 template<typename TTarget, typename T>
-CUDA_FUNCTION TTarget& as(T& t) {
+inline CUDA_FUNCTION TTarget& as(T& t) {
 	return reinterpret_cast<TTarget&>(t);
 }
 template<typename TTarget, typename T>
-CUDA_FUNCTION const TTarget& as(const T& t) {
+inline CUDA_FUNCTION const TTarget& as(const T& t) {
 	return reinterpret_cast<const TTarget&>(t);
 }
 template<typename TTarget, typename T>
-CUDA_FUNCTION TTarget* as(T* t) {
+inline CUDA_FUNCTION TTarget* as(T* t) {
 	return reinterpret_cast<TTarget*>(t);
 }
 template<typename TTarget, typename T>
-CUDA_FUNCTION const TTarget* as(const T* t) {
+inline CUDA_FUNCTION const TTarget* as(const T* t) {
 	return reinterpret_cast<const TTarget*>(t);
 }
 
 // Aligns up a given value (only for alignments of power of two)
 template < std::size_t ALIGNMENT, class T >
-CUDA_FUNCTION constexpr T round_to_align(T s) {
+inline CUDA_FUNCTION constexpr T round_to_align(T s) {
 	static_assert(!(ALIGNMENT & (ALIGNMENT - 1)), "Alignment only works for powers of 2");
 	return (s + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
 }

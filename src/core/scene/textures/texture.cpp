@@ -32,6 +32,7 @@ Texture::Texture(Texture&& tex) noexcept :
 	m_width(tex.m_width),
 	m_height(tex.m_height),
 	m_numLayers(tex.m_numLayers),
+	m_mipmapLevels(tex.m_mipmapLevels),
 	m_format(tex.m_format),
 	m_mode(tex.m_mode),
 	m_sRgb(tex.m_sRgb),
@@ -41,7 +42,6 @@ Texture::Texture(Texture&& tex) noexcept :
     m_glFormat(tex.m_glFormat),
 	m_handles(tex.m_handles),
 	m_constHandles(tex.m_constHandles),
-	m_mipmapLevels(tex.m_mipmapLevels),
 	m_name(std::move(tex.m_name))
 {
 	tex.m_cudaTexture = nullptr;
@@ -104,7 +104,7 @@ void Texture::synchronize() {
 				u32 height = m_height;
 				// Copy over all mipmap levels!
 				for(u32 level = 0u; level < m_mipmapLevels; ++level) {
-					cudaMemcpy3DParms copyParams{ 0u };
+					cudaMemcpy3DParms copyParams{};
 					copyParams.srcPtr = make_cudaPitchedPtr(m_cpuTexture->data(level), width * PIXEL_SIZE(m_format), width, height);
 					cuda::check_error(cudaGetMipmappedArrayLevel(&copyParams.dstArray, m_cudaTexture, level));
 					copyParams.extent = make_cudaExtent(width, height, m_numLayers);
@@ -132,7 +132,7 @@ void Texture::synchronize() {
 				u32 height = m_height;
 				// Copy over all mipmap levels!
 				for(u32 level = 0u; level < m_mipmapLevels; ++level) {
-					cudaMemcpy3DParms copyParams{ 0u };
+					cudaMemcpy3DParms copyParams{};
 					copyParams.dstPtr = make_cudaPitchedPtr(m_cpuTexture->data(level), width * PIXEL_SIZE(m_format), width, height);
 					cuda::check_error(cudaGetMipmappedArrayLevel(&copyParams.srcArray, m_cudaTexture, level));
 					copyParams.extent = make_cudaExtent(width, height, m_numLayers);
@@ -230,7 +230,7 @@ void Texture::clear() {
 				u32 width = m_width;
 				u32 height = m_height;
 				for(u32 level = 0u; level < m_mipmapLevels; ++level) {
-					cudaMemcpy3DParms copyParams{ 0u };
+					cudaMemcpy3DParms copyParams{};
 					copyParams.srcPtr = make_cudaPitchedPtr(s_zeroMem.data(), width * PIXEL_SIZE(m_format), width, height);
 					cuda::check_error(cudaGetMipmappedArrayLevel(&copyParams.dstArray, m_cudaTexture, level));
 					copyParams.extent = make_cudaExtent(width, height, m_numLayers);

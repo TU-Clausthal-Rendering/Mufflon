@@ -25,20 +25,20 @@ struct BpmVertexExt {
 	float prevConversionFactor { 0.0f };
 
 
-	CUDA_FUNCTION void init(const BpmPathVertex& thisVertex,
+	inline CUDA_FUNCTION void init(const BpmPathVertex& /*thisVertex*/,
 							const AreaPdf inAreaPdf,
 							const AngularPdf inDirPdf,
 							const float pChoice) {
 		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
 	}
 
-	CUDA_FUNCTION void update(const BpmPathVertex& prevVertex,
+	inline CUDA_FUNCTION void update(const BpmPathVertex& prevVertex,
 							  const BpmPathVertex& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const Spectrum& throughput,
-							  const float continuationPropability,
-							  const Spectrum& transmission) {
+							  const Spectrum& /*throughput*/,
+							  const float /*continuationPropability*/,
+							  const Spectrum& /*transmission*/) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
@@ -53,8 +53,8 @@ struct BpmVertexExt {
 		}
 	}
 
-	CUDA_FUNCTION void update(const BpmPathVertex& thisVertex,
-							  const scene::Direction& excident,
+	inline CUDA_FUNCTION void update(const BpmPathVertex& thisVertex,
+							  const scene::Direction& /*excident*/,
 							  const VertexSample& sample) {
 		// Sum up all previous relative probability (cached recursion).
 		// Also see PBRT p.1015.
@@ -96,7 +96,7 @@ float get_mis_weight(const BpmPathVertex& thisVertex, const AngularPdf pdfBack,
 	return 1.0f / (1.0f + mergeProbSum);
 }
 
-CUDA_FUNCTION float select_bandwidth(const float* distSq, int n) {
+inline CUDA_FUNCTION float select_bandwidth(const float* distSq, int n) {
 	// Take element k+1 for the independent area estimate (using the radius of the k-th element is biased).
 	return distSq[n];	// Unbiased according to Garcia 2012, but biased in my experiments
 
@@ -105,7 +105,7 @@ CUDA_FUNCTION float select_bandwidth(const float* distSq, int n) {
 }
 
 // A photon mapping kernel with dSq = current sample distance and rSq = bandwidth.
-CUDA_FUNCTION float kernel(float dSq, float rSq) {
+inline CUDA_FUNCTION float kernel(float dSq, float rSq) {
 	//return 1.0f;	// Uniform
 	//return 2.0f * (1.0f - dSq / rSq);		// Epanechnikov
 	return 3.0f * ei::sq(1.0f - dSq / rSq);	// Silverman
@@ -278,7 +278,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 				if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength
 					&& lensq(photonIt->position - currentPos) < mergeRadiusSq) {
 					radiance += merge(vertex[currentV], *photonIt);
-					if(isnan(radiance.x)) __debugbreak();
+					mAssert(!isnan(radiance.x));
 				}
 				++photonIt;
 			}
@@ -300,8 +300,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 					radiance += merge(vertex[currentV], photon) * kernel(distSq[i], bandwidth);
 			}
 			radiance /= currentMergeArea;
-			if(isnan(radiance.x))
-				__debugbreak();
+			mAssert(!isnan(radiance.x));
 		}
 
 		m_outputBuffer.contribute<RadianceTarget>(coord, throughput * radiance);

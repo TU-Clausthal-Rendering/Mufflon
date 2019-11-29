@@ -50,14 +50,14 @@ struct PinholeParams : public CameraParams {
 	ei::Vec<u16,2> resolution;	// Output buffer resoultion
 };
 
-CUDA_FUNCTION math::PositionSample
+inline CUDA_FUNCTION math::PositionSample
 pinholecam_sample_position(const PinholeParams& params) {
 	return { params.position, AreaPdf::infinite() };
 }
 
-CUDA_FUNCTION Importon
+inline CUDA_FUNCTION Importon
 pinholecam_sample_ray(const PinholeParams& params, const Pixel& pixel, const math::RndSet2& rndSet) {
-	// Get a (randomized) position in [-1,1]²
+	// Get a (randomized) position in [-1,1]ï¿½
 	ei::Vec2 subPixel = pixel + ei::Vec2(rndSet.u0, rndSet.u1);
 	ei::Vec2 canonicalPos = subPixel / params.resolution * 2.0f - 1.0f;
 	// Transform it into a point on the near plane (camera space)
@@ -82,7 +82,7 @@ pinholecam_sample_ray(const PinholeParams& params, const Pixel& pixel, const mat
 
 // Compute pixel position and PDF
 // position: a direction in world space.
-CUDA_FUNCTION ProjectionResult
+inline CUDA_FUNCTION ProjectionResult
 pinholecam_project(const PinholeParams& params, const scene::Direction& excident) {
 	float cosOut = dot(params.viewDir, excident);
 	if(cosOut < 0.0f) return ProjectionResult{};
@@ -117,7 +117,7 @@ pinholecam_project(const PinholeParams& params, const scene::Direction& excident
 
 // Compute the PDF value only
 // direction: a direction in world space.
-/*CUDA_FUNCTION float
+/*inline CUDA_FUNCTION float
 evaluate_pdf(const PinholeParams& params, const ei::Vec2& resolution, const scene::Direction& direction) {
 	// TODO: only if inside frustum
 	float aspectRatio = resolution.x / resolution.y;

@@ -85,7 +85,7 @@ ei::Vec3 normalize_position(ei::Vec3 pos, const ei::Box& box) {
 }
 
 template<typename DescType>
-CUDA_FUNCTION MortonCode_t<DescType>
+inline CUDA_FUNCTION MortonCode_t<DescType>
 calculate_morton_code(const DescType& primitives, i32 idx,
 					  const ei::Box& sceneBB) {
 	const ei::Vec3 centroid = get_centroid(primitives, idx);
@@ -151,7 +151,7 @@ void get_maximum_occupancy_variable_smem(i32 &gridSize, i32 &blockSize, i32 tota
 // -----
 
 template<typename Key>
-CUDA_FUNCTION i32 longestCommonPrefix(Key* sortedKeys,
+inline CUDA_FUNCTION i32 longestCommonPrefix(Key* sortedKeys,
 									  i32 numberOfElements, i32 index1, i32 index2, Key key1) {
 	// No need to check the upper bound, since i+1 will be at most numberOfElements - 1 (one 
 	// thread per internal node)
@@ -166,7 +166,7 @@ CUDA_FUNCTION i32 longestCommonPrefix(Key* sortedKeys,
 	return (i32)cuda::clz(key1 ^ key2);
 }
 
-template <typename T> CUDA_FUNCTION void build_lbvh_tree(
+template <typename T> inline CUDA_FUNCTION void build_lbvh_tree(
 	i32 numPrimitives,
 	T* sortedKeys,
 	i32 *parents,
@@ -273,9 +273,9 @@ struct BoundingBoxFunctor {
 };
 
 
-template < typename DescType > CUDA_FUNCTION
+template < typename DescType > inline CUDA_FUNCTION
 PrimCount_t<DescType> get_count(const DescType&, i32 primIdx) { return PrimCount_t<DescType>{1}; }
-template < Device dev > CUDA_FUNCTION
+template < Device dev > inline CUDA_FUNCTION
 PrimCount_t<LodDescriptor<dev>> get_count(const LodDescriptor<dev>& obj, i32 primIdx) {
 	if(primIdx >= i32(obj.polygon.numTriangles + obj.polygon.numQuads))
 		return { 0, 0, 1 };
@@ -284,22 +284,22 @@ PrimCount_t<LodDescriptor<dev>> get_count(const LodDescriptor<dev>& obj, i32 pri
 	return { 1, 0, 0 };
 }
 
-template< typename PrimCount > CUDA_FUNCTION
+template< typename PrimCount > inline CUDA_FUNCTION
 i32 encode_prim_counts(const PrimCount& primCount) {
 	return primCount.x;
 }
-template<> CUDA_FUNCTION
+template<> inline CUDA_FUNCTION
 i32 encode_prim_counts(const ei::IVec3& primCount) {
 	return (ei::min(primCount.x, 0x3FF) << 20)
 		| (ei::min(primCount.y, 0x3FF) << 10)
 		| (ei::min(primCount.z, 0x3FF));
 }
 
-template< typename PrimCount > CUDA_FUNCTION
+template< typename PrimCount > inline CUDA_FUNCTION
 PrimCount extract_prim_counts(i32 primCount) {
 	return PrimCount{ primCount };
 }
-template<> CUDA_FUNCTION
+template<> inline CUDA_FUNCTION
 ei::IVec3 extract_prim_counts(i32 primCount) {
 	return ei::IVec3{ (primCount & 0x3FF00000) >> 20,
 					 (primCount & 0x000FFC00) >> 10,
@@ -307,14 +307,14 @@ ei::IVec3 extract_prim_counts(i32 primCount) {
 }
 
 template < typename DescType >
-CUDA_FUNCTION float get_cost(const PrimCount_t<DescType>& primCount) {
+inline CUDA_FUNCTION float get_cost(const PrimCount_t<DescType>& primCount) {
 	const auto traversalCost = desc_info<DescType>::PRIM_TRAVERSAL_COST;
 	return desc_info<DescType>::NODE_TRAVERSAL_COST
 		+ dot(primCount, traversalCost);
 }
 
 template < typename DescType >
-CUDA_FUNCTION void calculate_bounding_boxes(
+inline CUDA_FUNCTION void calculate_bounding_boxes(
 	const DescType& desc,
 	i32 idx,		// Global thread index
 	i32 primIdx,	// Index of the primitive for which this thread is responsible
@@ -405,7 +405,7 @@ CUDA_FUNCTION __forceinline__ bool greatereq(i32 a, i32 b) { return a >= b; }
 CUDA_FUNCTION __forceinline__ bool any(bool a) { return a; }
 
 template< typename DescType >
-CUDA_FUNCTION void mark_collapsed_nodes(
+inline CUDA_FUNCTION void mark_collapsed_nodes(
 	const ei::Vec4* __restrict__ boundingBoxes,
 	const i32* __restrict__ parents,
 	const i32 leafIndex,	// Global thread index + numInternalNodes
@@ -490,7 +490,7 @@ __global__ void mark_nodesD(
 }
 
 
-CUDA_FUNCTION bool is_collapsed(const i32* offsets, const i32 numInternalNodes, const i32 node) {
+inline CUDA_FUNCTION bool is_collapsed(const i32* offsets, const i32 numInternalNodes, const i32 node) {
 	bool isCollapsed = false;
 	if(node > 0 && node < numInternalNodes) // Root and leaf nodes cannot be collapsed.
 		// Revert the inclusive scan to check wether this node had a mark '1' or '0'
@@ -500,7 +500,7 @@ CUDA_FUNCTION bool is_collapsed(const i32* offsets, const i32 numInternalNodes, 
 
 // Called for all nodes
 template < typename DescType >
-CUDA_FUNCTION void copy_to_collapsed_bvh(
+inline CUDA_FUNCTION void copy_to_collapsed_bvh(
 	const ei::Vec4* __restrict__ boundingBoxes,
 	const i32* __restrict__ parents,
 	const i32* __restrict__ offsets,

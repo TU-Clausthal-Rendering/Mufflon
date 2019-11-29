@@ -43,7 +43,7 @@ public:
 	 * Size of the material descriptor itself (mainly texture handles)
 	 * The size may vary per device.
 	 */
-	virtual std::size_t get_descriptor_size(Device device) const {
+	virtual std::size_t get_descriptor_size(Device /*device*/) const {
 		return sizeof(MaterialDescriptorBase);
 	}
 

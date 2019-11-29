@@ -6,18 +6,20 @@
 #    else
 #        define CORE_API __declspec(dllimport)
 #    endif
-#elif
+#else
 #    define CORE_API
 #endif
 
 #ifdef _MSC_VER
 #    define CDECL __cdecl
-#else
+#elif defined(_WIN32)
 #    define CDECL __attribute__((__cdecl__))
+#else
+#    define CDECL
 #endif // _MSC_VER
 
 #ifdef __CUDACC__
-#define CUDA_FUNCTION inline __host__ __device__
-#else
-#define CUDA_FUNCTION inline
-#endif // __CUDACC__
+#define CUDA_FUNCTION __host__ __device__
+#else // __CUDACC__
+#define CUDA_FUNCTION
+#endif

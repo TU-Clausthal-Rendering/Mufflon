@@ -101,6 +101,7 @@ public:
 
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {
+		(void)camera;
 		mAssert(camera != nullptr);
 		m_cameraDescChanged.for_each([](auto& elem) { elem.changed = true; });
 		// TODO: this function is obsolete, once the scene querries the 'changed' flag from the scenario itself.

@@ -21,7 +21,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation adjustPdf(NextEventEstimation&
 
 
 // Converts the typeless memory into the given light type and samples it
-CUDA_FUNCTION Emitter sample_light(const SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION Emitter sample_light(const SceneDescriptor<CURRENT_DEV>& scene,
 								   LightType type, const char* light,
 								   const math::RndSet2& rnd) {
 	mAssert(static_cast<u16>(type) < static_cast<u16>(LightType::NUM_LIGHTS));
@@ -37,7 +37,7 @@ CUDA_FUNCTION Emitter sample_light(const SceneDescriptor<CURRENT_DEV>& scene,
 }
 
 // Converts the typeless memory into the given light type and samples it
-CUDA_FUNCTION NextEventEstimation connect_light(const SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION NextEventEstimation connect_light(const SceneDescriptor<CURRENT_DEV>& scene,
 												LightType type, const char* light,
 												const ei::Vec3& position,
 												const math::RndSet2& rnd) {
@@ -54,13 +54,13 @@ CUDA_FUNCTION NextEventEstimation connect_light(const SceneDescriptor<CURRENT_DE
 }
 
 // Guide the light tree traversal based on flux only
-CUDA_FUNCTION float guide_flux(const scene::Point&, const scene::Point&, const scene::Point&,
+inline CUDA_FUNCTION float guide_flux(const scene::Point&, const scene::Point&, const scene::Point&,
 							   float leftFlux, float rightFlux) {
 	return leftFlux / (leftFlux + rightFlux);
 }
 
 // Guide the light tree traversal based on expected contribution
-CUDA_FUNCTION float guide_flux_pos(const scene::Point& refPosition,
+inline CUDA_FUNCTION float guide_flux_pos(const scene::Point& refPosition,
 								   const scene::Point& leftPosition,
 								   const scene::Point& rightPosition,
 								   float leftFlux, float rightFlux) {
@@ -77,7 +77,7 @@ CUDA_FUNCTION float guide_flux_pos(const scene::Point& refPosition,
  * until it cannot uniquely identify a subtree (ie. index 1 for interval [0,2]
  * and flux distribution of 50/50).
  */
-CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 						   const LightSubTree& tree, u64 left, u64 right,
 						   u64 rndChoice, float treeProb,
 						   const math::RndSet2& rnd) {
@@ -129,7 +129,7 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
  * seed: A random seed to randomize the dicision. All events (enumerated by indices)
  *		must use the same number.
  */
-CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
 						   u64 index, u64 numIndices, u64 seed,
 						   const math::RndSet2& rnd) {
 	using namespace lighttree_detail;
@@ -177,7 +177,7 @@ CUDA_FUNCTION Emitter emit(const SceneDescriptor<CURRENT_DEV>& scene,
  * Shared code for connecting to a subtree.
  * Takes the light tree, initial interval limits, and RNG number as inputs.
  */
-CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& scene,
 										  const LightSubTree& tree, u64 left, u64 right,
 										  u64 rndChoice, float treeProb, const ei::Vec3& position,
 										  const math::RndSet2& rnd,
@@ -246,7 +246,7 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
  *		Ready to use implementations: guide_flux (ignores the reference position)
  *		or guide_flux_pos
  */
-CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& scene, u64 index,
+inline CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& scene, u64 index,
 										  u64 numIndices, u64 seed, const ei::Vec3& position,
 										  const math::RndSet2& rnd) {
 	using namespace lighttree_detail;
@@ -298,7 +298,7 @@ CUDA_FUNCTION NextEventEstimation connect(const SceneDescriptor<CURRENT_DEV>& sc
  *		For both variants there is an alias function called connect_pdf()
  *		and emit_pdf() respectively.
  */
-CUDA_FUNCTION LightPdfs light_pdf(const LightTree<CURRENT_DEV>& tree,
+inline CUDA_FUNCTION LightPdfs light_pdf(const LightTree<CURRENT_DEV>& tree,
 								PrimitiveHandle primitive, ei::Vec2 surfaceParams,
 								const ei::Vec3& refPosition) {
 	mAssert(primitive.instanceId != -1);
@@ -376,7 +376,7 @@ CUDA_FUNCTION LightPdfs light_pdf(const LightTree<CURRENT_DEV>& tree,
  * Analogous to the area light hit-pdf there is an environment hit-pdf.
  * While the pdf is an AngularPdf it is reinterpreted as AreaPdf for compatibility reasons.
  */
-CUDA_FUNCTION AreaPdf background_pdf(const LightTree<CURRENT_DEV>& tree, const math::EvalValue& value) {
+inline CUDA_FUNCTION AreaPdf background_pdf(const LightTree<CURRENT_DEV>& tree, const math::EvalValue& value) {
 	float backgroundFlux = ei::sum(tree.background.flux);
 	float p = backgroundFlux / (tree.dirLights.root.flux + tree.posLights.root.flux + backgroundFlux);
 	return AreaPdf{ float(value.pdf.back) * p };

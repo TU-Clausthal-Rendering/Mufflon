@@ -6,12 +6,14 @@
 #    else
 #        define LOADER_API __declspec(dllimport)
 #    endif
-#elif
+#else
 #    define LOADER_API
 #endif
 
 #ifdef _MSC_VER
 #    define CDECL __cdecl
-#else
+#elif defined(_WIN32)
 #    define CDECL __attribute__((__cdecl__))
+#else
+#    define CDECL
 #endif // _MSC_VER

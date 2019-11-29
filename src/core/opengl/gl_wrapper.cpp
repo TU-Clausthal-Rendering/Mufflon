@@ -1,5 +1,6 @@
 #include "gl_wrapper.hpp"
 #include "glad/glad.h"
+#include <cstring>
 #include <memory>
 #include "util/assert.hpp"
 
@@ -91,7 +92,7 @@ namespace mufflon::gl {
 			auto tmp = std::make_unique<char[]>(clearValueSize * numValues);
 			// fill with clear value
 			for(size_t i = 0; i < numValues; ++i) {
-				memcpy(tmp.get() + i * clearValueSize, clearValue, clearValueSize);
+				std::memcpy(tmp.get() + i * clearValueSize, clearValue, clearValueSize);
 			}
 			// upload
 			bufferSubData(h, 0, clearValueSize * numValues, tmp.get());

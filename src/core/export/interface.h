@@ -12,7 +12,7 @@ extern "C" {
 #include <limits.h>
 
 #define INVALID_INDEX int32_t{-1}
-#define INVALID_SIZE ULLONG_MAX
+#define INVALID_SIZE std::size_t(ULLONG_MAX)
 #define INVALID_MATERIAL USHRT_MAX
 // Typedef for boolean value (since the standard doesn't specify
 // its size

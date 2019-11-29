@@ -5,7 +5,7 @@
 namespace mufflon { namespace math {
 
 // inverse erf approximation precision: +-6e-3
-CUDA_FUNCTION float erfInv(float x) {
+inline CUDA_FUNCTION float erfInv(float x) {
 	float tt1, tt2, lnx, sgn;
 	sgn = (x < 0.f) ? -1.0f : 1.0f;
 	lnx = logf((1.0f - x) * (1.0f + x));

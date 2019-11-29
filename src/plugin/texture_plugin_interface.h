@@ -3,11 +3,14 @@
 #include "core/export/texture_data.h"
 
 #ifdef _MSC_VER
-#define EXPORT __declspec(dllexport)
-#define CDECL __cdecl
-#else // _MSC_VER
-#define EXPORT
-#define CDECL __attribute__((__cdecl__))
+#    define EXPORT __declspec(dllexport)
+#    define CDECL __cdecl
+#elif defined(_WIN32)
+#    define EXPORT
+#    define CDECL __attribute__((__cdecl__))
+#else
+#    define EXPORT
+#    define CDECL
 #endif // _MSC_VER
 
 extern "C" {

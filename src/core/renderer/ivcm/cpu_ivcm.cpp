@@ -18,6 +18,8 @@ namespace {
 static float s_curvScale;
 static int s_numPhotons;
 
+}
+
 // Extension which stores a partial result of the MIS-weight computation for speed-up.
 struct IvcmVertexExt {
 	AreaPdf incidentPdf;
@@ -30,7 +32,7 @@ struct IvcmVertexExt {
 	Footprint2D footprint;
 
 
-	CUDA_FUNCTION void init(const IvcmPathVertex& thisVertex,
+	inline CUDA_FUNCTION void init(const IvcmPathVertex& /*thisVertex*/,
 							const AreaPdf inAreaPdf,
 							const AngularPdf inDirPdf,
 							const float pChoice) {
@@ -40,15 +42,16 @@ struct IvcmVertexExt {
 		this->footprint.init(1.0f / (float(inAreaPdf) * sourceCount), 1.0f / (float(inDirPdf) * sourceCount), pChoice);
 	}
 
-	CUDA_FUNCTION void update(const IvcmPathVertex& prevVertex,
-							  const IvcmPathVertex& thisVertex,
-							  const math::PdfPair pdf,
-							  const Connection& incident,
-							  const Spectrum& throughput,
-							  const float continuationPropability,
-							  const Spectrum& transmission,
-							  const scene::SceneDescriptor<Device::CPU>& scene,
-							  int numPhotons) {
+	
+	inline CUDA_FUNCTION void update(const IvcmPathVertex& prevVertex,
+									 const IvcmPathVertex& thisVertex,
+									 const math::PdfPair pdf,
+									 const Connection& incident,
+									 const Spectrum& throughput,
+									 const float /*continuationPropability*/,
+									 const Spectrum& /*transmission*/,
+									 const scene::SceneDescriptor<Device::CPU>& scene,
+									 int numPhotons) {
 		float inCos = thisVertex.get_geometric_factor(incident.dir);
 		float outCos = prevVertex.get_geometric_factor(incident.dir);
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
@@ -77,11 +80,11 @@ struct IvcmVertexExt {
 			prevEta.eta, incident.distance, inCos, 1.0f);
 	}
 
-	CUDA_FUNCTION void update(const IvcmPathVertex& thisVertex,
-							  const scene::Direction& excident,
+	inline CUDA_FUNCTION void update(const IvcmPathVertex& /*thisVertex*/,
+							  const scene::Direction& /*excident*/,
 							  const VertexSample& sample,
-							  const scene::SceneDescriptor<Device::CPU>& scene,
-							  int numPhotons) {
+							  const scene::SceneDescriptor<Device::CPU>& /*scene*/,
+							  int /*numPhotons*/) {
 		pdfBack = sample.pdf.back;
 	}
 };
@@ -122,6 +125,8 @@ public:
 		return m_vertex ? m_vertex->get_eta(media) : IvcmPathVertex::RefractionInfo{1.0f, 0.0f};
 	}
 };
+
+namespace {
 
 // incidentF/incidentB: per vertex area pdfs
 // n: path length in segments
@@ -335,7 +340,7 @@ void CpuIvcm::post_reset() {
 }
 
 
-float CpuIvcm::get_density(const ei::Vec3& pos, const ei::Vec3& normal, float currentMergeRadius) const {
+float CpuIvcm::get_density(const ei::Vec3& pos, const ei::Vec3& normal, float /*currentMergeRadius*/) const {
 	//return m_density->get_density(pos, normal);
 	return m_density->get_density_interpolated(pos, normal);
 	/*currentMergeRadius *= currentMergeRadius;
@@ -409,7 +414,7 @@ void CpuIvcm::iterate() {
 }
 
 
-void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
+void CpuIvcm::trace_photon(int idx, int numPhotons, u64 /*seed*/, float /*currentMergeRadius*/) {
 	math::RndSet2 rndStart { m_rngs[idx].next() };
 	u64 lightTreeRnd = m_rngs[idx].next();
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, lightTreeRnd, rndStart);
@@ -417,7 +422,7 @@ void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMerge
 	IvcmPathVertex::create_light(&vertex, nullptr, p);
 	const IvcmPathVertex* previous = m_photonMap.insert(p.initVec, vertex);
 	Spectrum throughput { 1.0f };
-	float mergeArea = ei::PI * currentMergeRadius * currentMergeRadius;
+	//float mergeArea = ei::PI * currentMergeRadius * currentMergeRadius;
 
 	int pathLen = 0;
 	while(pathLen < m_params.maxPathLength-1) { // -1 because there is at least one segment on the view path
@@ -560,8 +565,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 						float newCos = dot(currentVertex->get_geometric_normal(), photonDir);
 						area *= ei::max(0.0f, origCos / newCos);
 						if(area > 0.0f && dot(currentVertex->get_geometric_normal(), photon.get_geometric_normal()) > 0.0f) {
-							if(std::isnan(area))
-								__debugbreak();
+							mAssert(!std::isnan(area));
 							if(photonDist < closestDensityMerge) {
 							//if(1/area > density) {
 								density = 1.0f / (area + 1e-8f);
@@ -591,8 +595,7 @@ static float ivcm_heuristic(int numPhotons, float a0, float a1) {
 	aR *= aR;
 	float count = (1.0f + aR) / (1.0f / numPhotons + aR);
 	mAssert(count >= 1.0f);
-//	if(std::isnan(count))
-//		__debugbreak();
+//	mAssert(!std::isnan(count));
 	return count;
 }
 

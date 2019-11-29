@@ -116,7 +116,7 @@ inline std::unique_ptr<textures::Texture> create_summed_area_table(TextureHandle
  * Requires two uniform random numbers in [0, 1].
  * The return UV-coordinate will always be in [0,1]².
  */
-CUDA_FUNCTION EnvmapSampleResult importance_sample_texture(textures::ConstTextureDevHandle_t<CURRENT_DEV> summedAreaTable,
+inline CUDA_FUNCTION EnvmapSampleResult importance_sample_texture(textures::ConstTextureDevHandle_t<CURRENT_DEV> summedAreaTable,
 														   float u0, float u1) {
 	using namespace summed_details;
 

@@ -136,7 +136,7 @@ private:
 
 	static AttribDesc map_bin_attrib_type(AttribType type);
 	// Uncompressed data
-	AttribState read_uncompressed_attribute(const ObjectState& object, const LodState& lod);
+	AttribState read_uncompressed_attribute();
 	void read_normal_compressed_vertices(const ObjectState& object, const LodState& lod);
 	void read_normal_uncompressed_vertices(const ObjectState& object, const LodState& lod);
 	void read_uncompressed_triangles(const ObjectState& object, const LodState& lod);

@@ -197,7 +197,7 @@ public:
 	}
 
 	// Sets the after-load function for LoDs
-	void set_lod_loader_function(bool (CDECL*func)(ObjectHandle, u32)) {
+	void set_lod_loader_function(std::uint32_t(CDECL*func)(ObjectHandle, u32)) {
 		m_load_lod = func;
 	}
 
@@ -228,7 +228,7 @@ private:
 	static WorldContainer s_container;
 
 	// Function pointer for loading a LoD from a scene
-	bool (CDECL *m_load_lod)(ObjectHandle obj, u32 lod) = nullptr;
+	std::uint32_t(CDECL *m_load_lod)(ObjectHandle obj, u32 lod) = nullptr;
 
 	// All objects of the world.
 	std::map<std::string, Object, std::less<>> m_objects;

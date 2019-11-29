@@ -13,18 +13,18 @@ struct Curvature {
 	scene::Direction dirV;
 	ei::Vec3 efg;			// Weingarten matrix (2x2 symmetric)
 
-	CUDA_FUNCTION float get_gauss_curvature() const {
+	inline CUDA_FUNCTION float get_gauss_curvature() const {
 		// Assumption: first fundamental form is the identity
 		return efg.x * efg.z - efg.y * efg.y;
 	}
 
-	CUDA_FUNCTION float get_mean_curvature() const {
+	inline CUDA_FUNCTION float get_mean_curvature() const {
 		// Assumption: first fundamental form is the identity
 		return (efg.x + efg.z) * 0.5f;
 	}
 
 	// After this call, dirU and dirV will be the principal directions.
-	CUDA_FUNCTION void compute_principal_directions() {
+	inline CUDA_FUNCTION void compute_principal_directions() {
 		// If f=0, the tensor is already an diagonal matrix and thus, dirU
 		// and dirV are the eigenvectors in global space (locally they are
 		// (1,0) and (0,1)).
@@ -46,7 +46,7 @@ struct Curvature {
  * v0, v1, v2: positions of triangle vertices.
  * normal0, normal1, normal2: vertex normals of the triangle
  */
-CUDA_FUNCTION
+inline CUDA_FUNCTION
 float compute_gauss_curvature(const scene::Point& v0,
 							  const scene::Point& v1,
 							  const scene::Point& v2,
@@ -79,7 +79,7 @@ float compute_gauss_curvature(const scene::Point& v0,
  *
  * normal0, normal1, normal2: vertex normals of the quad
  */
-CUDA_FUNCTION
+inline CUDA_FUNCTION
 float compute_gauss_curvature(const scene::Point& v0,
 							  const scene::Point& v1,
 							  const scene::Point& v2,
@@ -101,7 +101,7 @@ float compute_gauss_curvature(const scene::Point& v0,
  * v0, v1, v2: positions of triangle vertices.
  * normal0, normal1, normal2: vertex normals of the triangle
  */
-CUDA_FUNCTION
+inline CUDA_FUNCTION
 float compute_mean_curvature(const scene::Point& v0,
 							 const scene::Point& v1,
 							 const scene::Point& v2,
@@ -138,7 +138,7 @@ float compute_mean_curvature(const scene::Point& v0,
  *
  * normal0, normal1, normal2: vertex normals of the quad
  */
-CUDA_FUNCTION
+inline CUDA_FUNCTION
 float compute_mean_curvature(const scene::Point& v0,
 							 const scene::Point& v1,
 							 const scene::Point& v2,
@@ -162,7 +162,7 @@ float compute_mean_curvature(const scene::Point& v0,
  * Rusinkiewicz Szymon
  * https://gfx.cs.princeton.edu/pubs/_2004_ECA/curvpaper.pdf
  */
-CUDA_FUNCTION
+inline CUDA_FUNCTION
 Curvature compute_curvature(const scene::Direction& geoNormal,
 							const scene::Point& v0,
 							const scene::Point& v1,
@@ -216,7 +216,7 @@ Curvature compute_curvature(const scene::Direction& geoNormal,
  * Rusinkiewicz Szymon
  * https://gfx.cs.princeton.edu/pubs/_2004_ECA/curvpaper.pdf
  */
-CUDA_FUNCTION
+inline CUDA_FUNCTION
 Curvature compute_curvature(const scene::Direction& geoNormal,
 							const scene::Point& v0,
 							const scene::Point& v1,

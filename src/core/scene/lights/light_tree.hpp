@@ -124,7 +124,7 @@ struct LightTree {
 	bool posGuide;
 
 	// Get the total flux of all lights
-	CUDA_FUNCTION float get_flux() const {
+	inline CUDA_FUNCTION float get_flux() const {
 		return dirLights.root.flux + posLights.root.flux + ei::sum(background.flux);
 	}
 };
