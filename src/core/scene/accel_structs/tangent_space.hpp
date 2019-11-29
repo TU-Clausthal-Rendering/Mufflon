@@ -83,7 +83,8 @@ CUDA_FUNCTION float compute_face_curvature(
 	if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles) {
 		// Triangle
 		vertexIndices += 3u * hitId.primId;
-		const ei::Mat3x3 transform { scene.instanceToWorld[hitId.instanceId] };
+		const ei::Mat3x4 instanceToWorld{ ei::invert(ei::Mat4x4{ scene.instanceToWorld[hitId.instanceId] }) };
+		const ei::Mat3x3 transform{ instanceToWorld };
 		const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
 		auto c = math::compute_curvature(geoNormal, transform * positions[vertexIndices[0]],
 										 transform * positions[vertexIndices[1]],
@@ -96,7 +97,8 @@ CUDA_FUNCTION float compute_face_curvature(
 		// Quad
 		const u32 quadId = (hitId.primId - object.polygon.numTriangles);
 		vertexIndices += 4u * quadId + 3u * object.polygon.numTriangles;
-		const ei::Mat3x3 transform { scene.instanceToWorld[hitId.instanceId] };
+		const ei::Mat3x4 instanceToWorld{ ei::invert(ei::Mat4x4{ scene.instanceToWorld[hitId.instanceId] }) };
+		const ei::Mat3x3 transform { instanceToWorld };
 		const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
 		auto c = math::compute_curvature(geoNormal, transform * positions[vertexIndices[0]],
 										 transform * positions[vertexIndices[1]],

@@ -422,7 +422,7 @@ and so on.
                  u32            // <OBJID> (0-based index of the object in the <OBJECTS> section)
                  u32            // Keyframe of the instance if animated or 0xffffffff
                  u32            // <InstID> of the previous object in an animation sequence or 0xffffffff
-                 12*f32         // 3x4 transformation matrix (rotation, scaling, translation)
+                 12*f32         // 3x4 inverse transformation matrix (rotation, scaling, translation; from world to instance!)
 
 
 Normal Compression

@@ -38,13 +38,13 @@ public:
 	Scene(const Scenario& scenario, const u32 animationPathIndex,
 		  util::FixedHashMap<ObjectHandle, InstanceRef>&& objects,
 		  std::vector<InstanceHandle>&& instances,
-		  const std::vector<ei::Mat3x4>& instanceTransformations,
+		  const std::vector<ei::Mat3x4>& worldToInstanceTransformation,
 		  const ei::Box& aabb) :
 		m_scenario(scenario),
 		m_animationPathIndex(animationPathIndex),
 		m_objects{ std::move(objects) },
 		m_instances{ std::move(instances) },
-		m_instanceTransformations{ instanceTransformations },
+		m_worldToInstanceTransformation{ worldToInstanceTransformation },
 		m_boundingBox{ aabb }
 	{}
 	Scene(const Scene&) = delete;
@@ -197,7 +197,7 @@ private:
 	util::FixedHashMap<ObjectHandle, InstanceRef> m_objects;
 	// List of instances; object list entries hold an index into this
 	std::vector<InstanceHandle> m_instances;
-	const std::vector<ei::Mat3x4>& m_instanceTransformations;
+	const std::vector<ei::Mat3x4>& m_worldToInstanceTransformation;
 
 	GenericResource m_media;			// Device copy of the media. It is not possible to access the world from a CUDA compiled file.
 	//ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
@@ -222,7 +222,7 @@ private:
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
 		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>,
-		unique_device_ptr<Device::OPENGL, ei::Mat3x4[]>> m_invInstTransformsDesc;
+		unique_device_ptr<Device::OPENGL, ei::Mat3x4[]>> m_instToWorldTransformsDesc;
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, u32[]>,
 		unique_device_ptr<Device::CUDA, u32[]>> m_instLodIndicesDesc;

@@ -13,13 +13,12 @@ using PtPathVertex = PathVertex<VertexExtension>;
 
 namespace {
 
-CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const scene::SceneDescriptor<CURRENT_DEV>& scene, const i32 instanceId,
-											   const ei::IVec3& indices, const ei::Vec3& hitpoint) {
+CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const ei::Vec3* vertices, const ei::IVec3& indices,
+											   const ei::Mat3x4& instanceToWorld, const ei::Vec3& hitpoint) {
 	// Compute the projected points on the triangle lines
-	const auto& vertices = scene.lods[scene.lodIndices[instanceId]].polygon.vertices;
-	const auto A = transform(vertices[indices.x], scene.instanceToWorld[instanceId]);
-	const auto B = transform(vertices[indices.y], scene.instanceToWorld[instanceId]);
-	const auto C = transform(vertices[indices.z], scene.instanceToWorld[instanceId]);
+	const auto A = transform(vertices[indices.x], instanceToWorld);
+	const auto B = transform(vertices[indices.y], instanceToWorld);
+	const auto C = transform(vertices[indices.z], instanceToWorld);
 	const auto AB = B - A;
 	const auto AC = C - A;
 	const auto BC = C - B;
@@ -42,14 +41,13 @@ CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const scene::SceneDescriptor<CURR
 		return onBC;
 }
 
-CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const scene::SceneDescriptor<CURRENT_DEV>& scene, const i32 instanceId,
-											   const ei::IVec4& indices, const ei::Vec3& hitpoint) {
+CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const ei::Vec3* vertices, const ei::IVec4& indices,
+											   const ei::Mat3x4& instanceToWorld, const ei::Vec3& hitpoint) {
 	// Compute the projected points on the quad lines
-	const auto& vertices = scene.lods[scene.lodIndices[instanceId]].polygon.vertices;
-	const auto A = transform(vertices[indices.x], scene.instanceToWorld[instanceId]);
-	const auto B = transform(vertices[indices.y], scene.instanceToWorld[instanceId]);
-	const auto C = transform(vertices[indices.w], scene.instanceToWorld[instanceId]);
-	const auto D = transform(vertices[indices.z], scene.instanceToWorld[instanceId]);
+	const auto A = transform(vertices[indices.x], instanceToWorld);
+	const auto B = transform(vertices[indices.y], instanceToWorld);
+	const auto C = transform(vertices[indices.w], instanceToWorld);
+	const auto D = transform(vertices[indices.z], instanceToWorld);
 	const auto AB = B - A;
 	const auto AC = C - A;
 	const auto BD = D - B;
@@ -78,11 +76,11 @@ CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const scene::SceneDescriptor<CURR
 		return onCD;
 }
 
-CUDA_FUNCTION float computeDistToRim(const scene::SceneDescriptor<CURRENT_DEV>& scene, const i32 instanceId,
-									 const u32 index, const ei::Vec3& hitpoint, const ei::Vec3& incident,
-									 const ei::Vec3& origin) {
-	const auto& sphere = scene.lods[scene.lodIndices[instanceId]].spheres.spheres[index];
-	const auto center = transform(sphere.center, scene.instanceToWorld[instanceId]);
+CUDA_FUNCTION float computeDistToRim(const ei::Sphere* spheres, const u32 index,
+									 const ei::Mat3x4& instanceToWorld, const ei::Vec3& hitpoint,
+									 const ei::Vec3& incident, const ei::Vec3& origin) {
+	const auto& sphere = spheres[index];
+	const auto center = transform(sphere.center, instanceToWorld);
 	// We use the angle between incident and center-hitpoint as the indicator of
 	// proximity to tangential ray (90° == tangent, 0° == max. non-tangentness
 	const auto hitToCenter = ei::normalize(center - hitpoint);
@@ -137,13 +135,15 @@ CUDA_FUNCTION void sample_wireframe(WireframeTargets::RenderBufferType<CURRENT_D
 			}
 
 			float projDistToRim;
+			const ei::Mat3x4 instanceToWorld{ ei::invert(ei::Mat4x4{ scene.worldToInstance[nextHit.hitId.instanceId] }) };
 			if(static_cast<u32>(nextHit.hitId.primId) < poly.numTriangles) {
 				const ei::IVec3 indices{
 					poly.vertexIndices[3 * hitId.primId + 0],
 					poly.vertexIndices[3 * hitId.primId + 1],
 					poly.vertexIndices[3 * hitId.primId + 2]
 				};
-				const ei::Vec3 closestLinePoint = computeClosestLinePoint(scene, hitId.instanceId, indices, hit);
+				const ei::Vec3 closestLinePoint = computeClosestLinePoint(lod.polygon.vertices,
+																		  indices, instanceToWorld, hit);
 				const auto lineSegment = closestLinePoint - vertex.get_position();
 				const auto projectedLineSegment = lineSegment - ei::dot(lineSegment, ray.direction) * ray.direction;
 				projDistToRim = ei::len(projectedLineSegment);
@@ -155,7 +155,8 @@ CUDA_FUNCTION void sample_wireframe(WireframeTargets::RenderBufferType<CURRENT_D
 					poly.vertexIndices[3 * poly.numTriangles + 4 * quadId + 2],
 					poly.vertexIndices[3 * poly.numTriangles + 4 * quadId + 3]
 				};
-				const ei::Vec3 closestLinePoint = computeClosestLinePoint(scene, hitId.instanceId, indices, hit);
+				const ei::Vec3 closestLinePoint = computeClosestLinePoint(lod.polygon.vertices,
+																		  indices, instanceToWorld, hit);
 				const auto lineSegment = closestLinePoint - vertex.get_position();
 				const auto projectedLineSegment = lineSegment - ei::dot(lineSegment, ray.direction) * ray.direction;
 				projDistToRim = ei::len(projectedLineSegment);
@@ -164,8 +165,9 @@ CUDA_FUNCTION void sample_wireframe(WireframeTargets::RenderBufferType<CURRENT_D
 				// it doesn't do it fast enough/in a correct way; the applied factor
 				// here is a workaround to get roughly the same line width as triangles
 				// and quads
-				projDistToRim = 0.05f * computeDistToRim(scene, hitId.instanceId, hitId.primId,
-														  hit, ray.direction, sample.origin);
+				projDistToRim = 0.05f * computeDistToRim(lod.spheres.spheres, hitId.primId,
+														 instanceToWorld, hit, ray.direction,
+														 sample.origin);
 			}
 			const float distThreshold = params.lineWidth * pixelSize;
 			// Only draw it if it's below the threshold (expressed in pixels)

@@ -73,8 +73,9 @@ CUDA_FUNCTION ei::Vec3 get_centroid(const LodDescriptor<dev>& obj, i32 primIdx) 
 template < Device dev >
 CUDA_FUNCTION ei::Vec3 get_centroid(const SceneDescriptor<dev>& scene, i32 primIdx) {
 	const i32 objIdx = scene.lodIndices[primIdx];
+	const ei::Mat3x4 instanceToWorld{ ei::invert(ei::Mat4x4{ scene.worldToInstance[primIdx] }) };
 	// Transform the center only (no need to compute the full bounding box).
-	return transform(center(scene.aabbs[objIdx]), scene.instanceToWorld[primIdx]);
+	return transform(center(scene.aabbs[objIdx]), instanceToWorld);
 }
 
 // Generic bounding box overloads.
@@ -101,7 +102,8 @@ CUDA_FUNCTION ei::Box get_bounding_box(const LodDescriptor<dev>& obj, i32 idx) {
 template < Device dev >
 CUDA_FUNCTION ei::Box get_bounding_box(const SceneDescriptor<dev>& scene, i32 idx) {
 	i32 objIdx = scene.lodIndices[idx];
-	return transform(scene.aabbs[objIdx], scene.instanceToWorld[idx]);
+	const ei::Mat3x4 instanceToWorld{ ei::invert(ei::Mat4x4{ scene.worldToInstance[idx] }) };
+	return transform(scene.aabbs[objIdx], instanceToWorld);
 }
 
 }}} // namespace mufflon::scene::accel_struct

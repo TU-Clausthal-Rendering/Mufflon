@@ -90,7 +90,7 @@ CUDA_FUNCTION __forceinline__ bool is_masked_out(const LodDescriptor<dev>&, cons
 }
 template < Device dev >
 CUDA_FUNCTION __forceinline__ bool is_masked_out(const SceneDescriptor<dev>& desc, const i32 idx) {
-	return desc.lodIndices[idx] == std::numeric_limits<u32>::max();
+	return !desc.is_instance_present(desc.lodIndices[idx]);
 }
 
 template<typename DescType>
@@ -583,7 +583,6 @@ __global__ void copy_to_collapsed_bvhD(
 
 	copy_to_collapsed_bvh<DescType>(boundingBoxes, parents, offsets, idx, numInternalNodes, numInternalNodesAfterCollapse, collapsedBVH);
 }
-
 
 template < typename DescType >
 void LBVHBuilder::build_lbvh(const DescType& desc,

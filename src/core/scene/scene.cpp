@@ -17,6 +17,7 @@
 #include "core/scene/tessellation/uniform.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include <ei/3dintersection.hpp>
+#include <execution>
 
 namespace mufflon { namespace scene {
 
@@ -160,7 +161,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 		//std::vector<std::unordered_map<u32, u32>> usedLods(get_max_thread_num());
 
 		// Preallocate the CPU-side arrays so we can multi-thread
-		const auto totalInstanceCount = m_instanceTransformations.size();
+		const auto totalInstanceCount = m_worldToInstanceTransformation.size();
 		lodIndices = std::make_unique<u32[]>(totalInstanceCount);
 		// All non-present instances get a LoD-index of 0xFFFFFFFF
 		std::memset(lodIndices.get(), std::numeric_limits<u32>::max(),
@@ -236,7 +237,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 
 				const auto instanceIndex = inst->get_index();
 				lodIndices[instanceIndex] = threadLodIndex + index;
-				const auto aabb = inst->get_bounding_box(instanceLod, m_instanceTransformations[inst->get_index()]);
+				const auto aabb = inst->get_bounding_box(instanceLod, m_worldToInstanceTransformation[inst->get_index()]);
 				m_boundingBox = ei::Box(m_boundingBox, aabb);
 			}
 		}
@@ -246,22 +247,14 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 				" LoDs in ", std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count(),
 				"ms");
 
-		// Compute the inverse instance transformations
-		auto invInstTransforms = std::make_unique<ei::Mat3x4[]>(totalInstanceCount);
-#pragma PARALLEL_FOR
-		for(i32 i = 0; i < static_cast<i32>(totalInstanceCount); ++i)
-			invInstTransforms[i] = ei::Mat3x4{ invert(ei::Mat4x4{m_instanceTransformations[i]}) };
-
 		// Allocate the device memory and copy over the descriptors
 		// Some of these don't need to be copied can be just taken when we're on the CPU
 		auto& lodDevDesc = m_lodDevDesc.template get<unique_device_ptr<NotGl<dev>, LodDescriptor<dev>[]>>();
 		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
-		auto& invInstTransformsDesc = m_invInstTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
 		if constexpr(dev == Device::CPU) {
 			lodDevDesc.reset(Allocator<Device::CPU>::realloc(lodDescs.release(), descCountEstimate, lodIndex.load()));
 			lodAabbsDesc.reset(Allocator<Device::CPU>::realloc(lodAabbs.release(), descCountEstimate, lodIndex.load()));
-			invInstTransformsDesc.reset(invInstTransforms.release());
-			sceneDescriptor.instanceToWorld = m_instanceTransformations.data();
+			sceneDescriptor.worldToInstance = m_worldToInstanceTransformation.data();
 		} else {
 			auto& instTransformsDesc = m_instTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
 			lodDevDesc = make_udevptr_array<NotGl<dev>, LodDescriptor<dev>>(lodIndex.load());
@@ -271,12 +264,28 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 
 			// Transformation matrices only have to be uploaded for non-CPU devices
 			instTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(totalInstanceCount);
-			invInstTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(m_instances.size());
-			copy(instTransformsDesc.get(), m_instanceTransformations.data(), sizeof(ei::Mat3x4) * totalInstanceCount);
-			copy(invInstTransformsDesc.get(), invInstTransforms.get(), sizeof(ei::Mat3x4) * m_instances.size());
-			sceneDescriptor.instanceToWorld = instTransformsDesc.get();
+			copy(instTransformsDesc.get(), m_worldToInstanceTransformation.data(), sizeof(ei::Mat3x4) * totalInstanceCount);
+			sceneDescriptor.worldToInstance = instTransformsDesc.get();
+
+			if constexpr(dev == Device::OPENGL) {
+				// Only OpenGL renderers really need the instance-to-world transformations
+				auto& instToWorldTransformsDesc = m_instToWorldTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
+				instToWorldTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(m_instances.size());
+				// Compute the inverse instance transformations
+				auto instToWorldTransformation = std::make_unique<ei::Mat3x4[]>(totalInstanceCount);
+
+				// TODO: enable parallelism (OpenMP compiling bugs out)
+				const auto begin = m_worldToInstanceTransformation.data();
+				const auto end = begin + totalInstanceCount;
+				std::for_each(std::execution::par, begin, end, [begin, &instToWorldTransformation](const ei::Mat3x4& worldToInst) {
+					const auto index = &worldToInst - begin;
+					instToWorldTransformation[index] = ei::Mat3x4{ invert(ei::Mat4x4{ worldToInst }) };
+				});
+
+				copy(instToWorldTransformsDesc.get(), instToWorldTransformation.get(), sizeof(ei::Mat3x4) * m_instances.size());
+				sceneDescriptor.instanceToWorld = instToWorldTransformsDesc.get();
+			}
 		}
-		sceneDescriptor.worldToInstance = invInstTransformsDesc.get();
 
 		if constexpr(dev != Device::OPENGL) {
 			auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<dev, u32[]>>();
@@ -328,7 +337,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 			auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
 
 			const auto t0 = std::chrono::high_resolution_clock::now();
-			m_accelStruct.build(sceneDescriptor, static_cast<u32>(m_instanceTransformations.size()));
+			m_accelStruct.build(sceneDescriptor, static_cast<u32>(m_worldToInstanceTransformation.size()));
 			m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = true;
 			m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = true;
 

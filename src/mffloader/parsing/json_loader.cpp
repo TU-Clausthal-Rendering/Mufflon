@@ -1014,15 +1014,18 @@ bool JsonLoader::load_file() {
 	// Parse our file specification
 	assertObject(m_state, document);
 	// Version
+	bool hasWorldToInstTrans = true;
 	auto versionIter = get(m_state, document, "version", false);
 	if(versionIter == document.MemberEnd()) {
 		logWarning("[JsonLoader::load_file] Scene file: no version specified (current one assumed)");
 	} else {
 		m_version = read<const char*>(m_state, versionIter);
 		if(m_version.compare(FILE_VERSION) != 0 && m_version.compare("1.0") != 0
-		   && m_version.compare("1.1") != 0 && m_version.compare("1.2"))
+		   && m_version.compare("1.1") != 0 && m_version.compare("1.2")
+		   && m_version.compare("1.3") != 0)
 			logWarning("[JsonLoader::load_file] Scene file: version mismatch (",
 					   m_version, "(file) vs ", FILE_VERSION, "(current))");
+		hasWorldToInstTrans = (m_version.compare("1.4") == 0);
 		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");
 	}
 	// Binary file path
@@ -1108,7 +1111,8 @@ bool JsonLoader::load_file() {
 	}
 	const bool deinstance = read_opt<bool>(m_state, document, "deinstance", false);
 	// Load the binary file before we load the rest of the JSON
-	if(!m_binLoader.load_file(m_binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods, deinstance))
+	if(!m_binLoader.load_file(m_binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods,
+							  deinstance, hasWorldToInstTrans))
 		return false;
 
 	try {

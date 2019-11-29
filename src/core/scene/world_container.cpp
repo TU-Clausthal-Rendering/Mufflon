@@ -121,7 +121,7 @@ void WorldContainer::reserve(const u32 objects, const u32 instances) {
 		throw std::runtime_error("This method may only be called on a clean world state!");
 	m_objects = util::FixedHashMap<StringView, Object>{ objects };
 	m_instances.reserve(instances);
-	m_instanceTransformations.reserve(instances);
+	m_worldToInstanceTrans.reserve(instances);
 	// Set the name pool size (only objects have names anyway)
 	if(!m_namePool.empty())
 		throw std::runtime_error("Trying to set the size for a non-empty name pool; "
@@ -164,7 +164,7 @@ ObjectHandle WorldContainer::duplicate_object(ObjectHandle hdl, const StringView
 }
 
 void WorldContainer::apply_transformation(InstanceHandle hdl) {
-	const ei::Mat3x4& transMat = get_instance_transformation(hdl);
+	const ei::Mat3x4 transMat = compute_instance_to_world_transformation(hdl);
 	ObjectHandle objectHandle = &hdl->get_object();
 	if(objectHandle->get_instance_counter() > 1) {
 		static thread_local std::string newName{};
@@ -184,7 +184,7 @@ void WorldContainer::apply_transformation(InstanceHandle hdl) {
 			spheres.transform(transMat);
 		}
 	}
-	set_instance_transformation(hdl, ei::Mat3x4{ ei::identity4x4() });
+	set_world_to_instance_transformation(hdl, ei::Mat3x4{ ei::identity4x4() });
 }
 
 InstanceHandle WorldContainer::create_instance(ObjectHandle obj, const u32 animationFrame) {
@@ -223,7 +223,7 @@ InstanceHandle WorldContainer::create_instance(ObjectHandle obj, const u32 anima
 		}
 	}
 
-	m_instanceTransformations.push_back(ei::Mat3x4{ ei::identity4x4() });
+	m_worldToInstanceTrans.push_back(ei::Mat3x4{ ei::identity4x4() });
 	return &m_instances.emplace_back(*obj, static_cast<u32>(m_instances.size()));
 }
 
@@ -242,12 +242,16 @@ InstanceHandle WorldContainer::get_instance(std::size_t index, const u32 animati
 	return nullptr;
 }
 
-const ei::Mat3x4& WorldContainer::get_instance_transformation(ConstInstanceHandle instance) const {
-	return m_instanceTransformations[instance->get_index()];
+const ei::Mat3x4& WorldContainer::get_world_to_instance_transformation(ConstInstanceHandle instance) const {
+	return m_worldToInstanceTrans[instance->get_index()];
 }
 
-void WorldContainer::set_instance_transformation(ConstInstanceHandle instance, const ei::Mat3x4& mat) {
-	m_instanceTransformations[instance->get_index()] = mat;
+ei::Mat3x4 WorldContainer::compute_instance_to_world_transformation(ConstInstanceHandle instance) const {
+	return ei::Mat3x4{ ei::invert(ei::Mat4x4{ get_world_to_instance_transformation(instance) })};
+}
+
+void WorldContainer::set_world_to_instance_transformation(ConstInstanceHandle instance, const ei::Mat3x4& mat) {
+	m_worldToInstanceTrans[instance->get_index()] = mat;
 }
 
 std::size_t WorldContainer::get_highest_instance_frame() const noexcept { 
@@ -773,7 +777,7 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		instanceHandles[index] = &inst;
 		++iter->second.count;
 		aabb = ei::Box{ aabb, inst.get_bounding_box(m_scenario->get_effective_lod(&inst),
-													get_instance_transformation(&inst)) };
+													compute_instance_to_world_transformation(&inst)) };
 	}
 	for(std::size_t i = animatedInstOffset; i < animatedInstCount; ++i) {
 		auto& inst = m_instances[i];
@@ -789,12 +793,12 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		instanceHandles[index] = &inst;
 		++iter->second.count;
 		aabb = ei::Box{ aabb, inst.get_bounding_box(m_scenario->get_effective_lod(&inst),
-													get_instance_transformation(&inst)) };
+													compute_instance_to_world_transformation(&inst)) };
 	}
 
 	m_scene = std::make_unique<Scene>(scenario, m_frameCurrent - m_frameStart,
 									  std::move(objInstRef), std::move(instanceHandles),
-									  m_instanceTransformations, aabb);
+									  m_worldToInstanceTrans, aabb);
 
 	// Check if the resulting scene has issues with size
 	if(ei::len(m_scene->get_bounding_box().min) >= SUGGESTED_MAX_SCENE_SIZE
@@ -890,8 +894,8 @@ bool WorldContainer::load_scene_lights() {
 				const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex>(polygons.get_material_indices_hdl());
 				const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point>(polygons.get_points_hdl());
 				const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
-				const ei::Mat3x4& instanceTransformation = get_instance_transformation(inst);
-				bool isMirroring = determinant(ei::Mat3x3{instanceTransformation}) < 0.0f;
+				const ei::Mat3x4 instToWorld = compute_instance_to_world_transformation(inst);
+				bool isMirroring = determinant(ei::Mat3x3{ instToWorld }) < 0.0f;
 				for(const auto& face : polygons.faces()) {
 					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
 					if(mat->get_properties().is_emissive()) {
@@ -900,7 +904,7 @@ bool WorldContainer::load_scene_lights() {
 							al.material = materials[primIdx];
 							int i = 0;
 							for(auto vHdl : face) {
-								al.points[i] = ei::transform(positions[vHdl.idx()], instanceTransformation);
+								al.points[i] = ei::transform(positions[vHdl.idx()], instToWorld);
 								al.uv[i] = uvs[vHdl.idx()];
 								++i;
 							}
@@ -914,7 +918,7 @@ bool WorldContainer::load_scene_lights() {
 							al.material = materials[primIdx];
 							int i = 0;
 							for(auto vHdl : face) {
-								al.points[i] = ei::transform(positions[vHdl.idx()], instanceTransformation);
+								al.points[i] = ei::transform(positions[vHdl.idx()], instToWorld);
 								al.uv[i] = uvs[vHdl.idx()];
 								++i;
 							}
@@ -936,10 +940,10 @@ bool WorldContainer::load_scene_lights() {
 				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
 					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[i]);
 					if(mat->get_properties().is_emissive()) {
-						const auto scale = Instance::extract_scale(instanceTransformation);
+						const auto scale = Instance::extract_scale(instToWorld);
 						mAssert(ei::approx(scale.x, scale.y) && ei::approx(scale.x, scale.z));
 						lights::AreaLightSphereDesc al{
-							transform(spheresData[i].center, instanceTransformation),
+							transform(spheresData[i].center, instToWorld),
 							scale.x * spheresData[i].radius,
 							materials[i]
 						};

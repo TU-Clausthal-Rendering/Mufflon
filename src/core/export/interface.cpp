@@ -1010,12 +1010,18 @@ Boolean object_get_id(ObjectHdl obj, uint32_t* id) {
 	CATCH_ALL(false)
 }
 
-Boolean instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat) {
+Boolean instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat,
+										   const bool isWorldToInst) {
 	TRY
 	CHECK_NULLPTR(inst, "instance handle", false);
 	CHECK_NULLPTR(mat, "transformation matrix", false);
 	ConstInstanceHandle instance = static_cast<ConstInstanceHandle>(inst);
-	s_world.set_instance_transformation(instance, util::pun<ei::Mat3x4>(*mat));
+	if(isWorldToInst) {
+		s_world.set_world_to_instance_transformation(instance, util::pun<ei::Mat3x4>(*mat));
+	} else {
+		const ei::Mat3x4 wToI{ ei::invert(ei::Mat4x4{ util::pun<ei::Mat3x4>(*mat) }) };
+		s_world.set_world_to_instance_transformation(instance, wToI);
+	}
 	return true;
 	CATCH_ALL(false)
 }
@@ -1025,7 +1031,7 @@ Boolean instance_get_transformation_matrix(InstanceHdl inst, Mat3x4* mat) {
 	CHECK_NULLPTR(inst, "instance handle", false);
 	ConstInstanceHandle instance = static_cast<ConstInstanceHandle>(inst);
 	if(mat != nullptr)
-		*mat = util::pun<Mat3x4>(s_world.get_instance_transformation(instance));
+		*mat = util::pun<Mat3x4>(s_world.compute_instance_to_world_transformation(instance));
 	return true;
 	CATCH_ALL(false)
 }
@@ -1034,7 +1040,7 @@ Boolean instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max, LodLev
 	TRY
 	CHECK_NULLPTR(inst, "instance handle", false);
 	const Instance& instance = *static_cast<ConstInstanceHandle>(inst);
-	const ei::Box& aabb = instance.get_bounding_box(lod, s_world.get_instance_transformation(&instance));
+	const ei::Box& aabb = instance.get_bounding_box(lod, s_world.compute_instance_to_world_transformation(&instance));
 	if(min != nullptr)
 		*min = util::pun<Vec3>(aabb.min);
 	if(max != nullptr)
