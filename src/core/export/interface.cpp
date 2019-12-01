@@ -3737,6 +3737,7 @@ CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
 	return true;
 	CATCH_ALL(false)
 #else // MUFFLON_ENABLE_OPEN_DENOISE
+	(void)filename;
 	return false;
 #endif // MUFFLON_ENABLE_OPEN_DENOISE
 }
@@ -4176,7 +4177,11 @@ Boolean mufflon_initialize() {
 			// avoid loading excessively many DLLs
 			for(const auto& dir : fs::directory_iterator(dllPath.parent_path() / "plugins")) {
 				fs::path path = dir.path();
+#ifdef _WIN32
 				if(!fs::is_directory(path) && path.extension() == ".dll") {
+#else // _WIN32
+				if(!fs::is_directory(path) && path.extension() == ".so") {
+#endif // _WIN32
 					TextureLoaderPlugin plugin{ path };
 					// If we succeeded in loading (and thus have the necessary functions),
 					// add it as a usable plugin

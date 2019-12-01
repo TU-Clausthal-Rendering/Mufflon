@@ -16,7 +16,7 @@
 #include "microfacet_refractive.hpp"
 #include "microfacet_full.hpp"
 #include <cuda_runtime.h>
-#include <cmath>
+#include <math.h>
 
 namespace mufflon { namespace scene { namespace materials {
 

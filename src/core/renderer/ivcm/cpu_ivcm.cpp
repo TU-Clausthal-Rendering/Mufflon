@@ -10,6 +10,7 @@
 #include "core/scene/lights/light_tree_sampling.hpp"
 
 #include <cn/rnd.hpp>
+#include <cmath>
 
 namespace mufflon::renderer {
 
@@ -228,7 +229,7 @@ CpuIvcm::connect(const IvcmPathVertex& path0, const IvcmPathVertex& path1,
 	Spectrum bxdfProd = val0.value * val1.value;
 	float cosProd = val0.cosOut * val1.cosOut;//TODO: abs?
 	mAssert(cosProd >= 0.0f);
-	mAssert(!isnan(bxdfProd.x));
+	mAssert(!std::isnan(bxdfProd.x));
 	// Early out if there would not be a contribution (estimating the materials is usually
 	// cheaper than the any-hit test).
 	if(any(greater(bxdfProd, 0.0f)) && cosProd > 0.0f) {
@@ -470,7 +471,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 				Pixel outCoord = coord;
 				auto conVal = connect(*currentVertex, *lightVertex, outCoord, mergeArea, numPhotons, reuseCount, incidentF, incidentB);
 				if(outCoord.x != -1) {
-					mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.x) && !isnan(currentVertex->ext().throughput.x));
+					mAssert(!std::isnan(conVal.cosines) && !std::isnan(conVal.bxdfs.x) && !std::isnan(throughput.x) && !std::isnan(currentVertex->ext().throughput.x));
 					m_outputBuffer.contribute<RadianceTarget>(outCoord, throughput * lightVertex->ext().throughput * conVal.cosines * conVal.bxdfs);
 				}
 			}
@@ -534,7 +535,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 				emission.value *= misWeight;
 				m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 			}
-			mAssert(!isnan(emission.value.x));
+			mAssert(!std::isnan(emission.value.x));
 		}//*/
 		if(currentVertex->is_end_point()) break;
 

@@ -7,6 +7,7 @@
 #include <cuda_runtime_api.h>
 #include <ei/3dtypes.hpp>
 #include <ei/3dintersection.hpp>
+#include <math.h>
 
 namespace mufflon { namespace scene { namespace accel_struct {
 

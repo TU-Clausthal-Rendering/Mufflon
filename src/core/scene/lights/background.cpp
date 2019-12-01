@@ -6,7 +6,7 @@
 namespace mufflon::scene::lights {
 
 Background::Background(const BackgroundType type) :
-	m_params{},
+	m_params{ MonochromParams{} },
 	m_type{ type },
 	m_scale{ 1.f },
 	m_flux{ 0.f }

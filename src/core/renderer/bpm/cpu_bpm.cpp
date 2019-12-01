@@ -7,6 +7,7 @@
 #include "core/renderer/random_walk.hpp"
 #include "core/scene/materials/medium.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
+#include <cmath>
 
 namespace mufflon::renderer {
 
@@ -261,7 +262,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 				float misWeight = get_mis_weight(vertex[currentV], emission.pdf, emission.emitPdf, numPhotons, prevMergeArea);
 				emission.value *= misWeight;
 			}
-			mAssert(!isnan(emission.value.x));
+			mAssert(!std::isnan(emission.value.x));
 			m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 		}
 		if(vertex[currentV].is_end_point()) break;
@@ -278,7 +279,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 				if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength
 					&& lensq(photonIt->position - currentPos) < mergeRadiusSq) {
 					radiance += merge(vertex[currentV], *photonIt);
-					mAssert(!isnan(radiance.x));
+					mAssert(!std::isnan(radiance.x));
 				}
 				++photonIt;
 			}
@@ -300,7 +301,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 					radiance += merge(vertex[currentV], photon) * kernel(distSq[i], bandwidth);
 			}
 			radiance /= currentMergeArea;
-			mAssert(!isnan(radiance.x));
+			mAssert(!std::isnan(radiance.x));
 		}
 
 		m_outputBuffer.contribute<RadianceTarget>(coord, throughput * radiance);

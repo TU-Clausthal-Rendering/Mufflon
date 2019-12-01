@@ -6,6 +6,7 @@
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/accel_structs/tangent_space.hpp"
+#include <math.h>
 
 namespace mufflon { namespace renderer {
 

@@ -4,6 +4,7 @@
 #include <rapidjson/document.h>
 #include "core/export/interface.h"
 #include <rapidjson/prettywriter.h>
+#include <vector>
 
 namespace mff_loader::exprt {
 

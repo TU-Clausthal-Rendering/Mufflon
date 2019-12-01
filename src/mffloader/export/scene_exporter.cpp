@@ -44,11 +44,11 @@ public:
 	{}
 	bool Double(double d) { Prefix(rapidjson::kNumberType); return EndValue(WriteDouble(d)); }
 	bool WriteDouble(double d) {
-		if(rapidjson::internal::Double(d).IsNanOrInf()) {
+		if(rapidjson::internal::Double(d).isnanOrInf()) {
 			// Note: This code path can only be reached if (RAPIDJSON_WRITE_DEFAULT_FLAGS & kWriteNanAndInfFlag).
 			if(!(rapidjson::kWriteDefaultFlags & rapidjson::kWriteNanAndInfFlag))
 				return false;
-			if(rapidjson::internal::Double(d).IsNan()) {
+			if(rapidjson::internal::Double(d).isnan()) {
 				PutReserve(*os_, 3);
 				PutUnsafe(*os_, 'N'); PutUnsafe(*os_, 'a'); PutUnsafe(*os_, 'N');
 				return true;

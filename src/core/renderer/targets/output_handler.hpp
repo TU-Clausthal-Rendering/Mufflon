@@ -159,7 +159,7 @@ public:
 			}
 		});
 
-		return std::move(rb);
+		return rb;
 	}
 	
 	template < Device dev1, Device dev2 >

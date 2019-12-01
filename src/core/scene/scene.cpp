@@ -63,7 +63,7 @@ void Scene::load_materials() {
 	const std::size_t MAT_SLOTS = m_scenario.get_num_material_slots();
 	std::size_t offset = round_to_align<alignof(materials::MaterialDescriptorBase)>(sizeof(int) * MAT_SLOTS);
 	for(MaterialIndex i = 0; i < m_scenario.get_num_material_slots(); ++i) {
-		mAssert(offset <= std::numeric_limits<i32>::max());
+		mAssert(offset <= static_cast<std::size_t>(std::numeric_limits<i32>::max()));
 		offsets.push_back(i32(offset));
 		//offset += materials::get_handle_pack_size();
 		offset += m_scenario.get_assigned_material(i)->get_descriptor_size(dev);

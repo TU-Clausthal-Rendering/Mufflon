@@ -52,7 +52,7 @@ public:
 			case std::ios_base::cur:
 			default: origin = SEEK_CUR;
 		}
-		while(offset > std::numeric_limits<long>::max()) {
+		while(offset > static_cast<u64>(std::numeric_limits<long>::max())) {
 			if(std::fseek(m_desc, std::numeric_limits<long>::max(), origin) != 0)
 				throw std::runtime_error("Failed to seek C file descriptor to desired position");
 			offset -= std::numeric_limits<long>::max();

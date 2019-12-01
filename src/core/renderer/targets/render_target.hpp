@@ -6,7 +6,7 @@
 #include "core/export/api.h"
 #include "core/memory/residency.hpp"
 #include <ei/vector.hpp>
-#include <cmath>
+#include <math.h>
 #include <type_traits>
 
 namespace mufflon { namespace renderer {

@@ -7,6 +7,7 @@
 #include "core/scene/lights/light_tree_sampling.hpp"
 #include "core/renderer/targets/render_targets.hpp"
 #include "core/renderer/footprint.hpp"
+#include <math.h>
 
 namespace mufflon { namespace renderer {
 

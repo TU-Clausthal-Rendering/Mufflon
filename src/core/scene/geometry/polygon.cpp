@@ -15,6 +15,7 @@
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include "core/scene/tessellation/tessellater.hpp"
 #include "core/scene/tessellation/displacement_mapper.hpp"
+#include <cmath>
 
 namespace mufflon::scene::geometry {
 

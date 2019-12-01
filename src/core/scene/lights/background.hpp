@@ -154,7 +154,7 @@ private:
 	// be either monochromatic, an environment map, or an analytic sky model.
 	// This boils down to a tagged union
 	struct MonochromParams {
-		Spectrum color{ 0.f };
+		Spectrum color{ 0.f, 0.f, 0.f };
 	};
 	struct EnvmapParams {
 		TextureHandle envLight{ nullptr };

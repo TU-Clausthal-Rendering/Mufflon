@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "core/math/sampling.hpp"
+#include <math.h>
 
 namespace mufflon { namespace renderer {
 
@@ -124,7 +125,7 @@ public:
 			f.update_travel(distance);
 		}
 	//	f.update_projection(ei::abs(inCos));
-		mAssert(!(std::isnan(f.m_aa) || std::isnan(f.m_ax) || std::isnan(f.m_xx)));
+		mAssert(!(isnan(f.m_aa) || isnan(f.m_ax) || isnan(f.m_xx)));
 		return f;
 	}
 private:
