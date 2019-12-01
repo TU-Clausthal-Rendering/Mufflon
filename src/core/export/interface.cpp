@@ -22,7 +22,6 @@
 #include "core/scene/textures/interface.hpp"
 #include "mffloader/interface/interface.h"
 #include <glad/glad.h>
-#include <OpenImageDenoise/oidn.hpp>
 #include <cuda_runtime.h>
 #include <fstream>
 #include <type_traits>
@@ -30,7 +29,10 @@
 #include <fstream>
 #include <vector>
 #include <set>
-#include "glad/glad.h"
+
+#ifdef MUFFLON_ENABLE_OPEN_DENOISE
+#include <OpenImageDenoise/oidn.hpp>
+#endif // MUFFLON_ENABLE_OPEN_DENOISE
 
 #ifdef _WIN32
 #include <windows.h>
@@ -87,10 +89,6 @@ using SphereVHdl = Spheres::SphereHandle;
 
 // Return values for invalid handles/attributes
 namespace {
-
-// Specifies the minimum compute capability requirements
-constexpr int minMajorCC = 5;
-constexpr int minMinorCC = 2;
 
 // static variables for interacting with the renderer
 renderer::IRenderer* s_currentRenderer;
@@ -3649,6 +3647,7 @@ Boolean render_save_screenshot(const char* filename, const char* targetName, Boo
 }
 
 CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
+#ifdef MUFFLON_ENABLE_OPEN_DENOISE
 	TRY
 	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
@@ -3737,6 +3736,9 @@ CORE_API Boolean CDECL render_save_denoised_radiance(const char* filename) {
 
 	return true;
 	CATCH_ALL(false)
+#else // MUFFLON_ENABLE_OPEN_DENOISE
+	return false;
+#endif // MUFFLON_ENABLE_OPEN_DENOISE
 }
 
 uint32_t render_get_render_target_count() {
@@ -4192,6 +4194,32 @@ Boolean mufflon_initialize() {
 		int count = 0;
 		cuda::check_error(cudaGetDeviceCount(&count));
 		if(count > 0) {
+			// Parse list of CCs to determine eligible GPUs
+#ifdef MUFFLON_CUDA_ARCHES
+			const std::string archString{ MUFFLON_CUDA_ARCHES };
+#else // MUFFLON_CUDA_ARCHES
+			const std::string archString{};
+#endif // MUFFLON_CUDA_ARCHES
+			std::istringstream ss{ archString };
+			using StringIterator = std::istream_iterator<std::string>;
+			const std::vector<std::string> arches{ StringIterator{ss}, StringIterator{} };
+			int minMajorCC = std::numeric_limits<int>::max();
+			int minMinorCC = std::numeric_limits<int>::max();
+			for(const auto& arch : arches) {
+				if(const auto pos = arch.find('.'); pos != arch.npos) {
+					char* end = nullptr;
+					const auto major = std::strtol(arch.c_str(), &end, 10);
+					if(major < minMajorCC) {
+						minMajorCC = major;
+						minMinorCC = std::strtol(arch.c_str() + pos + 1u, &end, 10);
+					}
+				}
+			}
+			if(minMajorCC == std::numeric_limits<int>::max()) {
+				minMajorCC = 0;
+				minMinorCC = 0;
+			}
+
 			// We select the device with the highest compute capability
 			int devIndex = -1;
 			int major = -1;

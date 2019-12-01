@@ -1,10 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 project("mufflon" VERSION 0.0.1 LANGUAGES C CXX CUDA)
 
-# Find OpenMP for linking
-find_package(OpenMP)
-find_package(CUDA REQUIRED)
-
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # Force 'Release' as build type if no other has been specified
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "Setting build type to 'Release' as none was specified.")
@@ -12,38 +9,41 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release"
     "MinSizeRel" "RelWithDebInfo")
 endif()
+# Discourage in-source builds
+if("${PROJECT_SOURCE_DIR}" STREQUAL "${PROJECT_BINARY_DIR}")
+   message(WARNING "In-source building is discouraged!")
+endif("${PROJECT_SOURCE_DIR}" STREQUAL "${PROJECT_BINARY_DIR}")
 
-# Give user the option to disable folders for MSVC solutions
-option(MUFFLON_USE_FOLDERS "Enable solution folders in Visual Studio" ON)
-if(MUFFLON_USE_FOLDERS)
-	set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+# We need CUDA, OpenMP is optional; other dependencies are packaged as sub-repos or in binary form
+find_package(OpenMP)
+find_package(CUDA REQUIRED)
+
+if(NOT OpenMP_CXX_FOUND)
+	message(WARNING "OpenMP is strongly recommended, as all CPU-side parallel code relies on it and will run serially without it")
 endif()
 
 # Option to be more strict on compilation
 option(MUFFLON_STRICT_COMPILATION "Enable W4/Wextra and WX/Werror" OFF)
+option(MUFFLON_ENABLE_OPEN_DENOISE "Enable OpenDenoise" ON)
 # CUDA arch
-set(ARCH "Auto" CACHE STRING "CUDA target compute capability (Auto uses present GPUs")
+set(MUFFLON_CUDA_ARCH "Auto" CACHE STRING "CUDA target compute capability (Auto uses present GPUs")
 
 # Select the compilation target for NVCC in terms of compute capability
-CUDA_SELECT_NVCC_ARCH_FLAGS(ARCH_FLAGS ${ARCH})
-if("${ARCH}" STREQUAL "Auto")
+CUDA_SELECT_NVCC_ARCH_FLAGS(ARCH_FLAGS ${MUFFLON_CUDA_ARCH})
+if("${MUFFLON_CUDA_ARCH}" STREQUAL "Auto")
 	STRING(REGEX REPLACE "sm_(.)(.)" "\\1.\\2" ARCH_CC ${ARCH_FLAGS_readable})
-	set(ARCH "${ARCH_CC}" CACHE STRING "CUDA target compute capability (Auto uses present GPUs)" FORCE)
-	message(STATUS "Detected CUDA arch: ${ARCH}")
+	set(MUFFLON_CUDA_ARCH "${ARCH_CC}" CACHE STRING "CUDA target compute capability (Auto uses present GPUs)" FORCE)
+	message(STATUS "Detected CUDA arch: ${MUFFLON_CUDA_ARCH}")
 endif()
 
+# Only MSVC generators have C# support
 if(MSVC)
 	enable_language(CSharp)
 	# Option to not build GUI
 	option(MUFFLON_BUILD_GUI "Build the GUI or not" ON)
 	# C# version
 	set(MUFFLON_DotNet_VERSION "4.6.1" CACHE STRING ".NET version to use")
-	endif()
-
-# Discourage in-source builds
-if("${PROJECT_SOURCE_DIR}" STREQUAL "${PROJECT_BINARY_DIR}")
-   message(WARNING "In-source building is discouraged!")
-endif("${PROJECT_SOURCE_DIR}" STREQUAL "${PROJECT_BINARY_DIR}")
+endif()
 
 # Ensure that our binaries get put in the proper directory
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build")
@@ -170,7 +170,17 @@ add_library(gliloader MODULE ${MUFFLON_GLILOADER_SOURCE_LIST} ${EPSILON_SOURCE_L
 add_library(mffloader SHARED ${MUFFLON_MFFLOADER_SOURCE_LIST} ${CHINOISE_SOURCE_LIST} ${EPSILON_SOURCE_LIST} ${MINIZ_SOURCE_LIST})
 add_library(pfmloader MODULE ${MUFFLON_PFMLOADER_SOURCE_LIST} ${EPSILON_SOURCE_LIST})
 add_library(stbiloader MODULE ${MUFFLON_STBILOADER_SOURCE_LIST} ${EPSILON_SOURCE_LIST} ${STBI_SOURCE_LIST})
-# TODO: GUI and python script
+# Dependency library targets
+add_library(openmesh_core SHARED IMPORTED)
+add_library(openmesh_tools SHARED IMPORTED)
+if(MUFFLON_ENABLE_OPEN_DENOISE)
+	add_library(opendenoise SHARED IMPORTED)
+	add_library(tbb SHARED IMPORTED)
+endif()
+
+# Set the libraries' headers for inclusion
+set_target_properties(core PROPERTIES PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/interface.h")
+set_target_properties(mffloader PROPERTIES PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/src/mffloader/interface/interface.h")
 
 # Set the include directories
 target_include_directories(core
@@ -219,23 +229,26 @@ target_include_directories(stbiloader
 target_compile_definitions(core PRIVATE _USE_MATH_DEFINES CORE_EXPORTS _CRT_SECURE_NO_WARNINGS)
 target_compile_definitions(mffloader PRIVATE LOADER_EXPORTS _CRT_SECURE_NO_WARNINGS)
 target_compile_definitions(stbiloader PRIVATE _CRT_SECURE_NO_WARNINGS)
+# Set the compile definition for min. CC requirement
+target_compile_definitions(core PRIVATE MUFFLON_CUDA_ARCHES="${MUFFLON_CUDA_ARCH}")
 
 set(CXX_TARGETS core gliloader mffloader pfmloader stbiloader)
 
-# Set CUDA flags
+# Set C++ standard and CUDA flags
 set_target_properties(core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 set_target_properties(core PROPERTIES CUDA_STANDARD 14)
 set_target_properties(core PROPERTIES CUDA_STANDARD_REQUIRED ON)
 target_compile_options(core PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 target_compile_options(core PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${ARCH_FLAGS}>)
 
-set_target_properties(${CXX_TARGETS} PROPERTIES
-	CXX_STANDARD 17
-	CXX_STANDARD_REQUIRED ON
-	CXX_EXTENSIONS OFF
-	CUDA_SEPARABLE_COMPILATION ON
-	CUDA_STANDARD 14
-	CUDA_STANDARD_REQUIRED ON
+set_target_properties(${CXX_TARGETS}
+	PROPERTIES
+		CXX_STANDARD 17
+		CXX_STANDARD_REQUIRED ON
+		CXX_EXTENSIONS OFF
+		CUDA_SEPARABLE_COMPILATION ON
+		CUDA_STANDARD 14
+		CUDA_STANDARD_REQUIRED ON
 )
 
 # Set compiler-specific flags
@@ -267,20 +280,17 @@ else()
 			target_compile_options(${TAR} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${MUFFLON_WARNING_FLAGS}>)
 		endif(MUFFLON_STRICT_COMPILATION)
 	endforeach(TAR)
-	# On GCC, we need to link in a library to get filesystem support
+	# On older GCC versions, we need to link in a library to get filesystem support
 	set(CXX_FS_LIBRARY "stdc++fs")
 endif()
 # Since GLI has some warnings themselves that we can't (or won't) fix, we just ignore them
 if(NOT MSVC)
-	target_compile_options(gliloader PRIVATE
+	set_source_files_properties(${GLI_SOURCE_LIST} PROPERTIES COMPILE_FLAGS
 		-Wno-ignored-qualifiers -Wno-unused-parameter -Wno-empty-body -Wno-unused-result -Wno-unused-variable -Wno-type-limits
 	)
 endif()
 
 # Dependency library targets
-add_library(openmesh_core SHARED IMPORTED)
-add_library(openmesh_tools SHARED IMPORTED)
-add_library(opendenoise SHARED IMPORTED)
 set(MUFFLON_OPENMESH_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/external/OpenMesh-8.0")
 set(MUFFLON_OPENDENOISE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/external/oidn-0.9")
 if(MSVC)
@@ -292,31 +302,45 @@ if(MSVC)
 	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshTools.dll")
 	set_target_properties(openmesh_tools PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/OpenMeshToolsd.lib")
 	set_target_properties(openmesh_tools PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshTools.lib")
-	set_target_properties(opendenoise PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/lib/OpenImageDenoise.lib")
-	set_target_properties(opendenoise PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/OpenImageDenoise.lib")
-	set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/bin/OpenImageDenoise.dll")
-	set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/bin/OpenImageDenoise.dll")
 	install(FILES
 			"${MUFFLON_OPENMESH_DIRECTORY}/Debug/bin/OpenMeshCored.dll"
 			"${MUFFLON_OPENMESH_DIRECTORY}/Debug/bin/OpenMeshToolsd.dll"
-			"${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/bin/OpenImageDenoise.dll"
 		DESTINATION "."
 		CONFIGURATIONS Debug
 	)
 	install(FILES
 			"${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshCore.dll"
 			"${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshTools.dll"
-			"${MUFFLON_OPENDENOISE_DIRECTORY}/Release/bin/OpenImageDenoise.dll"
 		DESTINATION "."
 		CONFIGURATIONS Release
 	)
+	if(MUFFLON_ENABLE_OPEN_DENOISE)
+		set_target_properties(opendenoise PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/lib/OpenImageDenoise.lib")
+		set_target_properties(opendenoise PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/OpenImageDenoise.lib")
+		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/bin/OpenImageDenoise.dll")
+		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/bin/OpenImageDenoise.dll")
+		set_target_properties(tbb PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/lib/tbb.lib")
+		set_target_properties(tbb PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/tbb.lib")
+		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/bin/tbb.dll")
+		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/bin/tbb.dll")
+		install(FILES
+				"${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/bin/OpenImageDenoise.dll"
+				"${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/bin/tbb.dll"
+			DESTINATION "."
+			CONFIGURATIONS Debug
+		)
+		install(FILES
+				"${MUFFLON_OPENDENOISE_DIRECTORY}/Release/bin/OpenImageDenoise.dll"
+				"${MUFFLON_OPENDENOISE_DIRECTORY}/Release/bin/tbb.dll"
+			DESTINATION "."
+			CONFIGURATIONS Release
+		)
+	endif()
 else(MSVC)
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/libOpenMeshCored.so")
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshCore.so")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/libOpenMeshToolsd.so")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshTools.so")
-	set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/lib/libOpenImageDenoise.so")
-	set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/libOpenImageDenoise.so")
+	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/libOpenMeshCored.so.8.0")
+	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshCore.so.8.0")
+	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/libOpenMeshToolsd.so.8.0")
+	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshTools.so.8.0")
 	install(FILES
 			"${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/libOpenMeshCored.so"
 			"${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/libOpenMeshToolsd.so"
@@ -331,6 +355,12 @@ else(MSVC)
 		DESTINATION "."
 		CONFIGURATIONS Release
 	)
+	if(MUFFLON_ENABLE_OPEN_DENOISE)
+		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/lib/libOpenImageDenoise.so.0")
+		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/libOpenImageDenoise.so.0")
+		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/lib/lbtbb.so.0")
+		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/libtbb.so.0")
+	endif()
 endif()
 
 # GUI building
@@ -391,22 +421,15 @@ if(MUFFLON_BUILD_GUI)
 endif(MUFFLON_BUILD_GUI)
 
 # Inter-target dependencies
-target_link_libraries(mffloader
-	PUBLIC
-		core
-)
+target_link_libraries(mffloader PUBLIC core)
 target_link_options(core PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${ARCH_FLAGS}>)
-target_link_libraries(core
-	PUBLIC
-		openmesh_core
-		openmesh_tools
-		opendenoise
-)
+target_link_libraries(core PRIVATE openmesh_core openmesh_tools)
+if(MUFFLON_ENABLE_OPEN_DENOISE)
+	target_link_libraries(core PRIVATE opendenoise tbb)
+	target_compile_definitions(core PRIVATE MUFFLON_ENABLE_OPEN_DENOISE)
+endif()
 if(OpenMP_CXX_FOUND)
-	target_link_libraries(core
-		PUBLIC
-			OpenMP::OpenMP_CXX
-	)
+	target_link_libraries(core PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
 # Set output targets for plugins
@@ -456,7 +479,7 @@ add_custom_command(TARGET pythonbindings PRE_BUILD
 )
 add_dependencies(core pythonbindings)
 
-# Install the dependencies (OpenMesh etc)
+# Copy the dependencies into the build folder
 if(WIN32)
 	add_custom_command(TARGET core PRE_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -475,9 +498,10 @@ else()
 	)
 endif()
 
-# TODO: specify install targets
+# Install shared libraries and dependencies
 install(TARGETS core mffloader
 	LIBRARY DESTINATION "."
+	PUBLIC_HEADER DESTINATION "include"
 )
 install(TARGETS stbiloader pfmloader gliloader
 	LIBRARY DESTINATION "plugins"
