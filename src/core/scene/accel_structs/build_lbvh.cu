@@ -795,8 +795,7 @@ void LBVHBuilder::build(
 ) {
 	logInfo("[LBVHBuilder::build] Building BVH for ", scene.numInstances, " instances.");
 	// Swap the actual-instance and numInstance counts to avoid specialization
-	build_lbvh<SceneDescriptor<dev>>(scene, scene.aabb, actualInstCount, true,
-									 scene.numInstances);
+	build_lbvh<SceneDescriptor<dev>>(scene, scene.aabb, scene.numInstances, true, actualInstCount);
 	m_primIds.mark_changed(dev);
 	m_bvhNodes.mark_changed(dev);
 }

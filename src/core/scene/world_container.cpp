@@ -739,11 +739,12 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		else
 			++(iter->second.count);
 	}
-	for(std::size_t i = animatedInstOffset; i < animatedInstCount; ++i) {
+	for(std::size_t i = 0u; i < animatedInstCount; ++i) {
+		const auto instanceIndex = animatedInstOffset + i;
 		// Discard masked instances and objects
-		if(m_scenario->is_masked(m_instances.data() + i))
+		if(m_scenario->is_masked(m_instances.data() + instanceIndex))
 			continue;
-		auto& obj = m_instances[i].get_object();
+		auto& obj = m_instances[instanceIndex].get_object();
 		if(m_scenario->is_masked(&obj))
 			continue;
 
@@ -786,8 +787,9 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		aabb = ei::Box{ aabb, inst.get_bounding_box(m_scenario->get_effective_lod(&inst),
 													compute_instance_to_world_transformation(&inst)) };
 	}
-	for(std::size_t i = animatedInstOffset; i < animatedInstCount; ++i) {
-		auto& inst = m_instances[i];
+	for(std::size_t i = 0u; i < animatedInstCount; ++i) {
+		const auto instanceIndex = animatedInstOffset + i;
+		auto& inst = m_instances[instanceIndex];
 		// Discard masked instances and objects
 		if(m_scenario->is_masked(&inst))
 			continue;

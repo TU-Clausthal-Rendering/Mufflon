@@ -241,6 +241,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 				m_boundingBox = ei::Box(m_boundingBox, aabb);
 			}
 		}
+
 		sceneDescriptor.validInstanceIndex = m_instances.front()->get_index();
 		const auto t1 = std::chrono::high_resolution_clock::now();
 		logInfo("[Scene::get_descriptor] Build descriptors for ", lodIndex.load(),
@@ -303,7 +304,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 		}
 
 		sceneDescriptor.numLods = static_cast<u32>(lodIndex.load());
-		sceneDescriptor.numInstances = static_cast<i32>(m_instances.size());
+		sceneDescriptor.numInstances = static_cast<i32>(totalInstanceCount);
 		sceneDescriptor.diagSize = len(m_boundingBox.max - m_boundingBox.min);
 		sceneDescriptor.aabb = m_boundingBox;
 		sceneDescriptor.lods = lodDevDesc.get();
@@ -337,7 +338,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 			auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
 
 			const auto t0 = std::chrono::high_resolution_clock::now();
-			m_accelStruct.build(sceneDescriptor, static_cast<u32>(m_worldToInstanceTransformation.size()));
+			m_accelStruct.build(sceneDescriptor, static_cast<u32>(m_instances.size()));
 			m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = true;
 			m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = true;
 
