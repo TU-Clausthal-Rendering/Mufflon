@@ -111,6 +111,7 @@ public:
 	const ei::Mat3x4& get_world_to_instance_transformation(ConstInstanceHandle instance) const;
 	ei::Mat3x4 compute_instance_to_world_transformation(ConstInstanceHandle instance) const;
 	void set_world_to_instance_transformation(ConstInstanceHandle instance, const ei::Mat3x4& mat);
+	void set_instance_to_world_transformation(ConstInstanceHandle instance, const ei::Mat3x4& mat);
 	ScenarioHandle get_scenario(const StringView name);
 	ScenarioHandle get_scenario(std::size_t index);
 	ScenarioHandle get_current_scenario() const noexcept;

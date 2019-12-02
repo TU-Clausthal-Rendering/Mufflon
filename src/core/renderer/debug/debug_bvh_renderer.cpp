@@ -31,13 +31,15 @@ void mufflon::renderer::DebugBvhRenderer::iterate()
 
 	// count transparent fragments
 	m_dynFragmentBuffer.bindCountBuffer();
+	const auto instanceToWorld = m_sceneDesc.cpuDescriptor->compute_instance_to_world_transformation(m_botIdx);
 	if (m_showBoxes)
 		m_boxPipe.draw(m_bboxes, sceneDesc.instanceToWorld, sceneDesc.numInstances, true, BoxColor);
 	if (m_showTopLevel)
 		m_boxPipe.draw(m_topLevelBoxes, m_topLevelLevels, m_topLevelNumBoxes, m_topLevelMaxLevel, true, TopColor);
-	if (m_showBotLevel)
-		m_boxPipe.draw(m_botLevelBoxes, m_botLevelLevels, m_sceneDesc.cpuDescriptor->instanceToWorld[m_botIdx],
-			m_botLevelNumBoxes, m_botLevelMaxLevel, true, BotColor);
+	// TODO: let OpenGL fetch the instance transformation from the (OpenGL-side already present) descriptor?
+	if(m_showBotLevel)
+		m_boxPipe.draw(m_botLevelBoxes, m_botLevelLevels, instanceToWorld,
+					   m_botLevelNumBoxes, m_botLevelMaxLevel, true, BotColor);
 	
 	
 	m_dynFragmentBuffer.prepareFragmentBuffer();
@@ -47,7 +49,7 @@ void mufflon::renderer::DebugBvhRenderer::iterate()
 	if (m_showTopLevel)
 		m_boxPipe.draw(m_topLevelBoxes, m_topLevelLevels, m_topLevelNumBoxes, m_topLevelMaxLevel, false, TopColor);
 	if (m_showBotLevel)
-		m_boxPipe.draw(m_botLevelBoxes, m_botLevelLevels, m_sceneDesc.cpuDescriptor->instanceToWorld[m_botIdx],
+		m_boxPipe.draw(m_botLevelBoxes, m_botLevelLevels, instanceToWorld,
 			m_botLevelNumBoxes, m_botLevelMaxLevel, false, BotColor);
 	
 	m_dynFragmentBuffer.blendFragmentBuffer();

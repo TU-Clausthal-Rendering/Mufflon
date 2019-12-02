@@ -120,9 +120,6 @@ void GlRenderer::draw_triangles(const gl::Pipeline& pipe, Attribute attribs) {
 			continue;
 		const scene::LodDescriptor<Device::OPENGL>& lod = sceneDesc.lods[idx];
 
-		printf("%u %u %u\n", idx, sceneDesc.instanceToWorld.id, sceneDesc.worldToInstance.id);
-		fflush(stdout);
-
 		if(!lod.polygon.numTriangles) continue;
 
 		// instance if for lookup in instance transformation buffer

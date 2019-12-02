@@ -82,9 +82,51 @@ struct CameraDescriptor {
 	}
 };
 
+template < Device dev >
+struct InstanceData {
+	ConstArrayDevHandle_t<dev, ei::Mat3x4> worldToInstance;		// Full inverse transformation Scale⁻¹ * Rotation⁻¹ * Translation⁻¹
+	ConstArrayDevHandle_t<dev, u32> lodIndices;
+
+	CUDA_FUNCTION __forceinline__ ei::Mat3x4 compute_instance_to_world_transformation(const i32 instanceIndex) const noexcept {
+		return compute_instance_to_world_transformation(this->worldToInstance[instanceIndex]);
+	}
+
+	static CUDA_FUNCTION ei::Mat3x4 compute_instance_to_world_transformation(const ei::Mat3x4& matrix) noexcept {
+		// Experiments determined this to be the fastest way by a factor of ~2 over naϊvely inverting
+		const ei::Mat3x3 rotScale{ matrix };
+		// Faster invert of 3x3 than LU decomposition (another speedup of factor ~5)
+		const auto m00 = matrix(1u, 1u) * matrix(2u, 2u) - matrix(1u, 2u) * matrix(2u, 1u);
+		const auto m01 = matrix(0u, 2u) * matrix(2u, 1u) - matrix(0u, 1u) * matrix(2u, 2u);
+		const auto m02 = matrix(0u, 1u) * matrix(1u, 2u) - matrix(0u, 2u) * matrix(1u, 1u);
+		const auto m10 = matrix(1u, 2u) * matrix(2u, 0u) - matrix(1u, 0u) * matrix(2u, 2u);
+		const auto m11 = matrix(0u, 0u) * matrix(2u, 2u) - matrix(0u, 2u) * matrix(2u, 0u);
+		const auto m12 = matrix(0u, 2u) * matrix(1u, 0u) - matrix(0u, 0u) * matrix(1u, 2u);
+		const auto m20 = matrix(1u, 0u) * matrix(2u, 1u) - matrix(1u, 1u) * matrix(2u, 0u);
+		const auto m21 = matrix(0u, 1u) * matrix(2u, 0u) - matrix(0u, 0u) * matrix(2u, 1u);
+		const auto m22 = matrix(0u, 0u) * matrix(1u, 1u) - matrix(0u, 1u) * matrix(1u, 0u);
+		const auto invRotScale = (1.f / ei::determinant(rotScale)) * ei::Mat3x3{ m00, m01, m02, m10, m11, m12, m20, m21, m22 };
+		const ei::Vec3 translation{ matrix, 0u, 3u };
+		const auto invTranslation = -(invRotScale * translation);
+		return ei::Mat3x4{
+			invRotScale.m00, invRotScale.m01, invRotScale.m02, invTranslation.x,
+			invRotScale.m10, invRotScale.m11, invRotScale.m12, invTranslation.y,
+			invRotScale.m20, invRotScale.m21, invRotScale.m22, invTranslation.z
+		};
+	}
+};
+
+template <>
+struct InstanceData<Device::OPENGL> {
+	ConstArrayDevHandle_t<Device::OPENGL, ei::Mat3x4> instanceToWorld;		// Full transformation Translation * Rotation * Scale
+	ConstArrayDevHandle_t<Device::OPENGL, ei::Mat3x4> worldToInstance;		// Full inverse transformation Scale⁻¹ * Rotation⁻¹ * Translation⁻¹
+	ConstArrayDevHandle_t<Device::CPU, u32> lodIndices;
+
+	const SceneDescriptor<Device::CPU>* cpuDescriptor;
+};
+
 // Light, camera etc.
 template < Device dev >
-struct SceneDescriptor {
+struct SceneDescriptor : public InstanceData<dev> {
 	static constexpr Device DEVICE = dev;
 	CameraDescriptor camera;
 	u32 numLods;
@@ -96,11 +138,6 @@ struct SceneDescriptor {
 	ConstArrayDevHandle_t<NotGl<dev>, LodDescriptor<dev>> lods;
 
 	AccelDescriptor accelStruct;
-	// Per instance: transformation + pre-computed scale
-	// TODO: put some of these into one array instead of separate ones
-	ConstArrayDevHandle_t<dev, ei::Mat3x4> instanceToWorld;		// Full transformation Translation * Rotation * Scale
-	ConstArrayDevHandle_t<dev, ei::Mat3x4> worldToInstance;		// Full inverse transformation Scale⁻¹ * Rotation⁻¹ * Translation⁻¹
-	ConstArrayDevHandle_t<NotGl<dev>, u32> lodIndices;
 	ConstArrayDevHandle_t<dev, ei::Box> aabbs; // For each object.
 
 	// The receiver of this struct is responsible for deallocating this memory!
@@ -109,15 +146,12 @@ struct SceneDescriptor {
 	ConstArrayDevHandle_t<dev, int> materials;	// Offsets + HandlePacks
 	ConstArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>> alphaTextures;
 
-	struct Empty {};
-	std::conditional_t < dev == Device::OPENGL, const SceneDescriptor<Device::CPU>*, Empty> cpuDescriptor;
-
 	static constexpr CUDA_FUNCTION bool is_instance_present(const u32 lodIndex) noexcept {
 		return lodIndex != std::numeric_limits<u32>::max();
 	}
 
 	CUDA_FUNCTION MaterialIndex get_material_index(PrimitiveHandle primitive) const {
-		const LodDescriptor<dev>& object = lods[lodIndices[primitive.instanceId]];
+		const LodDescriptor<dev>& object = lods[this->lodIndices[primitive.instanceId]];
 		const u32 faceCount = object.polygon.numTriangles + object.polygon.numQuads;
 		if(static_cast<u32>(primitive.primId) < faceCount)
 			return object.polygon.matIndices[primitive.primId];

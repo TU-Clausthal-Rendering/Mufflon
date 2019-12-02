@@ -1016,12 +1016,10 @@ Boolean instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat,
 	CHECK_NULLPTR(inst, "instance handle", false);
 	CHECK_NULLPTR(mat, "transformation matrix", false);
 	ConstInstanceHandle instance = static_cast<ConstInstanceHandle>(inst);
-	if(isWorldToInst) {
+	if(isWorldToInst)
 		s_world.set_world_to_instance_transformation(instance, util::pun<ei::Mat3x4>(*mat));
-	} else {
-		const ei::Mat3x4 wToI{ ei::invert(ei::Mat4x4{ util::pun<ei::Mat3x4>(*mat) }) };
-		s_world.set_world_to_instance_transformation(instance, wToI);
-	}
+	else
+		s_world.set_instance_to_world_transformation(instance, util::pun<ei::Mat3x4>(*mat));
 	return true;
 	CATCH_ALL(false)
 }
