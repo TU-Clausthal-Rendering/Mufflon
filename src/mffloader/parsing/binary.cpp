@@ -763,7 +763,8 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			instIter->second.handle = instHdl;
 
 		// We now have a valid instance: time to check if we have the required LoD
-		if(!object_has_lod(m_objects[objId].objHdl, lod)) {
+		// Only do so for non-animated instances though to avoid loading all LoDs into memory
+		if(keyframe == 0xFFFFFFFF && !object_has_lod(m_objects[objId].objHdl, lod)) {
 			// We don't -> gotta load it
 			lod = read_lod(m_objects[objId], lod);
 		}
@@ -772,11 +773,13 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			throw std::runtime_error("Failed to set transformation matrix for instance of object ID "
 									 + std::to_string(objId));
 
-		ei::Box instanceAabb;
-		if(!instance_get_bounding_box(instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
-			throw std::runtime_error("Failed to get bounding box for instance of object ID "
-									 + std::to_string(objId));
-		m_aabb = ei::Box(m_aabb, instanceAabb);
+		if(keyframe == 0xFFFFFFFF) {
+			ei::Box instanceAabb;
+			if(!instance_get_bounding_box(instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
+				throw std::runtime_error("Failed to get bounding box for instance of object ID "
+										 + std::to_string(objId));
+			m_aabb = ei::Box(m_aabb, instanceAabb);
+		}
 
 		hasInstance[objId] = true;
 	}
@@ -849,6 +852,9 @@ void BinaryLoader::deinstance() {
 void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::load_lod");
 	m_filePath = file;
+
+	for(u32 i = 0u; i < 3u; ++i)
+		m_fileDescs[i] = FileDescriptor{ m_filePath, "rb" };
 
 	if(!fs::exists(m_filePath))
 		throw std::runtime_error("Binary file '" + m_filePath.string() + "' doesn't exist");

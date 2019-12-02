@@ -121,10 +121,10 @@ LoaderStatus loader_load_json(const char* path) {
 		// Clear the world
 		world_clear_all();
 		json::JsonLoader loader{ filePath };
+		core_set_lod_loader(loader_load_lod);
 		s_jsonLoader.store(&loader);
-		if(!loader.load_file())
+		if(!loader.load_file(s_binPath))
 			return LoaderStatus::LOADER_ABORT;
-		s_binPath = loader.get_binary_file();
 	} catch(const std::exception& e) {
 		logError("[", FUNCTION_NAME, "] ", e.what());
 		s_jsonLoader.store(nullptr);
@@ -132,7 +132,6 @@ LoaderStatus loader_load_json(const char* path) {
 	}
 
 	s_jsonLoader.store(nullptr);
-	core_set_lod_loader(loader_load_lod);
 	return LoaderStatus::LOADER_SUCCESS;
 	CATCH_ALL(LoaderStatus::LOADER_ERROR)
 }

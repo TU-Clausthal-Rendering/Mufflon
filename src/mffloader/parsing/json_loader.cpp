@@ -114,7 +114,6 @@ JsonException::JsonException(const std::string& str, rapidjson::ParseResult res)
 void JsonLoader::clear_state() {
 	m_jsonString.clear();
 	m_state.reset();
-	m_binaryFile.clear();
 	m_materialMap.clear();
 	m_loadingStage.clear();
 }
@@ -994,7 +993,7 @@ void JsonLoader::selective_replace_keys(const rapidjson::Value& objectToCopy, ra
 }
 
 
-bool JsonLoader::load_file() {
+bool JsonLoader::load_file(fs::path& binaryFile) {
 	using namespace rapidjson;
 	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_file");
 
@@ -1029,17 +1028,17 @@ bool JsonLoader::load_file() {
 		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");
 	}
 	// Binary file path
-	m_binaryFile = read<const char*>(m_state, get(m_state, document, "binary"));
-	if(m_binaryFile.empty())
+	binaryFile = read<const char*>(m_state, get(m_state, document, "binary"));
+	if(binaryFile.empty())
 		throw std::runtime_error("Scene file has an empty binary file path");
-	logInfo("[JsonLoader::load_file] Detected binary file path '", m_binaryFile.string(), "'");
+	logInfo("[JsonLoader::load_file] Detected binary file path '", binaryFile.string(), "'");
 	// Make the file path absolute
-	if(m_binaryFile.is_relative())
-		m_binaryFile = fs::canonical(m_filePath.parent_path() / m_binaryFile);
-	if(!fs::exists(m_binaryFile)) {
+	if(binaryFile.is_relative())
+		binaryFile = fs::canonical(m_filePath.parent_path() / binaryFile);
+	if(!fs::exists(binaryFile)) {
 		logError("[JsonLoader::load_file] Scene file: specifies a binary file that doesn't exist ('",
-				 m_binaryFile.string(), "'");
-		throw std::runtime_error("Binary file '" + m_binaryFile.string() + "' does not exist");
+				 binaryFile.string(), "'");
+		throw std::runtime_error("Binary file '" + binaryFile.string() + "' does not exist");
 	}
 	// Tessellation level
 	const float initTessLevel = read_opt<float>(m_state, document, "initTessellationLevel", 0u);
@@ -1111,7 +1110,7 @@ bool JsonLoader::load_file() {
 	}
 	const bool deinstance = read_opt<bool>(m_state, document, "deinstance", false);
 	// Load the binary file before we load the rest of the JSON
-	if(!m_binLoader.load_file(m_binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods,
+	if(!m_binLoader.load_file(binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods,
 							  deinstance, hasWorldToInstTrans))
 		return false;
 
