@@ -135,7 +135,7 @@ inline CUDA_FUNCTION void sample_wireframe(WireframeTargets::RenderBufferType<CU
 			}
 
 			float projDistToRim;
-			const ei::Mat3x4 instanceToWorld{ ei::invert(ei::Mat4x4{ scene.worldToInstance[nextHit.hitId.instanceId] }) };
+			const ei::Mat3x4 instanceToWorld = scene.compute_instance_to_world_transformation(nextHit.hitId.instanceId);
 			if(static_cast<u32>(nextHit.hitId.primId) < poly.numTriangles) {
 				const ei::IVec3 indices{
 					poly.vertexIndices[3 * hitId.primId + 0],

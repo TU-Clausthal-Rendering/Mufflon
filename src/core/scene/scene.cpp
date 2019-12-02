@@ -277,9 +277,9 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 				// TODO: enable parallelism (OpenMP compiling bugs out)
 				const auto begin = m_worldToInstanceTransformation.data();
 				const auto end = begin + totalInstanceCount;
-				std::for_each(std::execution::par, begin, end, [begin, &instToWorldTransformation](const ei::Mat3x4& worldToInst) {
-					const auto index = &worldToInst - begin;
-					instToWorldTransformation[index] = ei::Mat3x4{ invert(ei::Mat4x4{ worldToInst }) };
+				const auto outBegin = instToWorldTransformation.get();
+				std::transform(std::execution::par_unseq, begin, end, outBegin, [](const ei::Mat3x4& matrix) {
+					return InstanceData<Device::CPU>::compute_instance_to_world_transformation(matrix);
 				});
 
 				copy(instToWorldTransformsDesc.get(), instToWorldTransformation.get(), sizeof(ei::Mat3x4) * m_instances.size());

@@ -1,4 +1,4 @@
-#include "world_container.hpp"
+﻿#include "world_container.hpp"
 #include "util/log.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/scene/lod.hpp"
@@ -246,11 +246,19 @@ const ei::Mat3x4& WorldContainer::get_world_to_instance_transformation(ConstInst
 }
 
 ei::Mat3x4 WorldContainer::compute_instance_to_world_transformation(ConstInstanceHandle instance) const {
-	return ei::Mat3x4{ ei::invert(ei::Mat4x4{ get_world_to_instance_transformation(instance) })};
+	const auto matrix = get_world_to_instance_transformation(instance);
+	return InstanceData<Device::CPU>::compute_instance_to_world_transformation(matrix);
 }
 
 void WorldContainer::set_world_to_instance_transformation(ConstInstanceHandle instance, const ei::Mat3x4& mat) {
 	m_worldToInstanceTrans[instance->get_index()] = mat;
+}
+
+void WorldContainer::set_instance_to_world_transformation(ConstInstanceHandle instance, const ei::Mat3x4& mat) {
+	// To avoid code duplication, we first write the (inverted) matrix and then let it be fetched and computed again
+	set_world_to_instance_transformation(instance, mat);
+	const auto inverted = compute_instance_to_world_transformation(instance);
+	set_world_to_instance_transformation(instance, inverted);
 }
 
 std::size_t WorldContainer::get_highest_instance_frame() const noexcept { 
