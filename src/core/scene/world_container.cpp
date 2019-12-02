@@ -785,8 +785,10 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		const auto index = iter->second.offset + iter->second.count;
 		instanceHandles[index] = &inst;
 		++iter->second.count;
-		aabb = ei::Box{ aabb, inst.get_bounding_box(m_scenario->get_effective_lod(&inst),
-													compute_instance_to_world_transformation(&inst)) };
+		const auto lod = m_scenario->get_effective_lod(&inst);
+		if(!load_lod(*iter->first, lod))
+			throw std::runtime_error("Failed to load LoD from disk while loading scene");
+		aabb = ei::Box{ aabb, inst.get_bounding_box(lod, compute_instance_to_world_transformation(&inst)) };
 	}
 	for(std::size_t i = 0u; i < animatedInstCount; ++i) {
 		const auto instanceIndex = animatedInstOffset + i;
@@ -802,8 +804,10 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		const auto index = iter->second.offset + iter->second.count;
 		instanceHandles[index] = &inst;
 		++iter->second.count;
-		aabb = ei::Box{ aabb, inst.get_bounding_box(m_scenario->get_effective_lod(&inst),
-													compute_instance_to_world_transformation(&inst)) };
+		const auto lod = m_scenario->get_effective_lod(&inst);
+		if(!load_lod(*iter->first, lod))
+			throw std::runtime_error("Failed to load LoD from disk while loading scene");
+		aabb = ei::Box{ aabb, inst.get_bounding_box(lod, compute_instance_to_world_transformation(&inst)) };
 	}
 
 	m_scene = std::make_unique<Scene>(scenario, m_frameCurrent - m_frameStart,

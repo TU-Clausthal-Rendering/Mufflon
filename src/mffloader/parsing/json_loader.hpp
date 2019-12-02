@@ -43,17 +43,13 @@ public:
 		m_loadingStage.resize(1024);
 	}
 
-	fs::path get_binary_file() const {
-		return m_binaryFile;
-	}
-
 	// This may be called from a different thread and leads to the current load being cancelled
 	void abort_load() { m_abort = true; m_binLoader.abort_load(); }
 	bool was_aborted() { return m_abort; }
 
 	const std::string& get_loading_stage() const noexcept { return m_loadingStage; }
 
-	bool load_file();
+	bool load_file(fs::path& binaryFile);
 	void clear_state();
 
 private:
@@ -81,7 +77,6 @@ private:
 	rapidjson::Value::ConstMemberIterator m_materials;
 	rapidjson::Value::ConstMemberIterator m_scenarios;
 	mufflon::StringView m_version;
-	fs::path m_binaryFile;
 	mufflon::StringView m_defaultScenario;
 	std::map<std::string, MaterialHdl, std::less<>> m_materialMap;
 	mufflon::util::FixedHashMap<mufflon::StringView, LightHdl> m_lightMap;
