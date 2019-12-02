@@ -274,7 +274,7 @@ class RenderActions:
         filename = filename.replace("#preCycles", str(preTime.cycles / 1000000) + "MCycles", 1)
         filename = filename.replace("#postCycles", str(postTime.cycles / 1000000) + "MCycles", 1)
         
-        self.dllInterface.render_save_denoised_radiance(fName)
+        self.dllInterface.render_save_denoised_radiance(filename)
 
     def take_screenshot(self, iterationNr, iterateTime=ProcessTime(0,0), preTime=ProcessTime(0,0), postTime=ProcessTime(0,0)):
         filename = self.screenshotPattern
