@@ -95,15 +95,15 @@ struct InstanceData {
 		// Experiments determined this to be the fastest way by a factor of ~2 over naϊvely inverting
 		const ei::Mat3x3 rotScale{ matrix };
 		// Faster invert of 3x3 than LU decomposition (another speedup of factor ~5)
-		const auto m00 = matrix(1u, 1u) * matrix(2u, 2u) - matrix(1u, 2u) * matrix(2u, 1u);
-		const auto m01 = matrix(0u, 2u) * matrix(2u, 1u) - matrix(0u, 1u) * matrix(2u, 2u);
-		const auto m02 = matrix(0u, 1u) * matrix(1u, 2u) - matrix(0u, 2u) * matrix(1u, 1u);
-		const auto m10 = matrix(1u, 2u) * matrix(2u, 0u) - matrix(1u, 0u) * matrix(2u, 2u);
-		const auto m11 = matrix(0u, 0u) * matrix(2u, 2u) - matrix(0u, 2u) * matrix(2u, 0u);
-		const auto m12 = matrix(0u, 2u) * matrix(1u, 0u) - matrix(0u, 0u) * matrix(1u, 2u);
-		const auto m20 = matrix(1u, 0u) * matrix(2u, 1u) - matrix(1u, 1u) * matrix(2u, 0u);
-		const auto m21 = matrix(0u, 1u) * matrix(2u, 0u) - matrix(0u, 0u) * matrix(2u, 1u);
-		const auto m22 = matrix(0u, 0u) * matrix(1u, 1u) - matrix(0u, 1u) * matrix(1u, 0u);
+		const auto m00 = rotScale.m11 * rotScale.m22 - rotScale.m21 * rotScale.m12;
+		const auto m01 = rotScale.m21 * rotScale.m02 - rotScale.m01 * rotScale.m22;
+		const auto m02 = rotScale.m01 * rotScale.m12 - rotScale.m11 * rotScale.m02;
+		const auto m10 = rotScale.m20 * rotScale.m12 - rotScale.m10 * rotScale.m22;
+		const auto m11 = rotScale.m00 * rotScale.m22 - rotScale.m20 * rotScale.m02;
+		const auto m12 = rotScale.m10 * rotScale.m02 - rotScale.m00 * rotScale.m12;
+		const auto m20 = rotScale.m10 * rotScale.m21 - rotScale.m20 * rotScale.m11;
+		const auto m21 = rotScale.m20 * rotScale.m01 - rotScale.m00 * rotScale.m21;
+		const auto m22 = rotScale.m00 * rotScale.m11 - rotScale.m10 * rotScale.m01;
 		const auto invRotScale = (1.f / ei::determinant(rotScale)) * ei::Mat3x3{ m00, m01, m02, m10, m11, m12, m20, m21, m22 };
 		const ei::Vec3 translation{ matrix, 0u, 3u };
 		const auto invTranslation = -(invRotScale * translation);
