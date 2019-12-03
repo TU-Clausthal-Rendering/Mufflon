@@ -4122,6 +4122,7 @@ Boolean mufflon_initialize() {
 			if(devIndex < 0) {
 				logWarning("[", FUNCTION_NAME, "] Found CUDA device(s), but none support unified addressing or have the required compute capability; "
 						 "continuing without CUDA");
+				mufflon::g_hasCudaEnabled = false;
 			} else {
 				cuda::check_error(cudaSetDevice(devIndex));
 				cuda::check_error(cudaGetDeviceProperties(&deviceProp, devIndex));
@@ -4132,6 +4133,7 @@ Boolean mufflon_initialize() {
 			}
 		} else {
 			logInfo("[", FUNCTION_NAME, "] No CUDA device found; continuing without CUDA");
+			mufflon::g_hasCudaEnabled = false;
 		}
 
 		// Initialize renderers
