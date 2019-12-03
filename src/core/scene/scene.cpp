@@ -17,7 +17,11 @@
 #include "core/scene/tessellation/uniform.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include <ei/3dintersection.hpp>
+#ifdef __cpp_lib_execution
 #include <execution>
+#else // __cpp_lib_execution
+#warning "Parallel STL algorithms are not supported by your standard library. This may result in a slight renderer slowdown"
+#endif // __cpp_lib_execution
 
 namespace mufflon { namespace scene {
 
@@ -279,7 +283,11 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 				const auto begin = m_worldToInstanceTransformation.data();
 				const auto end = begin + totalInstanceCount;
 				const auto outBegin = instToWorldTransformation.get();
-				std::transform(std::execution::par_unseq, begin, end, outBegin, [](const ei::Mat3x4& matrix) {
+				std::transform(
+#ifdef __cpp_lib_execution
+							   std::execution::par_unseq,
+#endif // __cpp_lib_execution
+							   begin, end, outBegin, [](const ei::Mat3x4& matrix) {
 					return InstanceData<Device::CPU>::compute_instance_to_world_transformation(matrix);
 				});
 

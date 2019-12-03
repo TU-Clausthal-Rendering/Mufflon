@@ -3,6 +3,7 @@
 #include "polygon_mesh.hpp"
 #include "util/assert.hpp"
 #include "core/scene/attributes/attribute.hpp"
+#include "core/scene/attributes/attribute_handles.hpp"
 #include "core/scene/types.hpp"
 #include "util/range.hpp"
 #include <ei/3dtypes.hpp>
@@ -174,19 +175,15 @@ public:
 	
 	template < class T >
 	void remove_vertex_attribute(const std::string& name) {
-		const AttributeIdentifier ident{
-			AttributeCategory::VERTEX, get_attribute_type<T>(), name
-		};
+		const AttributeIdentifier ident{ get_attribute_type<T>(), name };
 		if(const auto handle = m_vertexAttributes.find_attribute(ident); handle.has_value())
-			m_vertexAttributes.remove_attribute(handle);
+			m_vertexAttributes.remove_attribute(handle.value());
 	}
 	template < class T >
 	void remove_face_attribute(const std::string& name) {
-		const AttributeIdentifier ident{
-			AttributeCategory::FACE, get_attribute_type<T>(), name
-		};
+		const AttributeIdentifier ident{ get_attribute_type<T>(), name };
 		if(const auto handle = m_faceAttributes.find_attribute(ident); handle.has_value())
-			m_vertexAttributes.remove_attribute(handle);
+			m_faceAttributes.remove_attribute(handle.value());
 	}
 	void remove_curvature();
 

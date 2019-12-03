@@ -22,7 +22,7 @@ LodDescriptor<dev> Lod::get_descriptor(const bool allowSerialBvhBuild) {
 	};
 	desc.numPrimitives = desc.polygon.numTriangles + desc.polygon.numQuads + desc.spheres.numSpheres;
 	// If we're allowed to have a serial BVH build, we make it dependent on the number of primitives
-	const bool parallelBuild = allowSerialBvhBuild ? (desc.numPrimitives >= 1000u) : true;
+	const bool parallelBuild = allowSerialBvhBuild ? (desc.numPrimitives >= 1000) : true;
 
 	// (Re)build acceleration structure if necessary
 	if(m_accelStruct.needs_rebuild()) {

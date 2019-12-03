@@ -9,8 +9,8 @@ namespace mufflon::scene {
 
 Scenario::Scenario(const u32 index,
 				   util::StringPool& namePool) :
-	m_namePool{ namePool },
-	m_index{ index }
+	m_index{ index },
+	m_namePool{ namePool }
 {
 	this->remove_background();
 }

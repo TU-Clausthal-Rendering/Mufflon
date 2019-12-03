@@ -80,7 +80,7 @@ public:
 	template < class T >
 	void remove_attribute(StringView name) {
 		const AttributeIdentifier identifier{ get_attribute_type<T>(), name };
-		if(const auto handle = m_attributes.template find_attribute<T>(identifier); handle.has_value())
+		if(const auto handle = m_attributes.find_attribute(identifier); handle.has_value())
 			m_attributes.remove(handle.value());
 	}
 

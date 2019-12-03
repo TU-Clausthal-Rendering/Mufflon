@@ -78,7 +78,7 @@ inline CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const ei::Vec3* vertices, 
 
 inline CUDA_FUNCTION float computeDistToRim(const ei::Sphere* spheres, const u32 index,
 									 const ei::Mat3x4& instanceToWorld, const ei::Vec3& hitpoint,
-									 const ei::Vec3& incident, const ei::Vec3& origin) {
+									 const ei::Vec3& incident) {
 	const auto& sphere = spheres[index];
 	const auto center = transform(sphere.center, instanceToWorld);
 	// We use the angle between incident and center-hitpoint as the indicator of
@@ -166,8 +166,7 @@ inline CUDA_FUNCTION void sample_wireframe(WireframeTargets::RenderBufferType<CU
 				// here is a workaround to get roughly the same line width as triangles
 				// and quads
 				projDistToRim = 0.05f * computeDistToRim(lod.spheres.spheres, hitId.primId,
-														 instanceToWorld, hit, ray.direction,
-														 sample.origin);
+														 instanceToWorld, hit, ray.direction);
 			}
 			const float distThreshold = params.lineWidth * pixelSize;
 			// Only draw it if it's below the threshold (expressed in pixels)

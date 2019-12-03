@@ -205,7 +205,7 @@ void BinaryLoader::read_normal_uncompressed_vertices(const ObjectState& object, 
 }
 
 // Reads the attribute parameters, but not the actual data
-void BinaryLoader::read_uncompressed_attribute(const ObjectState& object, const LodState& lod) {
+void BinaryLoader::read_uncompressed_attribute() {
 	read(m_attribStateBuffer.name);
 	read(m_attribStateBuffer.meta);
 	m_attribStateBuffer.metaFlags = read<u32>();
@@ -230,7 +230,7 @@ void BinaryLoader::read_uncompressed_vertex_attributes(const ObjectState& object
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
-		read_uncompressed_attribute(object, lod);
+		read_uncompressed_attribute();
 		auto attrHdl = polygon_request_vertex_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 														m_attribStateBuffer.type);
 		if(attrHdl.name == nullptr)
@@ -256,7 +256,7 @@ void BinaryLoader::read_uncompressed_face_attributes(const ObjectState& object, 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
-		read_uncompressed_attribute(object, lod);
+		read_uncompressed_attribute();
 		auto attrHdl = polygon_request_face_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 													  m_attribStateBuffer.type);
 		if(attrHdl.name == nullptr)
@@ -282,7 +282,7 @@ void BinaryLoader::read_uncompressed_sphere_attributes(const ObjectState& object
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
-		read_uncompressed_attribute(object, lod);
+		read_uncompressed_attribute();
 		auto attrHdl = spheres_request_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 												 m_attribStateBuffer.type);
 		if(attrHdl.name == nullptr)
@@ -729,7 +729,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 								  const util::FixedHashMap<StringView, u32>& objectLods,
 								  util::FixedHashMap<StringView, InstanceMapping>& instanceLods) {
 	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_instances");
-	sprintf(m_loadingStage.data(), "Loading instances\0");
+	sprintf(m_loadingStage.data(), "Loading instances%c", '\0');
 	std::vector<uint8_t> hasInstance(m_objects.size(), false);
 	const u32 numInstances = read<u32>();
 	const u32 instDispInterval = std::max(1u, numInstances / 200u);
@@ -738,7 +738,8 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			return false;
 		// Only set the string every x instances to avoid overhead
 		if(i % instDispInterval == 0)
-			sprintf(m_loadingStage.data(), "Loading instance %u / %u\0", i, numInstances);
+			sprintf(m_loadingStage.data(), "Loading instance %u / %u%c",
+					i, numInstances, '\0');
 		const auto name = read<StringView>();
 		const u32 objId = read<u32>();
 		const u32 keyframe = read<u32>();
@@ -785,7 +786,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 	}
 
 	logInfo("[BinaryLoader::read_instances] Loaded ", numInstances, " instances");
-	sprintf(m_loadingStage.data(), "Creating default instances\0");
+	sprintf(m_loadingStage.data(), "Creating default instances%c", '\0');
 	// Create identity instances for objects not having one yet
 	const auto objectCount = hasInstance.size();
 	const u32 objDispInterval = std::max(1u, static_cast<u32>(objectCount) / 10u);
@@ -795,7 +796,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			return false;
 		// Only set the string every x objects to avoid overhead
 		if(i % objDispInterval == 0)
-			sprintf(m_loadingStage.data(), "Checking default instance for object %u / %zu\0", i, objectCount);
+			sprintf(m_loadingStage.data(), "Checking default instance for object %u / %zu%c", i, objectCount, '\0');
 		if(!hasInstance[i]) {
 			StringView objName = m_objects[i].name;
 			logPedantic("[BinaryLoader::read_instances] Creating default instance for object '",
@@ -833,7 +834,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 }
 
 void BinaryLoader::deinstance() {
-	sprintf(m_loadingStage.data(), "Performing deinstancing\0");
+	sprintf(m_loadingStage.data(), "Performing deinstancing%c", '\0');
 	// Both animated and not animated instances
 	auto applyTranformation = [](const u32 frame) {
 		const u32 numInstances = world_get_instance_count(frame);
@@ -929,7 +930,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		throw std::runtime_error("Binary file '" + m_filePath.string() + "' doesn't exist");
 	m_aabb.min = ei::Vec3{ 1e30f };
 	m_aabb.max = ei::Vec3{ -1e30f };
-	sprintf(m_loadingStage.data(), "Loading binary file\0");
+	sprintf(m_loadingStage.data(), "Loading binary file%c", '\0');
 	logInfo("[BinaryLoader::load_file] Loading binary file '", m_filePath.string(), "'");
 	try {
 		// Open the binary file and enable exception management
@@ -989,8 +990,8 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 			if(m_abort)
 				return false;
 			if(i % objDispInterval == 0u)
-				sprintf(m_loadingStage.data(), "Reading object definition %zu / %zu\0",
-						i, objectCount);
+				sprintf(m_loadingStage.data(), "Reading object definition %zu / %zu%c",
+						i, objectCount, '\0');
 
 			m_objects.push_back(ObjectState{});
 			// Jump to the right position in file

@@ -32,6 +32,7 @@ public:
 	using DirLightHandle = std::map<std::string, lights::DirectionalLight, std::less<>>::iterator;
 	using EnvLightHandle = std::map<std::string, TextureHandle, std::less<>>::iterator;
 
+	using LodLoadFuncPtr = std::uint32_t(CDECL*)(ObjectHandle obj, u32 lod);
 
 
 	enum class Sanity {
@@ -168,7 +169,7 @@ public:
 	// Set the new animation frame. Caution: this invalidates the currently loaded scene
 	// which must thus be set for any active renderer!
 	bool set_frame_current(const u32 frameCurrent);
-	void set_lod_loader_function(bool (CDECL*func)(ObjectHandle, u32));
+	void set_lod_loader_function(LodLoadFuncPtr func);
 	void set_tessellation_level(const float tessLevel) { m_tessLevel = tessLevel; }
 
 

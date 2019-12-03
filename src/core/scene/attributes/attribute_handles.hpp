@@ -86,7 +86,7 @@ struct AttributeHandle {
 
 // Returns the attribute type enum value for a given type
 template < class T >
-inline constexpr AttributeType get_attribute_type() { static_assert(sizeof(T) == 0, "Unsupported attribute type!"); }
+[[noreturn]] inline constexpr AttributeType get_attribute_type() { static_assert(sizeof(T) == 0, "Unsupported attribute type!"); }
 template <>
 inline constexpr AttributeType get_attribute_type<std::int16_t>() { return AttributeType::SHORT; }
 template <>
