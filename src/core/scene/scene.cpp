@@ -301,8 +301,8 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 			if constexpr(dev == Device::CPU) {
 				instLodIndicesDesc.reset(lodIndices.release());
 			} else {
-				instLodIndicesDesc = make_udevptr_array<dev, u32>(m_instances.size());
-				copy<u32>(instLodIndicesDesc.get(), lodIndices.get(), sizeof(u32) * m_instances.size());
+				instLodIndicesDesc = make_udevptr_array<dev, u32>(totalInstanceCount);
+				copy<u32>(instLodIndicesDesc.get(), lodIndices.get(), sizeof(u32) * totalInstanceCount);
 			}
 			sceneDescriptor.lodIndices = instLodIndicesDesc.get();
 		} else {

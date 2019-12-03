@@ -535,7 +535,6 @@ RayIntersectionResult first_intersection(
 			uv.x = atan2f(geoNormal.z, geoNormal.x) / (2.0f * ei::PI) + 0.5f;
 			uv.y = acosf(-geoNormal.y) / ei::PI;
 			surfParams.st = uv;
-			return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, geoNormal, tangentX, uv, surfParams };
 		} else {
 			const i32* indices = (i32*)obj.polygon.vertexIndices;
 			const ei::Vec3* meshVertices = obj.polygon.vertices;
