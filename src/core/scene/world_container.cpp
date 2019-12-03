@@ -7,6 +7,7 @@
 #include "core/scene/tessellation/cam_dist.hpp"
 #include <iostream>
 #include <ei/conversions.hpp>
+#include <execution>
 #include <windows.h>
 
 namespace mufflon::scene {
@@ -768,10 +769,7 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		instanceHandles.resize(currOffset);
 	}
 
-	// Next we can build the vector of instances and compute the bounding box
-	ei::Box aabb{};
-	aabb.min = ei::Vec3{ std::numeric_limits<float>::max() };
-	aabb.max = ei::Vec3{ -std::numeric_limits<float>::max() };
+	// Next we can build the vector of instances
 	for(std::size_t i = 0u; i < regInstCount; ++i) {
 		auto& inst = m_instances[i];
 		// Discard masked instances and objects
@@ -788,7 +786,6 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		const auto lod = m_scenario->get_effective_lod(&inst);
 		if(!load_lod(*iter->first, lod))
 			throw std::runtime_error("Failed to load LoD from disk while loading scene");
-		aabb = ei::Box{ aabb, inst.get_bounding_box(lod, compute_instance_to_world_transformation(&inst)) };
 	}
 	for(std::size_t i = 0u; i < animatedInstCount; ++i) {
 		const auto instanceIndex = animatedInstOffset + i;
@@ -807,8 +804,31 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		const auto lod = m_scenario->get_effective_lod(&inst);
 		if(!load_lod(*iter->first, lod))
 			throw std::runtime_error("Failed to load LoD from disk while loading scene");
-		aabb = ei::Box{ aabb, inst.get_bounding_box(lod, compute_instance_to_world_transformation(&inst)) };
 	}
+
+	// Compute the bounding box of the scene
+	// To do this in parallel we reduce in num. of threads
+	ei::Box aabb{};
+	aabb.min = ei::Vec3{ std::numeric_limits<float>::max() };
+	aabb.max = ei::Vec3{ -std::numeric_limits<float>::max() };
+	std::vector<ei::Box> threadAabbs(get_max_thread_num(), aabb);
+#pragma PARALLEL_FOR
+	for(i32 i = 0; i < static_cast<i32>(regInstCount); ++i)
+		threadAabbs[get_current_thread_idx()] = ei::Box{
+			threadAabbs[get_current_thread_idx()],
+			m_instances[i].get_bounding_box(m_scenario->get_effective_lod(&m_instances[i]),
+											compute_instance_to_world_transformation(&m_instances[i]))
+	};
+#pragma PARALLEL_FOR
+	for(i32 i = static_cast<i32>(animatedInstOffset); i < static_cast<i32>(animatedInstCount); ++i)
+		threadAabbs[get_current_thread_idx()] = ei::Box{
+			threadAabbs[get_current_thread_idx()],
+			m_instances[i].get_bounding_box(m_scenario->get_effective_lod(&m_instances[i]),
+											compute_instance_to_world_transformation(&m_instances[i]))
+	};
+	// Merge the bounding boxes
+	for(const auto& box : threadAabbs)
+		aabb = ei::Box{ aabb, box };
 
 	m_scene = std::make_unique<Scene>(scenario, m_frameCurrent - m_frameStart,
 									  std::move(objInstRef), std::move(instanceHandles),
