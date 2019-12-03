@@ -209,7 +209,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 			}
 
 			// Reserve the proper amount of LoD descriptors
-			const auto threadLodIndex = lodIndex.fetch_add(static_cast<u32>(currUsedLods.size()));
+			const auto threadLodIndex = lodIndex.fetch_add(lodCounter);
 			auto currLodIndex = threadLodIndex;
 			// Now that we know all instances a LoD has we can create the descriptors uniquely
 			// and also perform displacement mapping if necessary
