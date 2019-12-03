@@ -31,7 +31,9 @@ void mufflon::renderer::DebugBvhRenderer::iterate()
 
 	// count transparent fragments
 	m_dynFragmentBuffer.bindCountBuffer();
-	const auto instanceToWorld = m_sceneDesc.cpuDescriptor->compute_instance_to_world_transformation(m_botIdx);
+	ei::Mat3x4 instanceToWorld;
+	if(m_showBoxes || m_showBotLevel)
+		instanceToWorld = m_sceneDesc.cpuDescriptor->compute_instance_to_world_transformation(m_botIdx);
 	if (m_showBoxes)
 		m_boxPipe.draw(m_bboxes, sceneDesc.instanceToWorld, sceneDesc.numInstances, true, BoxColor);
 	if (m_showTopLevel)
@@ -84,14 +86,17 @@ void mufflon::renderer::DebugBvhRenderer::post_reset()
 
 
 	if (m_showTopLevel) {
-		upload_box_array(sceneDesc.cpuDescriptor->accelStruct, m_topLevelBoxes, m_topLevelLevels, m_topLevelNumBoxes, m_topLevelMaxLevel);
+		upload_box_array(sceneDesc.cpuDescriptor->accelStruct, sceneDesc.aabb,
+						 m_topLevelBoxes, m_topLevelLevels, m_topLevelNumBoxes, m_topLevelMaxLevel);
 		if (!m_topLevelNumBoxes) m_showTopLevel = false;
 		if(lastShowTopLevel != m_showTopLevel)
 			logInfo("top level count: ", m_topLevelMaxLevel);
 	}
 
 	if (m_showBotLevel) {
-		upload_box_array(sceneDesc.cpuDescriptor->lods[m_botIdx].accelStruct, m_botLevelBoxes, m_botLevelLevels, m_botLevelNumBoxes, m_botLevelMaxLevel);
+		const auto lodIndex = sceneDesc.cpuDescriptor->lodIndices[m_botIdx];
+		upload_box_array(sceneDesc.cpuDescriptor->lods[lodIndex].accelStruct, sceneDesc.cpuDescriptor->aabbs[lodIndex],
+						 m_botLevelBoxes, m_botLevelLevels, m_botLevelNumBoxes, m_botLevelMaxLevel);
 		if (!m_botLevelNumBoxes) m_showBotLevel = false;
 		if(lastBotIdx != m_botIdx)
 			logInfo("bottom level count: ", m_botLevelMaxLevel);
@@ -203,7 +208,8 @@ void mufflon::renderer::DebugBvhRenderer::init()
 	glNamedBufferStorage(m_transformBuffer, sizeof(CameraTransforms), &curTransforms, 0);
 }
 
-void mufflon::renderer::DebugBvhRenderer::upload_box_array(const scene::AccelDescriptor& accel, gl::Buffer& dstBoxBuffer, gl::Buffer& dstLevelBuffer,
+void mufflon::renderer::DebugBvhRenderer::upload_box_array(const scene::AccelDescriptor& accel, const ei::Box& aabb,
+														   gl::Buffer& dstBoxBuffer, gl::Buffer& dstLevelBuffer,
 	int& boxCount, int& maxLevel) {
 	// create array with bounding boxes
 	auto blas = reinterpret_cast<const scene::accel_struct::LBVH<Device::CPU>*>(accel.accelParameters);
@@ -215,69 +221,69 @@ void mufflon::renderer::DebugBvhRenderer::upload_box_array(const scene::AccelDes
 
 
 	boxCount = blas->numInternalNodes * 2;
-	if (!boxCount) return;
-
-	
-	bboxes.resize(boxCount);
-	for (int i = 0; i < boxCount; ++i) {
-		bboxes[i] = blas->bvh[i].bb;
-	}
-
-	// determine bounding box levels ()
-	level.resize(boxCount * 2, 0);
-
-	// traverse all level
-	struct Info
-	{
-		scene::accel_struct::BvhNode node;
-		int level;
-	};
-
-	std::stack<Info> levelStack;
-	maxLevel = 0;
-	levelStack.push({blas->bvh[0], 0});
-	levelStack.push({blas->bvh[1], 0});
-	while(!levelStack.empty())
-	{
-		auto e = levelStack.top();
-		levelStack.pop();
-		maxLevel = std::max(maxLevel, e.level);
-
-		// push children
-		auto nextIdx = e.node.index * 2;
-		if (e.node.index >= blas->numInternalNodes) continue;
-
-		levelStack.push({ blas->bvh[nextIdx], e.level + 1 });
-		levelStack.push({ blas->bvh[nextIdx + 1], e.level + 1 });
-		// two level indices per box because bounding box edge points count as one primitve for the box pipeline
-		level[nextIdx * 2] = e.level + 1;
-		level[nextIdx * 2 + 1] = e.level + 1;
-		level[nextIdx * 2 + 2] = e.level + 1;
-		level[nextIdx * 2 + 3] = e.level + 1;
-	}
-
-	// remove boxes for level filter
-	if (m_minLevel > 0 || m_maxLevel < maxLevel)
-	{
-		// filter out some boxes
-		int dst = 0;
-		for(int src = 0; src < boxCount; ++src)
-		{
-			const auto lvl = level[2 * src];
-			if(lvl < m_minLevel || lvl > m_maxLevel) continue; // skip data
-			// keep data
-			bboxes[dst] = bboxes[src];
-			level[dst * 2] = level[src * 2];
-			level[dst * 2 + 1] = level[src * 2];
-			++dst;
+	if(boxCount == 0) {
+		// Display AABB for single-primitive BVHs
+		boxCount = 1;
+		bboxes.push_back(aabb);
+		level.push_back(0);
+	} else {
+		bboxes.resize(boxCount);
+		for(int i = 0; i < boxCount; ++i) {
+			bboxes[i] = blas->bvh[i].bb;
 		}
 
-		// resize buffer
-		bboxes.resize(dst);
-		level.resize(dst * 2);
-		boxCount = dst;
+		// determine bounding box levels ()
+		level.resize(boxCount * 2, 0);
 
-		if (!boxCount) return;
+		// traverse all level
+		struct Info {
+			scene::accel_struct::BvhNode node;
+			int level;
+		};
+
+		std::stack<Info> levelStack;
+		maxLevel = 0;
+		levelStack.push({ blas->bvh[0], 0 });
+		levelStack.push({ blas->bvh[1], 0 });
+		while(!levelStack.empty()) {
+			auto e = levelStack.top();
+			levelStack.pop();
+			maxLevel = std::max(maxLevel, e.level);
+
+			// push children
+			auto nextIdx = e.node.index * 2;
+			if(e.node.index >= blas->numInternalNodes) continue;
+
+			levelStack.push({ blas->bvh[nextIdx], e.level + 1 });
+			levelStack.push({ blas->bvh[nextIdx + 1], e.level + 1 });
+			// two level indices per box because bounding box edge points count as one primitve for the box pipeline
+			level[nextIdx * 2] = e.level + 1;
+			level[nextIdx * 2 + 1] = e.level + 1;
+			level[nextIdx * 2 + 2] = e.level + 1;
+			level[nextIdx * 2 + 3] = e.level + 1;
+		}
+
+		// remove boxes for level filter
+		if(m_minLevel > 0 || m_maxLevel < maxLevel) {
+			// filter out some boxes
+			int dst = 0;
+			for(int src = 0; src < boxCount; ++src) {
+				const auto lvl = level[2 * src];
+				if(lvl < m_minLevel || lvl > m_maxLevel) continue; // skip data
+				// keep data
+				bboxes[dst] = bboxes[src];
+				level[dst * 2] = level[src * 2];
+				level[dst * 2 + 1] = level[src * 2];
+				++dst;
+			}
+
+			// resize buffer
+			bboxes.resize(dst);
+			level.resize(dst * 2);
+			boxCount = dst;
+
+			if(!boxCount) return;
+		}
 	}
 
 	glGenBuffers(1, &dstBoxBuffer);
