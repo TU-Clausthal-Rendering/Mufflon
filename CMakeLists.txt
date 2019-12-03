@@ -35,6 +35,10 @@ if("${MUFFLON_CUDA_ARCH}" STREQUAL "Auto")
 	set(MUFFLON_CUDA_ARCH "${ARCH_CC}" CACHE STRING "CUDA target compute capability (Auto uses present GPUs)" FORCE)
 	message(STATUS "Detected CUDA arch: ${MUFFLON_CUDA_ARCH}")
 endif()
+# For whatever reason the arch flags may be in the wrong format, so we gotta fix that
+string(REGEX REPLACE "gencode;" "gencode=" ARCH_FLAGS "${ARCH_FLAGS}")
+# Since CMake's target_link_options does not pass options to nvlink yet, we have to set them globally to the NVCC flags...
+list(APPEND CUDA_NVCC_FLAGS "${ARCH_FLAGS}")
 
 # Only MSVC generators have C# support
 if(MSVC)
@@ -55,6 +59,10 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release")
+
+# For Linux and MacOS systems we have to set the rpath of the resulting shared libs
+set(CMAKE_MACOSX_RPATH 1)
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}")
 
 # Store our source files in a variable to auto-gen source groups
 file(GLOB_RECURSE MUFFLON_CORE_SOURCE_LIST CONFIGURE_DEPENDS
@@ -180,8 +188,10 @@ if(MUFFLON_ENABLE_OPEN_DENOISE)
 endif()
 
 # Set the libraries' headers for inclusion
-set_target_properties(core PROPERTIES PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/interface.h")
-set_target_properties(mffloader PROPERTIES PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/src/mffloader/interface/interface.h")
+set_target_properties(core PROPERTIES PUBLIC_HEADER
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/interface.h;${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/api.h;${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/texture_data.h")
+set_target_properties(mffloader PROPERTIES PUBLIC_HEADER
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/mffloader/interface/interface.h;${CMAKE_CURRENT_SOURCE_DIR}/src/mffloader/interface/api.h")
 
 # Set the include directories
 target_include_directories(core
@@ -240,7 +250,6 @@ set_target_properties(core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 set_target_properties(core PROPERTIES CUDA_STANDARD 14)
 set_target_properties(core PROPERTIES CUDA_STANDARD_REQUIRED ON)
 target_compile_options(core PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
-target_compile_options(core PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${ARCH_FLAGS}>)
 
 set_target_properties(${CXX_TARGETS}
 	PROPERTIES
@@ -281,7 +290,7 @@ else()
 			target_compile_options(${TAR} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${MUFFLON_WARNING_FLAGS}>)
 		endif(MUFFLON_STRICT_COMPILATION)
 	endforeach(TAR)
-	# On older GCC versions, we need to link in a library to get filesystem support
+	# On older GCC versions, we need to link in a library to get filesystem support (also to avoid getting NASTY runtime bugs due to incompatibilities between libstdc++ and gcc!)
 	set(CXX_FS_LIBRARY "stdc++fs")
 endif()
 # Since GLI has some warnings themselves that we can't (or won't) fix, we just ignore them
@@ -444,15 +453,17 @@ if(MUFFLON_BUILD_GUI)
 endif(MUFFLON_BUILD_GUI)
 
 # Inter-target dependencies
-target_link_libraries(mffloader PRIVATE core)
-target_link_options(core PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${ARCH_FLAGS}>)
-target_link_libraries(core PRIVATE openmesh_core openmesh_tools)
+target_link_libraries(mffloader PRIVATE core ${CXX_FS_LIBRARY})
+target_link_libraries(core PRIVATE openmesh_core openmesh_tools ${CXX_FS_LIBRARY})
 if(MUFFLON_ENABLE_OPEN_DENOISE)
 	target_link_libraries(core PRIVATE opendenoise tbb)
-	target_compile_definitions(core PRIVATE MUFFLON_ENABLE_OPEN_DENOISE)
+	set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/interface.cpp" COMPILE_DEFINITIONS MUFFLON_ENABLE_OPEN_DENOISE)
 endif()
 if(OpenMP_CXX_FOUND)
 	target_link_libraries(core PRIVATE OpenMP::OpenMP_CXX)
+	target_link_libraries(gliloader PRIVATE OpenMP::OpenMP_CXX)
+	target_link_libraries(stbiloader PRIVATE OpenMP::OpenMP_CXX)
+	target_link_libraries(pfmloader PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
 # Set output targets for plugins
@@ -539,9 +550,13 @@ else()
 endif()
 
 # Install shared libraries and dependencies
-install(TARGETS core mffloader
+install(TARGETS core
 	LIBRARY DESTINATION "."
-	PUBLIC_HEADER DESTINATION "include"
+	PUBLIC_HEADER DESTINATION "include/core"
+)
+install(TARGETS mffloader
+	LIBRARY DESTINATION "."
+	PUBLIC_HEADER DESTINATION "include/mffloader"
 )
 install(TARGETS stbiloader pfmloader gliloader
 	LIBRARY DESTINATION "plugins"

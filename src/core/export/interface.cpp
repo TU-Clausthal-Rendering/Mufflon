@@ -4146,7 +4146,7 @@ Boolean mufflon_initialize() {
 		s_logFile = std::ofstream("log.txt", std::ios_base::trunc);
 		// Load plugins from the DLLs directory
 		s_plugins.clear();
-		fs::path dllPath;
+		fs::path dllPath{};
 		// First obtain the module handle (platform specific), then use that to
 		// get the module's path
 #ifdef _WIN32
@@ -4197,8 +4197,8 @@ Boolean mufflon_initialize() {
 
 		// Set the CUDA device to initialize the context
 		int count = 0;
-		cuda::check_error(cudaGetDeviceCount(&count));
-		if(count > 0) {
+		const auto res = cudaGetDeviceCount(&count);
+		if(res == cudaSuccess && count > 0) {
 			// Parse list of CCs to determine eligible GPUs
 #ifdef MUFFLON_CUDA_ARCHES
 			const std::string archString{ MUFFLON_CUDA_ARCHES };

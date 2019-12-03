@@ -7,7 +7,7 @@
 #include "medium.hpp"
 #include <cuda_runtime.h>
 #include <ei/vector.hpp>
-#include <cmath>
+#include <math.h>
 
 namespace mufflon { namespace scene { namespace materials {
 

@@ -2,6 +2,7 @@ from ctypes import *
 from time import *
 from enum import IntEnum
 import ntpath
+import os
 
 class ProcessTime(Structure):
     _fields_ = [
@@ -11,8 +12,12 @@ class ProcessTime(Structure):
 
 class DllHolder:
     def __init__(self):
-        self.core = cdll.LoadLibrary("core.dll")
-        self.mffLoader = cdll.LoadLibrary("mffloader.dll")
+        if os.name == 'nt':
+            self.core = cdll.LoadLibrary("core.dll")
+            self.mffLoader = cdll.LoadLibrary("mffloader.dll")
+        else:
+            self.core = cdll.LoadLibrary("./libcore.so")
+            self.mffLoader = cdll.LoadLibrary("./libmffloader.so")
 
 class Device(IntEnum):
     CPU = 1,
@@ -54,6 +59,7 @@ class DllInterface:
         self.dllHolder.core.world_load_scenario.restype = c_void_p
         self.dllHolder.core.render_save_screenshot.argtypes = [c_char_p, c_char_p, c_bool]
         self.dllHolder.core.render_save_denoised_radiance.argtypes = [c_char_p]
+        self.dllHolder.mffLoader.restype = LoaderStatus
         
     def __del__(self):
         self.dllHolder.core.mufflon_destroy()
@@ -199,7 +205,7 @@ class RenderActions:
         self.sceneName = fileName.split(".")[0]
         returnValue = self.dllInterface.loader_load_json(sceneJson)
         if returnValue != LoaderStatus.SUCCESS:
-            raise Exception("Failed to load scene '" + sceneJson + "' (error code: " + returnValue.name + ")")
+            raise Exception("Failed to load scene '" + sceneJson + "' (error code: " + LoaderStatus(returnValue).name + ")")
         self.enable_render_target(defaultRenderTarget, False)
 
     def enable_renderer(self, rendererName, devices):

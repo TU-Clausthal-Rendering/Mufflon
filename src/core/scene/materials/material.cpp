@@ -107,7 +107,7 @@ template<>
 constexpr void instanciate_materials<Materials(0)>() {}
 template void instanciate_materials<Materials::NUM>();
 
-/*template class Material<Materials::EMISSIVE>;
+template class Material<Materials::EMISSIVE>;
 template class Material<Materials::LAMBERT>;
 template class Material<Materials::ORENNAYAR>;
 template class Material<Materials::TORRANCE>;
@@ -117,6 +117,6 @@ template class Material<Materials::TORRANCE_LAMBERT>;
 template class Material<Materials::FRESNEL_TORRANCE_LAMBERT>;
 template class Material<Materials::WALTER_TORRANCE>;
 template class Material<Materials::FRESNEL_TORRANCE_WALTER>;
-template class Material<Materials::MICROFACET>;*/
+template class Material<Materials::MICROFACET>;
 
 } // namespace mufflon::scene::materials
