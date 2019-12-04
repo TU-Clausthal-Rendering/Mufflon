@@ -5,9 +5,7 @@ from bindings import Device
 
 def render():
     renderer = bindings.RenderActions()
-    # Log levels can be set differently for loader and renderer
     renderer.set_renderer_log_level(LogLevel.PEDANTIC)
-    renderer.set_loader_log_level(LogLevel.WARNING)
     
     # Name is case insensitive
     renderer.enable_renderer("PT", Device.CPU)# | Device.CUDA)

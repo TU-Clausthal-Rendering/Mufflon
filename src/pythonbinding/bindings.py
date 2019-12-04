@@ -66,9 +66,6 @@ class DllInterface:
         
     def core_set_log_level(self, logLevel):
         return self.dllHolder.core.core_set_log_level(c_int32(logLevel)) != 0
-        
-    def loader_set_log_level(self, logLevel):
-        return self.dllHolder.mffLoader.loader_set_log_level(c_int32(logLevel)) != 0
 
     def disable_profiling(self):
         self.dllHolder.core.profiling_disable()
@@ -256,10 +253,6 @@ class RenderActions:
         
     def set_renderer_log_level(self, logLevel):
         if not self.dllInterface.core_set_log_level(logLevel):
-            raise Exception("Failed to set log level to '" + logLevel.name + "'")
-            
-    def set_loader_log_level(self, logLevel):
-        if not self.dllInterface.loader_set_log_level(logLevel):
             raise Exception("Failed to set log level to '" + logLevel.name + "'")
 
     def enable_render_target(self, targetName, variance):

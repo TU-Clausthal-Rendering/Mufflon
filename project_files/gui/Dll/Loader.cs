@@ -22,8 +22,6 @@ namespace gui.Dll
         };
 
         [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool loader_set_logger(Core.LogCallback callback);
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern LoaderStatus loader_load_json(string path);
         [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern LoaderStatus loader_save_scene(string path);
@@ -61,7 +59,5 @@ namespace gui.Dll
         [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.LPStr)]
         internal static extern string loader_get_dll_error();
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool loader_set_log_level(Core.Severity level);
     }
 }

@@ -35,16 +35,6 @@ std::string s_lastError;
 std::atomic<json::JsonLoader*> s_jsonLoader = nullptr;
 fs::path s_binPath;
 
-void(*s_logCallback)(const char*, int);
-
-// Function delegating the logger output to the applications handle, if applicable
-void delegateLog(LogSeverity severity, const std::string& message) {
-	TRY
-	if(s_logCallback != nullptr)
-		s_logCallback(message.c_str(), static_cast<int>(severity));
-	CATCH_ALL(;)
-}
-
 } // namespace
 
 const char* loader_get_dll_error() {
@@ -63,42 +53,6 @@ const char* loader_get_dll_error() {
 	buffer[s_lastError.size()] = '\0';
 	return buffer;
 	CATCH_ALL(nullptr)
-}
-
-bool loader_set_log_level(LogLevel level) {
-	switch(level) {
-		case LogLevel::LOG_PEDANTIC:
-			mufflon::s_logLevel = LogSeverity::PEDANTIC;
-			return true;
-		case LogLevel::LOG_INFO:
-			mufflon::s_logLevel = LogSeverity::INFO;
-			return true;
-		case LogLevel::LOG_WARNING:
-			mufflon::s_logLevel = LogSeverity::WARNING;
-			return true;
-		case LogLevel::LOG_ERROR:
-			mufflon::s_logLevel = LogSeverity::ERROR;
-			return true;
-		case LogLevel::LOG_FATAL_ERROR:
-			mufflon::s_logLevel = LogSeverity::FATAL_ERROR;
-			return true;
-		default:
-			logError("[", FUNCTION_NAME, "] Invalid log level");
-			return false;
-	}
-}
-
-Boolean loader_set_logger(void(*logCallback)(const char*, int)) {
-	TRY
-	static bool initialized = false;
-	s_logCallback = logCallback;
-	if(!initialized) {
-		registerMessageHandler(delegateLog);
-		disableStdHandler();
-		initialized = true;
-	}
-	return true;
-	CATCH_ALL(false)
 }
 
 LoaderStatus loader_load_json(const char* path) {

@@ -3975,7 +3975,6 @@ Boolean mufflon_set_logger(void(*logCallback)(const char*, int)) {
 		for(auto& plugin : s_plugins) {
 			logInfo("[", FUNCTION_NAME, "] Loaded texture plugin '",
 					plugin.get_path().string(), "'");
-			plugin.set_logger(logCallback);
 		}
 		int count = 0;
 		cuda::check_error(cudaGetDeviceCount(&count));

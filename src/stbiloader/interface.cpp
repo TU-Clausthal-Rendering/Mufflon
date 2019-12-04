@@ -49,34 +49,7 @@ TextureFormat get_float_format(int components) {
 	}
 }
 
-// Function delegating the logger output to the applications handle, if applicable
-void delegateLog(LogSeverity severity, const std::string& message) {
-	try {
-		if(s_logCallback != nullptr)
-			s_logCallback(message.c_str(), static_cast<int>(severity));
-	} catch(const std::exception& e) {
-		logError("[", FUNCTION_NAME, "] Caught exception: ", e.what());
-		return;
-	}
-}
-
 } // namespace
-
-Boolean set_logger(void(*logCallback)(const char*, int)) {
-	try {
-		static bool initialized = false;
-		s_logCallback = logCallback;
-		if(!initialized) {
-			registerMessageHandler(delegateLog);
-			disableStdHandler();
-			initialized = true;
-		}
-		return true;
-	} catch(const std::exception& e) {
-		logError("[", FUNCTION_NAME, "] Caught exception: ", e.what());
-		return false;
-	}
-}
 
 Boolean can_load_texture_format(const char* ext) {
 	return std::strncmp(ext, ".hdr", 4u) == 0
