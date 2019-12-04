@@ -121,22 +121,6 @@ constexpr VertexAttributeHdl INVALID_POLY_VATTR_HANDLE{ ATTRTYPE_COUNT, nullptr 
 constexpr FaceAttributeHdl INVALID_POLY_FATTR_HANDLE{ ATTRTYPE_COUNT, nullptr };
 constexpr SphereAttributeHdl INVALID_SPHERE_ATTR_HANDLE{ ATTRTYPE_COUNT, nullptr };
 
-// Convert attribute type to string for convenience
-inline StringView get_attr_type_name(const GeomAttributeType& type) {
-	switch(type) {
-		case GeomAttributeType::ATTRTYPE_SHORT: return "short";
-		case GeomAttributeType::ATTRTYPE_USHORT: return "ushort";
-		case GeomAttributeType::ATTRTYPE_INT: return "int";
-		case GeomAttributeType::ATTRTYPE_UINT: return "uint";
-		case GeomAttributeType::ATTRTYPE_FLOAT: return "float";
-		case GeomAttributeType::ATTRTYPE_FLOAT2: return "float2";
-		case GeomAttributeType::ATTRTYPE_FLOAT3: return "float3";
-		case GeomAttributeType::ATTRTYPE_FLOAT4: return "float4";
-		case GeomAttributeType::ATTRTYPE_SPHERE: return "sphere";
-		default: return "unknown";
-	}
-}
-
 // Initializes all renderers
 template < bool initOpenGL, std::size_t I = 0u >
 inline void init_renderers() {
@@ -4065,7 +4049,6 @@ Boolean mufflon_initialize() {
 					if(plugin.is_loaded()) {
 						logInfo("[", FUNCTION_NAME, "] Loaded texture plugin '",
 								plugin.get_path().string(), "'");
-						plugin.set_logger(s_logCallback);
 						s_plugins.push_back(std::move(plugin));
 					}
 				}
@@ -4220,7 +4203,7 @@ void mufflon_destroy() {
 	s_plugins.clear();
 	s_screenTexture.reset();
 	WorldContainer::clear_instance();
-	cuda::check_error(cudaDeviceReset());
+	cudaDeviceReset();
 	CATCH_ALL(;)
 }
 

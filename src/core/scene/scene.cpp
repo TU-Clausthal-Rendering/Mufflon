@@ -254,7 +254,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 
 		// Allocate the device memory and copy over the descriptors
 		// Some of these don't need to be copied can be just taken when we're on the CPU
-		auto& lodDevDesc = m_lodDevDesc.template get<unique_device_ptr<NotGl<dev>, LodDescriptor<dev>[]>>();
+		auto& lodDevDesc = m_lodDevDesc.template get<unique_device_ptr<NotGl<dev>(), LodDescriptor<dev>[]>>();
 		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
 		if constexpr(dev == Device::CPU) {
 			lodDevDesc.reset(Allocator<Device::CPU>::realloc(lodDescs.release(), descCountEstimate, lodIndex.load()));
@@ -262,7 +262,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 			sceneDescriptor.worldToInstance = m_worldToInstanceTransformation.data();
 		} else {
 			auto& instTransformsDesc = m_instTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
-			lodDevDesc = make_udevptr_array<NotGl<dev>, LodDescriptor<dev>>(lodIndex.load());
+			lodDevDesc = make_udevptr_array<NotGl<dev>(), LodDescriptor<dev>>(lodIndex.load());
 			lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodIndex.load());
 			copy(lodDevDesc.get(), lodDescs.get(), sizeof(LodDescriptor<dev>) * lodIndex.load());
 			copy(lodAabbsDesc.get(), lodAabbs.get(), sizeof(ei::Box) * lodIndex.load());

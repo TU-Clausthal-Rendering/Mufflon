@@ -72,8 +72,8 @@ inline CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 		params.albedo * sdiv(g, gi),
 		math::PathEventType::REFLECTED,
 		excidentTS,
-		cavityPdf * sdiv(gi, ei::abs(4.0f * incidentTS.z * halfTS.z)),
-		cavityPdf * sdiv(ge, ei::abs(4.0f * excidentTS.z * halfTS.z))
+		{ cavityPdf * sdiv(gi, ei::abs(4.0f * incidentTS.z * halfTS.z)),
+		  cavityPdf * sdiv(ge, ei::abs(4.0f * excidentTS.z * halfTS.z)) }
 	};
 }
 
@@ -109,8 +109,8 @@ inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleTorrance& pa
 
 	return math::BidirSampleValue {
 		params.albedo * sdiv(g * d, ei::abs(4.0f * incidentTS.z * excidentTS.z)),
-		AngularPdf(sdiv(gi * d, ei::abs(4.0f * incidentTS.z))),
-		AngularPdf(sdiv(ge * d, ei::abs(4.0f * excidentTS.z)))
+		{ AngularPdf(sdiv(gi * d, ei::abs(4.0f * incidentTS.z))),
+		  AngularPdf(sdiv(ge * d, ei::abs(4.0f * excidentTS.z))) }
 	};
 }
 

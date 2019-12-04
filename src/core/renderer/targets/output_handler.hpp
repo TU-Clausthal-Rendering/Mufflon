@@ -47,6 +47,8 @@ struct IsReduceMomentsEnabled<P, std::enable_if_t<P::REDUCE_MOMENTS>> : std::tru
 // Interface class for all output handlers
 class IOutputHandler {
 public:
+	virtual ~IOutputHandler() = default;
+
 	virtual std::size_t get_render_target_count() const noexcept = 0;
 	virtual StringView get_render_target_name(std::size_t index) const = 0;
 	virtual std::unique_ptr<float[]> get_data(StringView name, const bool variance) = 0;
@@ -67,7 +69,7 @@ public:
 };
 
 template < class... Ts >
-class OutputHandler : public IOutputHandler {
+class OutputHandler final : public IOutputHandler {
 public:
 	static_assert(have_distinct_names<Ts...>(),
 				  "All render targets for an output handler must have distinct names");

@@ -101,6 +101,8 @@ struct AtomicOps<Device::CUDA, T> {
 #ifdef __CUDA_ARCH__
 		return atomicExch(&atom, value);
 #else // __CUDA_ARCH__
+		(void)atom;
+		(void)value;
 		return T{};
 #endif // __CUDA_ARCH__
 	}
@@ -108,6 +110,9 @@ struct AtomicOps<Device::CUDA, T> {
 	__host__ __device__ static void add(typename AtomicValue<Device::CUDA, T>::Type& atom, const T value) {
 #ifdef __CUDA_ARCH__
 		(void)atomicAdd(&atom, value);
+#else // __CUDA_ARCH__
+		(void)atom;
+		(void)value;
 #endif // __CUDA_ARCH__
 	}
 
@@ -115,6 +120,7 @@ struct AtomicOps<Device::CUDA, T> {
 #ifdef __CUDA_ARCH__
 		return atom;
 #else // __CUDA_ARCH__
+		(void)atom;
 		return T{};
 #endif // __CUDA_ARCH__
 	}

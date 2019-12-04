@@ -87,7 +87,7 @@ inline void copy(gl::BufferHandle<T> dst, gl::BufferHandle<T> src, std::size_t s
 }
 
 template < typename T >
-inline void copy(gl::TextureHandle dst, gl::BufferHandle<T> src, std::size_t size) {
+inline void copy(gl::TextureHandle /*dst*/, gl::BufferHandle<T> /*src*/, std::size_t /*size*/) {
 	// TODO gl
 }
 

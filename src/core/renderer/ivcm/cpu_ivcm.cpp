@@ -311,8 +311,8 @@ void CpuIvcm::pre_reset() {
 }
 
 void CpuIvcm::post_reset() {
-	ResetEvent resetFlags { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
-								ResetEvent::ALL : get_reset_event() };
+	ResetEvent resetFlags { { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
+								ResetEvent::ALL : get_reset_event() } };
 	init_rngs(m_outputBuffer.get_num_pixels());
 	if(resetFlags.resolution_changed()) {
 		m_photonMapManager.resize(m_outputBuffer.get_num_pixels() * m_params.maxPathLength);

@@ -33,9 +33,6 @@ inline std::ostream& win_red(std::ostream &s)
 
 namespace mufflon {
 
-	// Defaults the log level to 'Info', but can be changed at runtime
-	LogSeverity s_logLevel = LogSeverity::INFO;
-
 	namespace details {
 
 		static std::vector<MessageHandlerFunc> s_msgHandlers;

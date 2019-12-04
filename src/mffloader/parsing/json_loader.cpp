@@ -386,29 +386,26 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 }
 
 void JsonLoader::free_material(MaterialParams* mat) {
+	if(mat == nullptr)
+		return;
 	switch(mat->innerType) {
 		case MATERIAL_LAMBERT:
 		case MATERIAL_TORRANCE:
 		case MATERIAL_WALTER:
 		case MATERIAL_EMISSIVE:
 		case MATERIAL_ORENNAYAR:
-			delete mat;
-			return;
+			break;
 		case MATERIAL_BLEND:
-			if(mat->inner.blend.a.mat != nullptr)
-				free_material(mat->inner.blend.a.mat);
-			if(mat->inner.blend.b.mat != nullptr)
-				free_material(mat->inner.blend.b.mat);
-			return;
+			free_material(mat->inner.blend.a.mat);
+			free_material(mat->inner.blend.b.mat);
+			break;
 		case MATERIAL_FRESNEL:
-			if(mat->inner.fresnel.a != nullptr)
 			free_material(mat->inner.fresnel.a);
-			if(mat->inner.blend.a.mat != nullptr)
-				if(mat->inner.fresnel.b != nullptr)
 			free_material(mat->inner.fresnel.b);
-			return;
-		default: return;
+			break;
+		default: break;
 	}
+	delete mat;
 }
 
 bool JsonLoader::load_cameras(const ei::Box& aabb) {

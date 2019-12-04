@@ -218,17 +218,17 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float
 		// Store a photon to the photon map
 		if(m_params.knn == 0)
 			m_photonMap.insert(vertex[currentV].get_position(), {
-				vertex[currentV].ext().incidentPdf,
-				vertex[currentV].get_incident_direction(), pathLen,
-				throughput / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
-				vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor,
+				{ vertex[currentV].ext().incidentPdf,
+				  vertex[currentV].get_incident_direction(), pathLen,
+				  throughput / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
+				  vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor },
 				vertex[currentV].get_position() });
 		else
 			prevKdTreeIdx = m_photonMapKd.insert(vertex[currentV].get_position(), {
-				vertex[currentV].ext().incidentPdf,
-				vertex[currentV].get_incident_direction(), pathLen,
-				throughput / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
-				vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor,
+				{ vertex[currentV].ext().incidentPdf,
+				  vertex[currentV].get_incident_direction(), pathLen,
+				  throughput / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
+				  vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor },
 				1.0f, prevKdTreeIdx });
 	} while(pathLen < m_params.maxPathLength-1); // -1 because there is at least one segment on the view path
 }

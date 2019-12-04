@@ -117,7 +117,7 @@ inline CUDA_FUNCTION math::PathSample sample(const MatSampleWalter& params,
 
 	return math::PathSample {
 		Spectrum { throughput }, eventType, excidentTS,
-		pdfForw, pdfBack
+		{ pdfForw, pdfBack }
 	};
 }
 
@@ -167,8 +167,8 @@ inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& para
 			g = geoshadowing_vcavity_reflection(gi, ge);
 		return math::BidirSampleValue {
 			Spectrum{ sdiv(g * d, 4.0f * incidentTS.z * excidentTS.z) },
-			AngularPdf{ sdiv(gi * d, 4.0f * ei::abs(incidentTS.z)) },
-			AngularPdf{ sdiv(ge * d, 4.0f * ei::abs(excidentTS.z)) }
+			{ AngularPdf{ sdiv(gi * d, 4.0f * ei::abs(incidentTS.z)) },
+			  AngularPdf{ sdiv(ge * d, 4.0f * ei::abs(excidentTS.z)) } }
 		};
 	}
 
@@ -181,8 +181,8 @@ inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& para
 	float bsdf = g * common * sdiv(n_e * n_e, ei::abs(incidentTS.z * excidentTS.z));
 	return math::BidirSampleValue {
 		Spectrum{bsdf},
-		AngularPdf(gi * common * sdiv(n_e * n_e, ei::abs(incidentTS.z))),
-		AngularPdf(ge * common * sdiv(n_i * n_i, ei::abs(excidentTS.z)))
+		{ AngularPdf(gi * common * sdiv(n_e * n_e, ei::abs(incidentTS.z))),
+		  AngularPdf(ge * common * sdiv(n_i * n_i, ei::abs(excidentTS.z))) }
 	};
 }
 

@@ -32,8 +32,9 @@ private:
 	class Node;
 
 	void allocate_head_node();
+	static void delete_head_node(Node*);
 
-	std::unique_ptr<Node> m_tree;
+	std::unique_ptr<Node, void(*)(Node*)> m_tree;
 	Node* m_head;
 	std::size_t m_poolSize;
 };

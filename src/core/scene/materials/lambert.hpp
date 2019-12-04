@@ -27,8 +27,8 @@ inline CUDA_FUNCTION math::PathSample sample(const MatSampleLambert& params,
 		Spectrum{params.albedo},
 		math::PathEventType::REFLECTED,
 		excidentTS * ei::sgn(incidentTS.z),
-		AngularPdf(excidentTS.z / ei::PI),
-		AngularPdf(ei::abs(incidentTS.z) / ei::PI)
+		{ AngularPdf(excidentTS.z / ei::PI),
+		  AngularPdf(ei::abs(incidentTS.z) / ei::PI) }
 	};
 }
 
@@ -41,8 +41,8 @@ inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleLambert& par
 	// Two sided diffuse (therefore the abs())
 	return math::BidirSampleValue {
 		params.albedo / ei::PI,
-		AngularPdf(ei::abs(excidentTS.z) / ei::PI),
-		AngularPdf(ei::abs(incidentTS.z) / ei::PI)
+		{ AngularPdf(ei::abs(excidentTS.z) / ei::PI),
+		  AngularPdf(ei::abs(incidentTS.z) / ei::PI) }
 	};
 }
 

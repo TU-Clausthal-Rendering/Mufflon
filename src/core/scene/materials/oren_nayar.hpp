@@ -61,8 +61,8 @@ inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleOrenNayar& p
 #else // ONLAMBERT_SAMPLING
 		//AngularPdf{ (pF / ei::PI + (1-pF) * 1.5f * cosDeltaPhi * sinThetaO) * cosThetaO },
 		//AngularPdf{ (pB / ei::PI + (1-pB) * 1.5f * cosDeltaPhi * sinThetaI) * cosThetaI }
-		AngularPdf{ (pF / ei::PI * cosThetaO + (1-pF) * 0.40596962562901f * cosDeltaPhi * sdiv(powf(acosf(cosThetaO), 1.4f), sinThetaO)) },
-		AngularPdf{ (pB / ei::PI * cosThetaI + (1-pB) * 0.40596962562901f * cosDeltaPhi * sdiv(powf(acosf(cosThetaI), 1.4f), sinThetaI)) }
+		{ AngularPdf{ (pF / ei::PI * cosThetaO + (1-pF) * 0.40596962562901f * cosDeltaPhi * sdiv(powf(acosf(cosThetaO), 1.4f), sinThetaO)) },
+		  AngularPdf{ (pB / ei::PI * cosThetaI + (1-pB) * 0.40596962562901f * cosDeltaPhi * sdiv(powf(acosf(cosThetaI), 1.4f), sinThetaI)) } }
 #endif // ONLAMBERT_SAMPLING
 	};
 }

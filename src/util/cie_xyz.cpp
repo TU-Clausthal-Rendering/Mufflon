@@ -20,7 +20,6 @@ static constexpr double CIE_Y_INTEGRAL = 106.856895;
 static constexpr double PLANCK = 6.62607015;				//e-34	[J*s]
 static constexpr double BOLTZMANN = 1.380649;				//e-23	[J/K]
 static constexpr double SPEED_OF_LIGHT = 2.99792458;		//e8	[m]
-static constexpr double WIEN_DISPLACEMENT = 2.8977721e-3;	//		[m]
 
 struct XyzBlackBodySpectrum {
 	double spectralRadiance[CIE_XYZ_SAMPLES];		//		[W / (s*m³)]

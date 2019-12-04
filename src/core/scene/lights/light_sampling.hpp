@@ -468,10 +468,10 @@ inline CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<CU
 												  const ei::Vec3& direction) {
 	switch(background.type) {
 		case BackgroundType::COLORED: return { background.monochromParams.color * background.scale,
-			1.0f, AngularPdf{0.0f}, AngularPdf{1.0f / (4.0f * ei::PI)} };
+			1.0f, { AngularPdf{0.0f}, AngularPdf{1.0f / (4.0f * ei::PI)} } };
 		case BackgroundType::SKY_HOSEK: {
 			return { get_hosek_sky_rgb_radiance(background.skyParams, direction) * background.scale,
-				1.f, AngularPdf{0.f}, AngularPdf{1.0f / (4.0f * ei::PI)} };
+				1.f, { AngularPdf{0.f}, AngularPdf{1.0f / (4.0f * ei::PI)} } };
 		}
 		case BackgroundType::ENVMAP: {
 			UvCoordinate uv;
@@ -500,7 +500,7 @@ inline CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<CU
 				pdfScale *= sinPixel / (2.0f * ei::PI * ei::PI * sinJac);
 			}
 			radiance *= background.scale;
-			return { radiance, 1.0f, AngularPdf{0.0f}, AngularPdf{pdfScale / cdf} };
+			return { radiance, 1.0f, { AngularPdf{0.0f}, AngularPdf{pdfScale / cdf} } };
 		}
 		default: mAssert(false); return {};
 	}

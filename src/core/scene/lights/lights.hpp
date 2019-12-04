@@ -261,7 +261,7 @@ CUDA_FUNCTION __forceinline__ float get_falloff(const float cosTheta,
 
 CUDA_FUNCTION __forceinline__ math::EvalValue
 evaluate_point(const Spectrum& intensity) {
-	return { intensity, 1.0f, AngularPdf{ 1.0f / (4*ei::PI) }, AngularPdf{ 0.0f } };
+	return { intensity, 1.0f, { AngularPdf{ 1.0f / (4*ei::PI) }, AngularPdf{ 0.0f } } };
 }
 
 CUDA_FUNCTION __forceinline__ math::EvalValue
@@ -277,8 +277,8 @@ evaluate_spot(const scene::Direction& excident,
 	const float cosFalloffStartf = __half2float(cosFalloffStart);
 	const float falloff = get_falloff(cosOut, cosThetaMaxf, cosFalloffStartf);
 	return { intensity * falloff, 1.0f,
-			 AngularPdf{ math::get_uniform_cone_pdf(cosThetaMaxf) },
-			 AngularPdf{ 0.0f } };
+			 { AngularPdf{ math::get_uniform_cone_pdf(cosThetaMaxf) },
+			   AngularPdf{ 0.0f } } };
 }
 
 CUDA_FUNCTION __forceinline__ math::EvalValue
@@ -288,13 +288,13 @@ evaluate_area(const scene::Direction& excident, const Spectrum& intensity,
 	const float cosOut = dot(normal, excident);
 	// Early out (wrong hemisphere)
 	if(cosOut <= 0.0f) return math::EvalValue{};
-	return { intensity, cosOut, AngularPdf{ cosOut / ei::PI },
-			 AngularPdf{ 0.0f } };
+	return { intensity, cosOut, { AngularPdf{ cosOut / ei::PI },
+			 AngularPdf{ 0.0f } } };
 }
 
 CUDA_FUNCTION __forceinline__ math::EvalValue
 evaluate_dir(const Spectrum& irradiance, bool /*isEnvMap*/, float projSceneArea) {
-	return { irradiance, 1.0f, AngularPdf{ 1.0f / projSceneArea }, AngularPdf{0.0f} };
+	return { irradiance, 1.0f, { AngularPdf{ 1.0f / projSceneArea }, AngularPdf{0.0f} } };
 }
 
 }}} // namespace mufflon::scene::lights

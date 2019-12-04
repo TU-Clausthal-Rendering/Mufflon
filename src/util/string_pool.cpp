@@ -15,8 +15,10 @@ public:
 	Node& operator=(const Node&) = delete;
 	Node& operator=(Node&&) = delete;
 	~Node() {
-		if(m_next)
-			delete m_next;
+		if(m_next) {
+			m_next->~Node();
+			free(m_next);
+		}
 	}
 
 	char* insert(const StringView string) {
@@ -45,6 +47,7 @@ private:
 };
 
 StringPool::StringPool(const std::size_t pageCount) :
+	m_tree(nullptr, &delete_head_node),
 	m_poolSize{ (pageCount > 0u ? pageCount : 1u) * PAGE_SIZE }
 {
 	this->clear();
@@ -84,6 +87,13 @@ void StringPool::allocate_head_node() {
 	Node* node = new (memory) Node{ charCount };
 	m_tree.reset(node);
 	m_head = node;
+}
+
+void StringPool::delete_head_node(Node* node) {
+	if(node) {
+		node->~Node();
+		free(node);
+	}
 }
 
 } // namespace mufflon::util

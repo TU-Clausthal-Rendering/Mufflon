@@ -122,7 +122,7 @@ inline CUDA_FUNCTION math::PathSample sample(const MatSampleMicrofacet& params,
 	return math::PathSample {
 		Spectrum { throughput },
 		reflect ? math::PathEventType::REFLECTED : math::PathEventType::REFRACTED,
-		excidentTS, pdfForw, pdfBack
+		excidentTS, { pdfForw, pdfBack }
 	};
 }
 
@@ -167,8 +167,8 @@ inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleMicrofacet& 
 		float common = d * f / 4.0f;
 		return math::BidirSampleValue {
 			Spectrum{ sdiv(g * common, incidentTS.z * excidentTS.z) },
-			AngularPdf{ sdiv(gi * common, ei::abs(incidentTS.z)) },
-			AngularPdf{ sdiv(ge * common, ei::abs(excidentTS.z)) }
+			{ AngularPdf{ sdiv(gi * common, ei::abs(incidentTS.z)) },
+			  AngularPdf{ sdiv(ge * common, ei::abs(excidentTS.z)) } }
 		};
 	}
 
@@ -181,8 +181,8 @@ inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleMicrofacet& 
 	float bsdf = g * common * sdiv(n_t * n_t, ei::abs(incidentTS.z * excidentTS.z));
 	return math::BidirSampleValue {
 		Spectrum{bsdf},
-		AngularPdf(gi * common * sdiv(n_t * n_t, ei::abs(incidentTS.z))),
-		AngularPdf(ge * common * sdiv(n_i * n_i, ei::abs(excidentTS.z)))
+		{ AngularPdf(gi * common * sdiv(n_t * n_t, ei::abs(incidentTS.z))),
+		  AngularPdf(ge * common * sdiv(n_i * n_i, ei::abs(excidentTS.z))) }
 	};
 }
 

@@ -231,8 +231,8 @@ evaluate(const TangentSpace& tangentSpace,
 	return math::EvalValue{
 		res.value, ei::abs(eDotN),
 		// Swap back output values if we swapped the directions before
-		adjoint ? res.pdf.back : res.pdf.forw,
-		adjoint ? res.pdf.forw : res.pdf.back
+		{ adjoint ? res.pdf.back : res.pdf.forw,
+		  adjoint ? res.pdf.forw : res.pdf.back }
 	};
 }
 

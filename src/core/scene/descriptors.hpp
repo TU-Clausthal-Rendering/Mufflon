@@ -135,7 +135,7 @@ struct SceneDescriptor : public InstanceData<dev> {
 	float diagSize;	// len(aabb.max - aabb.min)
 	ei::Box aabb;	// Scene-wide bounding box
 	// The receiver of this struct is responsible for deallocating these two arrays!
-	ConstArrayDevHandle_t<NotGl<dev>, LodDescriptor<dev>> lods;
+	ConstArrayDevHandle_t<NotGl<dev>(), LodDescriptor<dev>> lods;
 
 	AccelDescriptor accelStruct;
 	ConstArrayDevHandle_t<dev, ei::Box> aabbs; // For each object.

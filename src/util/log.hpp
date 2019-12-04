@@ -20,7 +20,8 @@ enum class LogSeverity {
 };
 
 /// Holds the currently set log level
-extern LogSeverity s_logLevel;
+// Defaults the log level to 'Info', but can be changed at runtime
+LogSeverity s_logLevel = LogSeverity::INFO;
 	
 typedef void (*MessageHandlerFunc)(LogSeverity _severity, const std::string& _message);
 	

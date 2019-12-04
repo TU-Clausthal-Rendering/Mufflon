@@ -122,7 +122,7 @@ public:
 	}
 
 	template < class T >
-	static T* free(T* ptr, std::size_t n) {
+	static T* free(T* ptr, std::size_t /*n*/) {
 		if(ptr != nullptr) {
 			static_assert(std::is_trivially_destructible<T>::value, "Cannot deallocate complex types on CUDA side like this!");
 			cuda::check_error(cudaFree(ptr));
