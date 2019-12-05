@@ -167,12 +167,12 @@ inline CUDA_FUNCTION i32 longestCommonPrefix(Key* sortedKeys,
 	// No need to check the upper bound, since i+1 will be at most numberOfElements - 1 (one 
 	// thread per internal node)
 	if(index2 < 0 || index2 >= numberOfElements)
-		return 0;
+		return -1;
 
 	Key key2 = sortedKeys[index2];
 
 	if(key1 == key2)
-		return 64 + (i32)cuda::clz(u32(index1 ^ index2));
+		return sizeof(Key) * CHAR_BIT + (i32)cuda::clz(u32(index1 ^ index2));
 
 	return (i32)cuda::clz(key1 ^ key2);
 }
@@ -183,6 +183,7 @@ template <typename T> inline CUDA_FUNCTION void build_lbvh_tree(
 	i32 *parents,
 	const i32 idx
 ) {
+
 	const T key1 = sortedKeys[idx];
 
 	const i32 lcp1 = longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + 1, key1);
@@ -192,16 +193,15 @@ template <typename T> inline CUDA_FUNCTION void build_lbvh_tree(
 
 	// Compute upper bound for the length of the range.
 	const i32 minLcp = longestCommonPrefix(sortedKeys, numPrimitives, idx, idx - direction, key1);
-	i32 lMax = 128;
+	i32 lMax = 2;
 	while(longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + lMax * direction, key1) >
 		  minLcp) {
-		lMax *= 4;
+		lMax *= 2;
 	}
 
 	// Find other end using binary search.
 	i32 l = 0;
-	i32 t = lMax;
-	while(t > 1) {
+	for(i32 t = lMax; t > 1; ) {
 		t = t / 2;
 		if(longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + (l + t) * direction, key1) >
 		   minLcp) {
@@ -213,16 +213,13 @@ template <typename T> inline CUDA_FUNCTION void build_lbvh_tree(
 	// Find the split position using binary search.
 	const i32 nodeLcp = longestCommonPrefix(sortedKeys, numPrimitives, idx, j, key1);
 	i32 s = 0;
-	i32 divisor = 2;
-	t = l;
 	const i32 maxDivisor = 1 << (32 - cuda::clz(u32(l)));
-	while(divisor <= maxDivisor) {
+	for(i32 t, divisor = 2; divisor <= maxDivisor; divisor *= 2) {
 		t = (l + divisor - 1) / divisor;
 		if(longestCommonPrefix(sortedKeys, numPrimitives, idx, idx + (s + t) * direction, key1)
 			> nodeLcp) {
 			s += t;
 		}
-		divisor *= 2;
 	}
 	const i32 splitPosition = idx + s * direction + min(direction, 0);
 
@@ -237,6 +234,8 @@ template <typename T> inline CUDA_FUNCTION void build_lbvh_tree(
 	mAssert(rightIndex < 2 * numPrimitives - 1);
 
 	// Set parent nodes.
+	mAssert(parents[leftIndex] == 0);
+	mAssert(parents[rightIndex] == 0);
 	parents[leftIndex] = ~idx;
 	parents[rightIndex] = idx;
 
@@ -669,6 +668,8 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 								sortedMortonCodes.get() + numPrimitives, primIds);
 		}
 
+		// This is just a workaround to avoid infinite loops later on
+		mem_set<DescType::DEVICE>(parents.get(), 0, numNodes * sizeof(i32));
 		// Create BVH.
 		// Layout: first internal nodes, then leves.
 		if(DescType::DEVICE == Device::CUDA) {
