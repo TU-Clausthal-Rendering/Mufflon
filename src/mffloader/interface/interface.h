@@ -1,7 +1,6 @@
 #pragma once
 
 #include "api.h"
-#include "core/export/interface.h"
 
 extern "C" {
 #include <stdint.h>
