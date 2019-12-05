@@ -21,7 +21,7 @@ namespace {
 
 // Reads a file completely and returns the string containing all bytes
 std::string read_file(fs::path path) {
-	auto scope = Profiler::instance().start<CpuProfileState>("JSON read_file", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JSON read_file", ProfileLevel::HIGH);
 	logPedantic("[read_file] Loading JSON file '", path.string(), "' into RAM");
 	const std::uintmax_t fileSize = fs::file_size(path);
 	std::string fileString;
@@ -121,7 +121,7 @@ void JsonLoader::clear_state() {
 TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, MipmapType mipmapType,
 									std::optional<TextureFormat> targetFormat,
 									TextureCallback callback, void* userParams) {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
 	logPedantic("[JsonLoader::load_texture] Loading texture '", name, "'");
 	// Make the path relative to the file
 	fs::path path(name);
@@ -141,7 +141,7 @@ TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, 
 }
 
 std::pair<TextureHdl, TextureHdl> JsonLoader::load_displacement_map(const char* name) {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_displacement_map", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_displacement_map", ProfileLevel::HIGH);
 	// Make the path relative to the file
 	fs::path path(name);
 	if(!path.is_absolute())
@@ -157,7 +157,7 @@ std::pair<TextureHdl, TextureHdl> JsonLoader::load_displacement_map(const char* 
 }
 
 MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator matIter) {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_material", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_material", ProfileLevel::HIGH);
 	logPedantic("[JsonLoader::load_material] Loading material '", matIter->name.GetString(), "'");
 	using namespace rapidjson;
 	MaterialParams* mat = new MaterialParams{};
@@ -409,7 +409,7 @@ void JsonLoader::free_material(MaterialParams* mat) {
 }
 
 bool JsonLoader::load_cameras(const ei::Box& aabb) {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_cameras", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_cameras", ProfileLevel::HIGH);
 	sprintf(m_loadingStage.data(), "Parsing cameras%c", '\0');
 	using namespace rapidjson;
 	const Value& cameras = m_cameras->value;
@@ -491,7 +491,7 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 }
 
 bool JsonLoader::load_lights() {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_lights", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_lights", ProfileLevel::HIGH);
 	sprintf(m_loadingStage.data(), "Parsing lights%c", '\0');
 	using namespace rapidjson;
 	const Value& lights = m_lights->value;
@@ -739,7 +739,7 @@ bool JsonLoader::load_lights() {
 }
 
 bool JsonLoader::load_materials() {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_materials", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_materials", ProfileLevel::HIGH);
 	sprintf(m_loadingStage.data(), "Parsing materials%c", '\0');
 	using namespace rapidjson;
 	const Value& materials = m_materials->value;
@@ -765,7 +765,7 @@ bool JsonLoader::load_materials() {
 
 bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 								const mufflon::util::FixedHashMap<StringView, binary::InstanceMapping>& instances) {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_scenarios", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_scenarios", ProfileLevel::HIGH);
 	sprintf(m_loadingStage.data(), "Parsing scenarios%c", '\0');
 	using namespace rapidjson;
 	const Value& scenarios = m_scenarios->value;
@@ -992,7 +992,7 @@ void JsonLoader::selective_replace_keys(const rapidjson::Value& objectToCopy, ra
 
 bool JsonLoader::load_file(fs::path& binaryFile) {
 	using namespace rapidjson;
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_file");
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_file");
 
 	this->clear_state();
 	logInfo("[JsonLoader::load_file] Parsing scene file '", m_filePath.string(), "'");
@@ -1139,7 +1139,7 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 			throw std::runtime_error("Cannot find the default scenario '" + std::string(m_defaultScenario) + "'");
 
 		sprintf(m_loadingStage.data(), "Loading initial scenario%c", '\0');
-		auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_file - load default scenario", ProfileLevel::LOW);
+		auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_file - load default scenario", ProfileLevel::LOW);
 		if(!world_load_scenario(defScenHdl))
 			throw std::runtime_error("Cannot load the default scenario '" + std::string(m_defaultScenario) + "'");
 		// Check if we should tessellate initially, indicated by a non-zero max. level

@@ -157,7 +157,7 @@ CpuBidirPathTracer::CpuBidirPathTracer() {
 }
 
 void CpuBidirPathTracer::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU BPT iteration", ProfileLevel::HIGH);
+	auto scope = Profiler::core().start<CpuProfileState>("CPU BPT iteration", ProfileLevel::HIGH);
 
 	// Allocate a path memory (up to pathlength many vertices per thread)
 	std::vector<std::vector<BptPathVertex>> pathMem(get_thread_num());

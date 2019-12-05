@@ -216,7 +216,7 @@ void DisplacementMapper::set_triangle_inner_vertex(const float x, const float y,
 
 
 void DisplacementMapper::post_tessellate() {
-	auto profileTimer = Profiler::instance().start<CpuProfileState>("DisplacementMapper::post_tessellate");
+	auto profileTimer = Profiler::core().start<CpuProfileState>("DisplacementMapper::post_tessellate");
 	if constexpr(!USE_CENTRAL_DIFFERENCE) {
 		// Actual displacement: go over all vertices, check if one of its faces is displacement mapped
 		// according to the provided material assignment and if yes, adjust the vertex position
@@ -248,7 +248,7 @@ void DisplacementMapper::post_tessellate() {
 		}
 
 		{
-			auto normalProfileTimer = Profiler::instance().start<CpuProfileState>("DisplacementMapper::post_tessellate normals");
+			auto normalProfileTimer = Profiler::core().start<CpuProfileState>("DisplacementMapper::post_tessellate normals");
 			// TODO: we recompute the geometric normals here, but we could probably compute them directly...
 #pragma PARALLEL_FOR
 			for(i64 i = 0; i < static_cast<i64>(m_mesh->n_vertices()); ++i) {

@@ -3434,7 +3434,7 @@ Boolean render_iterate(ProcessTime* time) {
 		time->microseconds = CpuProfileState::get_process_time().count() - time->microseconds;
 	}
 	s_currentRenderer->post_iteration(*s_imageOutput);
-	Profiler::instance().create_snapshot_all();
+	Profiler::core().create_snapshot_all();
 	return true;
 	CATCH_ALL(false)
 }
@@ -3834,13 +3834,13 @@ Boolean renderer_get_parameter_enum_name(const char* param, int value, const cha
 
 void profiling_enable() {
 	TRY
-	Profiler::instance().set_enabled(true);
+	Profiler::core().set_enabled(true);
 	CATCH_ALL(;)
 }
 
 void profiling_disable() {
 	TRY
-	Profiler::instance().set_enabled(false);
+	Profiler::core().set_enabled(false);
 	CATCH_ALL(;)
 }
 
@@ -3848,16 +3848,16 @@ Boolean profiling_set_level(ProfilingLevel level) {
 	TRY
 	switch(level) {
 		case ProfilingLevel::PROFILING_OFF:
-			Profiler::instance().set_enabled(false);
+			Profiler::core().set_enabled(false);
 			return true;
 		case ProfilingLevel::PROFILING_LOW:
-			Profiler::instance().set_profile_level(ProfileLevel::LOW);
+			Profiler::core().set_profile_level(ProfileLevel::LOW);
 			return true;
 		case ProfilingLevel::PROFILING_HIGH:
-			Profiler::instance().set_profile_level(ProfileLevel::HIGH);
+			Profiler::core().set_profile_level(ProfileLevel::HIGH);
 			return true;
 		case ProfilingLevel::PROFILING_ALL:
-			Profiler::instance().set_profile_level(ProfileLevel::ALL);
+			Profiler::core().set_profile_level(ProfileLevel::ALL);
 			return true;
 		default:
 			logError("[", FUNCTION_NAME, "] invalid profiling level");
@@ -3869,7 +3869,7 @@ Boolean profiling_set_level(ProfilingLevel level) {
 Boolean profiling_save_current_state(const char* path) {
 	TRY
 	CHECK_NULLPTR(path, "file path", false);
-	Profiler::instance().save_current_state(path);
+	Profiler::core().save_current_state(path);
 	return true;
 	CATCH_ALL(false)
 }
@@ -3877,7 +3877,7 @@ Boolean profiling_save_current_state(const char* path) {
 Boolean profiling_save_snapshots(const char* path) {
 	TRY
 	CHECK_NULLPTR(path, "file path", false);
-	Profiler::instance().save_snapshots(path);
+	Profiler::core().save_snapshots(path);
 	return true;
 	CATCH_ALL(false)
 }
@@ -3885,7 +3885,7 @@ Boolean profiling_save_snapshots(const char* path) {
 Boolean profiling_save_total_and_snapshots(const char* path) {
 	TRY
 	CHECK_NULLPTR(path, "file path", false);
-	Profiler::instance().save_total_and_snapshots(path);
+	Profiler::core().save_total_and_snapshots(path);
 	return true;
 	CATCH_ALL(false)
 }
@@ -3893,7 +3893,7 @@ Boolean profiling_save_total_and_snapshots(const char* path) {
 const char* profiling_get_current_state() {
 	TRY
 	static thread_local std::string str;
-	str = Profiler::instance().save_current_state();
+	str = Profiler::core().save_current_state();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
@@ -3901,7 +3901,7 @@ const char* profiling_get_current_state() {
 const char* profiling_get_snapshots() {
 	TRY
 	static thread_local std::string str;
-	str = Profiler::instance().save_snapshots();
+	str = Profiler::core().save_snapshots();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
@@ -3909,7 +3909,7 @@ const char* profiling_get_snapshots() {
 const char* profiling_get_total() {
 	TRY
 	static thread_local std::string str;
-	str = Profiler::instance().save_total();
+	str = Profiler::core().save_total();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
@@ -3917,14 +3917,14 @@ const char* profiling_get_total() {
 const char* profiling_get_total_and_snapshots() {
 	TRY
 	static thread_local std::string str;
-	str = Profiler::instance().save_total_and_snapshots();
+	str = Profiler::core().save_total_and_snapshots();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 
 void profiling_reset() {
 	TRY
-	Profiler::instance().reset_all();
+	Profiler::core().reset_all();
 	CATCH_ALL(;)
 }
 

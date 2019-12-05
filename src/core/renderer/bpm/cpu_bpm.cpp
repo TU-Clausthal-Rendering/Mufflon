@@ -119,7 +119,7 @@ CpuBidirPhotonMapper::CpuBidirPhotonMapper() {
 }
 
 void CpuBidirPhotonMapper::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU BPM iteration", ProfileLevel::LOW);
+	auto scope = Profiler::core().start<CpuProfileState>("CPU BPM iteration", ProfileLevel::LOW);
 
 	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
 	if(m_params.progressive)

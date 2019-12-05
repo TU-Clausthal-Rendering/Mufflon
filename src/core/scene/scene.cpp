@@ -343,7 +343,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
     if(dev != Device::OPENGL) {
 		// Rebuild Instance BVH?
 		if (m_accelStruct.needs_rebuild()) {
-			auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
+			auto scope = Profiler::core().start<CpuProfileState>("build_instance_bvh");
 
 			const auto t0 = std::chrono::high_resolution_clock::now();
 			m_accelStruct.build(sceneDescriptor, static_cast<u32>(m_instances.size()));

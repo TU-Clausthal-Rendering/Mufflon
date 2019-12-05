@@ -174,7 +174,7 @@ void BinaryLoader::read_normal_compressed_vertices(const ObjectState& object, co
 
 // Read vertices without deflation and without normal compression
 void BinaryLoader::read_normal_uncompressed_vertices(const ObjectState& object, const LodState& lod) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_normal_uncompressed_vertices");
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_normal_uncompressed_vertices");
 	if(lod.numVertices == 0)
 		return;
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
@@ -332,7 +332,7 @@ void BinaryLoader::read_uncompressed_sphere_materials(const ObjectState& object,
 }
 
 void BinaryLoader::read_uncompressed_triangles(const ObjectState& object, const LodState& lod) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_uncompressed_triangles");
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_uncompressed_triangles");
 	if(lod.numTriangles == 0)
 		return;
 	// Read the faces (cannot do that bulk-like)
@@ -346,7 +346,7 @@ void BinaryLoader::read_uncompressed_triangles(const ObjectState& object, const 
 }
 
 void BinaryLoader::read_uncompressed_quads(const ObjectState& object, const LodState& lod) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_uncompressed_quads");
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_uncompressed_quads");
 	if(lod.numQuads == 0)
 		return;
 	// Read the faces (cannot do that bulk-like)
@@ -633,7 +633,7 @@ void BinaryLoader::read_compressed_sphere_attributes(const ObjectState& object, 
 }
 
 u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_lod");
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_lod");
 
 	// Remember where we were in the file
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
@@ -728,7 +728,7 @@ void BinaryLoader::read_object() {
 bool BinaryLoader::read_instances(const u32 globalLod,
 								  const util::FixedHashMap<StringView, u32>& objectLods,
 								  util::FixedHashMap<StringView, InstanceMapping>& instanceLods) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_instances");
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_instances");
 	sprintf(m_loadingStage.data(), "Loading instances%c", '\0');
 	std::vector<uint8_t> hasInstance(m_objects.size(), false);
 	const u32 numInstances = read<u32>();
@@ -851,7 +851,7 @@ void BinaryLoader::deinstance() {
 }
 
 void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::load_lod");
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::load_lod");
 	m_filePath = file;
 
 	for(u32 i = 0u; i < 3u; ++i)
@@ -923,7 +923,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 							 const util::FixedHashMap<StringView, mufflon::u32>& objectLods,
 							 util::FixedHashMap<StringView, InstanceMapping>& instanceLods,
 							 const bool deinstance, const bool loadWorldToInstTrans) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::load_file");
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::load_file");
 	m_loadWorldToInstTrans = loadWorldToInstTrans;
 	m_filePath = std::move(file);
 	if(!fs::exists(m_filePath))

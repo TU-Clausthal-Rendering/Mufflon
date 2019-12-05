@@ -23,7 +23,7 @@ GpuPathTracer::GpuPathTracer() :
 {}
 
 void GpuPathTracer::iterate() {
-	//auto scope = Profiler::instance().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
+	//auto scope = Profiler::core().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
 
 	copy(&m_sceneDesc->lightTree.posGuide, &m_params.neeUsePositionGuide, sizeof(bool));
 	cuda::check_error(gpupt_detail::call_kernel(std::move(m_outputBuffer),

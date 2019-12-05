@@ -29,8 +29,6 @@ using namespace mufflon;
 
 namespace {
 
-void(*s_logCallback)(const char*, int);
-
 TextureFormat get_int_format(int components) {
 	switch(components) {
 		case 1: return TextureFormat::FORMAT_R8U;

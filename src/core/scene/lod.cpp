@@ -30,7 +30,7 @@ LodDescriptor<dev> Lod::get_descriptor(const bool allowSerialBvhBuild) {
 					m_parent->get_name(), "' with ", desc.numPrimitives, " primitives (",
 					desc.polygon.numTriangles, "T / ", desc.polygon.numQuads, "Q / ",
 					desc.spheres.numSpheres, "S).");
-		auto timer = Profiler::instance().start<CpuProfileState>("[Lod::get_descriptor] build object BVH.");
+		auto timer = Profiler::core().start<CpuProfileState>("[Lod::get_descriptor] build object BVH.");
 		m_accelStruct.build(desc, get_bounding_box(), parallelBuild);
 	}
 	desc.accelStruct = m_accelStruct.acquire_const<dev>();

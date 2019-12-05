@@ -171,7 +171,7 @@ CpuVcm::CpuVcm() {}
 CpuVcm::~CpuVcm() {}
 
 void CpuVcm::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU VCM iteration", ProfileLevel::LOW);
+	auto scope = Profiler::core().start<CpuProfileState>("CPU VCM iteration", ProfileLevel::LOW);
 
 	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
 	if(m_params.progressive)

@@ -370,7 +370,7 @@ float CpuIvcm::get_density(const ei::Vec3& pos, const ei::Vec3& normal, float /*
 }
 
 void CpuIvcm::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU IVCM iteration", ProfileLevel::LOW);
+	auto scope = Profiler::core().start<CpuProfileState>("CPU IVCM iteration", ProfileLevel::LOW);
 
 	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
 	if(m_params.progressive)

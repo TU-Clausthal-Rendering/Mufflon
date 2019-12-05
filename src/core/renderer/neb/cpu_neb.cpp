@@ -494,7 +494,7 @@ static int pairing(int a, int b) {
 }
 
 void CpuNextEventBacktracking::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU NEB iteration", ProfileLevel::HIGH);
+	auto scope = Profiler::core().start<CpuProfileState>("CPU NEB iteration", ProfileLevel::HIGH);
 
 	m_sceneDesc.lightTree.posGuide = m_params.neeUsePositionGuide;
 

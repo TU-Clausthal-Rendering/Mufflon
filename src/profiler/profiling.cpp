@@ -100,7 +100,12 @@ std::ostream& ProfileState::save_total_and_snapshots(std::ostream& stream) const
 	return stream;
 }
 
-Profiler& Profiler::instance() {
+Profiler& Profiler::core() {
+	static Profiler instance;
+	return instance;
+}
+
+Profiler& Profiler::loader() {
 	static Profiler instance;
 	return instance;
 }

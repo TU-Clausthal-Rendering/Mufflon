@@ -22,7 +22,7 @@ OpenMesh::FaceHandle create_dummy_face(geometry::PolygonMeshType& mesh) {
 } // namespace
 
 void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
-	auto profilerTimer = Profiler::instance().start<CpuProfileState>("Tessellater::tessellate", ProfileLevel::HIGH);
+	auto profilerTimer = Profiler::core().start<CpuProfileState>("Tessellater::tessellate", ProfileLevel::HIGH);
 
 	// Setup
 	m_mesh = &mesh;

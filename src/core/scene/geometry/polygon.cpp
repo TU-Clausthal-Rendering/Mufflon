@@ -361,7 +361,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 
 void Polygons::tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
 						  const bool usePhong) {
-	auto profileTimer = Profiler::instance().start<CpuProfileState>("Polygons::tessellate");
+	auto profileTimer = Profiler::core().start<CpuProfileState>("Polygons::tessellate");
 	this->synchronize<Device::CPU>();
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
@@ -385,7 +385,7 @@ void Polygons::tessellate(tessellation::TessLevelOracle& oracle, const Scenario*
 }
 
 void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario) {
-	auto profileTimer = Profiler::instance().start<CpuProfileState>("Polygons::displace");
+	auto profileTimer = Profiler::core().start<CpuProfileState>("Polygons::displace");
 	this->synchronize<Device::CPU>();
 	// Then perform tessellation
 	const std::size_t prevTri = m_triangles;

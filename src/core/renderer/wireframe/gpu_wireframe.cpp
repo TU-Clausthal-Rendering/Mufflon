@@ -30,7 +30,7 @@ void GpuWireframe::post_reset() {
 }
 
 void GpuWireframe::iterate() {
-	//auto scope = Profiler::instance().start<GpuProfileState>("GPU Wireframe iteration", ProfileLevel::LOW);
+	//auto scope = Profiler::core().start<GpuProfileState>("GPU Wireframe iteration", ProfileLevel::LOW);
 
 	for(int i = 0; i < m_outputBuffer.get_num_pixels(); ++i)
 		m_seeds[i] = static_cast<u32>(m_rng.next());
