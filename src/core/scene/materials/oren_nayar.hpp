@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/math/sampling.hpp"
 #include "material_definitions.hpp"
 #include "core/scene/textures/texture.hpp"

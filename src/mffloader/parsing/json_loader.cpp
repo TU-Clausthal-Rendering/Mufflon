@@ -6,7 +6,6 @@
 #include "util/int_types.hpp"
 #include "util/degrad.hpp"
 #include "util/cie_xyz.hpp"
-#include "core/export/interface.h"
 #include "core/scene/handles.hpp"
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>

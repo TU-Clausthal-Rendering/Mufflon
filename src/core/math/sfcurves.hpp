@@ -2,7 +2,7 @@
 
 #include "util/types.hpp"
 #include "util/assert.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 
 
 namespace mufflon { namespace math {

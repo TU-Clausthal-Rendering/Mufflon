@@ -2,7 +2,7 @@
 
 #include "material_definitions.hpp"
 #include "medium.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/scene/types.hpp"
 #include "util/log.hpp"
 #include "util/assert.hpp"

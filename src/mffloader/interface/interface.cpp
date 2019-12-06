@@ -1,4 +1,4 @@
-#include "interface.h"
+#include "mff_interface.h"
 #include "util/filesystem.hpp"
 #include "util/log.hpp"
 #include "profiler/cpu_profiler.hpp"

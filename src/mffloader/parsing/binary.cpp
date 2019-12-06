@@ -1,5 +1,4 @@
 #include "binary.hpp"
-#include "core/export/interface.h"
 #include "util/log.hpp"
 #include "util/punning.hpp"
 #include "util/string_view.hpp"

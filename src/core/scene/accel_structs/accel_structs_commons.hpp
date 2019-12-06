@@ -3,7 +3,7 @@
 #include "util/types.hpp"
 #include "util/punning.hpp"
 #include "util/assert.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "core/scene/descriptors.hpp"
 

@@ -2,7 +2,7 @@
 
 #include "util/filesystem.hpp"
 #include <rapidjson/document.h>
-#include "core/export/interface.h"
+#include "core_interface.h"
 #include <rapidjson/prettywriter.h>
 #include <vector>
 

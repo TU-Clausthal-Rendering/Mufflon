@@ -3,7 +3,7 @@
 #include "hosek_sky_model.hpp"
 #include "ei/vector.hpp"
 #include "ei/3dtypes.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/handles.hpp"

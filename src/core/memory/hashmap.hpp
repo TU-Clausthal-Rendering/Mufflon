@@ -1,7 +1,7 @@
 #pragma once
 
 #include "residency.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "allocator.hpp"
 #include "generic_resource.hpp"
 #include "util/types.hpp"

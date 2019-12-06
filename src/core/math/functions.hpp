@@ -1,5 +1,5 @@
 #pragma once
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include <ei/elementarytypes.hpp>
 
 namespace mufflon { namespace math {

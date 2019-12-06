@@ -4,7 +4,7 @@
 #include "util/types.hpp"
 #include "util/tagged_tuple.hpp"
 #include "util/string_view.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "core/opengl/gl_texture.hpp"
 #include <array>

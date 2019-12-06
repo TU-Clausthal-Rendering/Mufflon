@@ -1,4 +1,4 @@
-﻿#include "interface.h"
+﻿#include "core_interface.h"
 #include "plugin/texture_plugin.hpp"
 #include "util/log.hpp"
 #include "util/byte_io.hpp"
@@ -20,7 +20,7 @@
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/textures/interface.hpp"
-#include "mffloader/interface/interface.h"
+#include "mffloader/interface/mff_interface.h"
 #include <glad/glad.h>
 #include <cuda_runtime.h>
 #include <fstream>

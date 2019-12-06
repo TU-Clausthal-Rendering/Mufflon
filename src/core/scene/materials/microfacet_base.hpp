@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "util/types.hpp"
 #include "core/math/sampling.hpp"
 #include "core/math/functions.hpp"

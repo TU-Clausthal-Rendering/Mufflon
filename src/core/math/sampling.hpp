@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ei/3dtypes.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/scene/types.hpp"
 #include "sample_types.hpp"
 #include <cuda_runtime.h>

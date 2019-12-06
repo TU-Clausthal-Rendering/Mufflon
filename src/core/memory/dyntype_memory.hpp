@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 
 namespace mufflon { // There is no memory namespace on purpose
 

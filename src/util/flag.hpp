@@ -1,7 +1,7 @@
 #pragma once
 
 #include "util/assert.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include <climits>
 #include <type_traits>
 

@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "core/scene/handles.hpp"
 #include "core/scene/textures/interface.hpp"

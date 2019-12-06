@@ -1,7 +1,7 @@
 #pragma once
 
 #include "util/types.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "sfcurves.hpp"
 
 

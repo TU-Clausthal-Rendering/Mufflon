@@ -3,7 +3,7 @@
 #include "util/int_types.hpp"
 #include "util/tagged_tuple.hpp"
 #include "core/cuda/cuda_utils.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include <ei/vector.hpp>
 #include <math.h>

@@ -191,9 +191,9 @@ endif()
 
 # Set the libraries' headers for inclusion
 set_target_properties(core PROPERTIES PUBLIC_HEADER
-	"${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/interface.h;${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/api.h;${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/texture_data.h")
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/core_interface.h;${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/core_api.h;${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/texture_data.h")
 set_target_properties(mffloader PROPERTIES PUBLIC_HEADER
-	"${CMAKE_CURRENT_SOURCE_DIR}/src/mffloader/interface/interface.h;${CMAKE_CURRENT_SOURCE_DIR}/src/mffloader/interface/api.h")
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/mffloader/interface/mff_interface.h;${CMAKE_CURRENT_SOURCE_DIR}/src/mffloader/interface/mff_api.h")
 
 # Set the include directories
 target_include_directories(core
@@ -223,6 +223,7 @@ target_include_directories(mffloader
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/epsilon/include
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/miniz
 		${CMAKE_CURRENT_SOURCE_DIR}/external/rapidjson-1.1.0/$<CONFIG>/include
+		${CMAKE_CURRENT_SOURCE_DIR}/src/core/export
 )
 target_include_directories(pfmloader
 	PRIVATE
@@ -251,7 +252,9 @@ set(CXX_TARGETS core gliloader mffloader pfmloader stbiloader)
 set_target_properties(core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 set_target_properties(core PROPERTIES CUDA_STANDARD 14)
 set_target_properties(core PROPERTIES CUDA_STANDARD_REQUIRED ON)
-target_compile_options(core PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+target_compile_options(core PRIVATE
+	$<$<COMPILE_LANGUAGE:CUDA>:${ARCH_FLAGS}>
+	$<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 
 set_target_properties(${CXX_TARGETS}
 	PROPERTIES
@@ -567,11 +570,11 @@ endif()
 # Install shared libraries and dependencies
 install(TARGETS core
 	LIBRARY DESTINATION "."
-	PUBLIC_HEADER DESTINATION "include/core"
+	PUBLIC_HEADER DESTINATION "include"
 )
 install(TARGETS mffloader
 	LIBRARY DESTINATION "."
-	PUBLIC_HEADER DESTINATION "include/mffloader"
+	PUBLIC_HEADER DESTINATION "include"
 )
 install(TARGETS stbiloader pfmloader gliloader
 	LIBRARY DESTINATION "plugins"

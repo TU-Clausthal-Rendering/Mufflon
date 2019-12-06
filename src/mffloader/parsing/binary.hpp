@@ -4,7 +4,7 @@
 #include "util/flag.hpp"
 #include "util/int_types.hpp"
 #include "util/fixed_hashmap.hpp"
-#include "core/export/interface.h"
+#include "core_interface.h"
 #include <ei/3dtypes.hpp>
 #include <atomic>
 #include <fstream>

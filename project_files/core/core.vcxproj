@@ -190,8 +190,8 @@
     <ClInclude Include="..\..\src\core\data_structs\dm_octree.hpp" />
     <ClInclude Include="..\..\src\core\data_structs\kdtree.hpp" />
     <ClInclude Include="..\..\src\core\data_structs\photon_map.hpp" />
-    <ClInclude Include="..\..\src\core\export\api.h" />
-    <ClInclude Include="..\..\src\core\export\interface.h" />
+    <ClInclude Include="..\..\src\core\export\core_api.h" />
+    <ClInclude Include="..\..\src\core\export\core_interface.h" />
     <ClInclude Include="..\..\src\core\export\texture_data.h" />
     <ClInclude Include="..\..\src\core\math\curvature.hpp" />
     <ClInclude Include="..\..\src\core\math\functions.hpp" />
@@ -741,7 +741,7 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
       <Message>Copied the necessary .dll's into the execution directory</Message>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>cudart.lib;OpenMeshCored.lib;OpenMeshToolsd.lib;tbb.lib;tbbmalloc.lib;OpenImageDenoise.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cudart.lib;OpenMeshCored.lib;OpenMeshToolsd.lib;OpenImageDenoise.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\lib;$(SolutionDir)external\oidn-0.9\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>DebugFastLink</GenerateDebugInformation>
     </Link>
@@ -783,7 +783,7 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>cudart.lib;OpenMeshCore.lib;OpenMeshTools.lib;tbb.lib;tbbmalloc.lib;OpenImageDenoise.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cudart.lib;OpenMeshCore.lib;OpenMeshTools.lib;OpenImageDenoise.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\lib;$(SolutionDir)external\oidn-0.9\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>

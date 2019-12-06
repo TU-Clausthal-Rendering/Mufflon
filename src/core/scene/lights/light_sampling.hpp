@@ -2,7 +2,7 @@
 
 #include "lights.hpp"
 #include "texture_sampling.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "ei/vector.hpp"
 #include "ei/conversions.hpp"
 #include "core/math/sampling.hpp"

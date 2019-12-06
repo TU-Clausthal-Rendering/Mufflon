@@ -1,6 +1,7 @@
 #pragma once
 
-#include "api.h"
+#include "mff_api.h"
+#include "core_interface.h"
 
 extern "C" {
 #include <stdint.h>

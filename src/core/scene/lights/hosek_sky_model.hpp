@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
 #include "util/degrad.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include <ei/vector.hpp>
 #include <cuda_runtime.h>
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "camera.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "util/types.hpp"
 #include "core/math/sampling.hpp"
 #include <ei/3dtypes.hpp>
