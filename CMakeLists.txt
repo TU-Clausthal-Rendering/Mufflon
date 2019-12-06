@@ -73,7 +73,9 @@ file(GLOB_RECURSE MUFFLON_CORE_SOURCE_LIST CONFIGURE_DEPENDS
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/profiler/*"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/util/*"
 )
-
+file(GLOB_RECURSE MUFFLON_SHADER_SOURCE_LIST CONFIGURE_DEPENDS
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/*.glsl"
+)
 file(GLOB_RECURSE MUFFLON_GUI_SOURCE_LIST CONFIGURE_DEPENDS
 	"${CMAKE_CURRENT_SOURCE_DIR}/project_files/gui/*.cs"
 	"${CMAKE_CURRENT_SOURCE_DIR}/project_files/gui/*.xaml"
@@ -164,6 +166,10 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src"
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src"
 	PREFIX "src"
 	FILES ${MUFFLON_STBILOADER_SOURCE_LIST}
+)
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src"
+	PREFIX "src"
+	FILES ${MUFFLON_SHADER_SOURCE_LIST}
 )
 source_group(deps\\chinoise FILES ${CHINOISE_SOURCE_LIST})
 source_group(deps\\cub FILES ${CUB_SOURCE_LIST})
@@ -457,12 +463,37 @@ if(MUFFLON_BUILD_GUI)
 	# Unfortunately we can't properly set the language version, so we rely on the default being high enough
 	string(REGEX REPLACE "/langversion:.*$" "" CMAKE_CSharp_FLAGS "${CMAKE_CSharp_FLAGS}")
 	string(REGEX REPLACE "/langversion:.* " "" CMAKE_CSharp_FLAGS "${CMAKE_CSharp_FLAGS}")
+	
+	# This solution is taken from https://stackoverflow.com/questions/18132987/cmake-and-msvs-nuget
+	find_program(MUFFLON_NUGET nuget)
+	if(NOT MUFFLON_NUGET)
+		message(WARNING "CMake could not find the nuget command line tool. Please manually specify its location in MUFFLON_NUGET, or you'll have to manually isntall/restore NuGet packages!")
+	else()
+		# Copy the Nuget config file from source location to the CMake build directory.
+		configure_file("${CMAKE_CURRENT_SOURCE_DIR}/project_files/gui/packages.config" packages.config COPYONLY)
+		# Run Nuget using the .config file to install any missing dependencies to the build directory.
+		execute_process(COMMAND 
+			${MUFFLON_NUGET} restore packages.config -SolutionDirectory ${CMAKE_BINARY_DIR}
+			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+		)
+	endif()
+	# Provide the path to the Nuget-installed references, in case this is a fresh project build.
+	set(MUFFLON_JSON_DLL "${CMAKE_BINARY_DIR}/packages/Newtonsoft.Json.12.0.2/lib/net45/Newtonsoft.Json.dll")
+	set_property(TARGET gui PROPERTY 
+		VS_DOTNET_REFERENCE_Newtonsoft.Json "${MUFFLON_JSON_DLL}"
+	)
 
 	target_link_libraries(gui
 		PUBLIC
 			core
 			mffloader
 	)
+	install(TARGETS gui
+		ARCHIVE DESTINATION "."
+		RUNTIME DESTINATION "."
+		LIBRARY DESTINATION "."
+	)
+	install(FILES "${MUFFLON_JSON_DLL}" DESTINATION ".")
 endif(MUFFLON_BUILD_GUI)
 
 # Inter-target dependencies
@@ -530,7 +561,17 @@ add_custom_command(TARGET pythonbindings PRE_BUILD
 )
 add_dependencies(core pythonbindings)
 
-# Copy the dependencies into the build folder
+# Copy the shaders and dependencies into the build folder
+# We could copy the shaders in one go, but on Windows there is a limit for the number of characters
+# a single command may have, so a loop is the safer call
+foreach(shader ${MUFFLON_SHADER_SOURCE_LIST})
+	add_custom_command(TARGET core PRE_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			"${shader}"
+			"${CMAKE_BINARY_DIR}/build/$<CONFIG>/shader"
+	)
+endforeach()
+
 if(WIN32)
 	add_custom_command(TARGET core PRE_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -566,17 +607,19 @@ else()
 	endif()
 endif()
 
-# Install shared libraries and dependencies
-install(TARGETS core
-	LIBRARY DESTINATION "."
-	PUBLIC_HEADER DESTINATION "include"
-)
-install(TARGETS mffloader
+# Install shared libraries, dependencies, and shaders
+install(TARGETS core mffloader
+	ARCHIVE DESTINATION "."
+	RUNTIME DESTINATION "."
 	LIBRARY DESTINATION "."
 	PUBLIC_HEADER DESTINATION "include"
 )
 install(TARGETS stbiloader pfmloader gliloader
+	ARCHIVE DESTINATION "."
+	RUNTIME DESTINATION "."
 	LIBRARY DESTINATION "plugins"
 )
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/pythonbinding/bindings.py"
 	DESTINATION ".")
+install(FILES ${MUFFLON_SHADER_SOURCE_LIST}
+	DESTINATION "shader")
