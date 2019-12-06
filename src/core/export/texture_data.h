@@ -1,8 +1,11 @@
 #pragma once
 
+#ifdef __cplusplus
 extern "C" {
+#endif // __cplusplus
 
 #include <stdint.h>
+#include <stddef.h>
 
 typedef enum {
 	FORMAT_R8U,
@@ -29,13 +32,15 @@ typedef enum {
 
 typedef struct {
 	// A block of data which is formated with .format (on padding or similar).
-	uint8_t* data = nullptr;
-	uint32_t width = 0u;
-	uint32_t height = 0u;
-	uint32_t components = 0u;
-	uint32_t layers = 0u;
-	TextureFormat format = TextureFormat::FORMAT_NUM;
-	uint32_t sRgb = 1u;
+	uint8_t* data;
+	uint32_t width;
+	uint32_t height;
+	uint32_t components;
+	uint32_t layers;
+	TextureFormat format;
+	uint32_t sRgb;
 } TextureData;
 
-}
+#ifdef __cplusplus
+} // extern "C"
+#endif // __cplusplus

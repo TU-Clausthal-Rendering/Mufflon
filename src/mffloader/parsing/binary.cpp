@@ -147,8 +147,8 @@ void BinaryLoader::read_normal_compressed_vertices(const ObjectState& object, co
 	std::size_t pointsRead = 0u;
 	std::size_t uvsRead = 0u;
 
-	BulkLoader pointsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
-	BulkLoader uvsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[2u].get() } };
+	BulkLoader pointsBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
+	BulkLoader uvsBulk{ BulkType::BULK_FILE, { m_fileDescs[2u].get() } };
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
 		util::pun<Vec3>(object.aabb.max)
@@ -184,9 +184,9 @@ void BinaryLoader::read_normal_uncompressed_vertices(const ObjectState& object, 
 	std::size_t pointsRead = 0u;
 	std::size_t normalsRead = 0u;
 	std::size_t uvsRead = 0u;
-	BulkLoader pointsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
-	BulkLoader normalsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[1u].get() } };
-	BulkLoader uvsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[2u].get() } };
+	BulkLoader pointsBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
+	BulkLoader normalsBulk{ BulkType::BULK_FILE, { m_fileDescs[1u].get() } };
+	BulkLoader uvsBulk{ BulkType::BULK_FILE, { m_fileDescs[2u].get() } };
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
 		util::pun<Vec3>(object.aabb.max)
@@ -224,7 +224,7 @@ void BinaryLoader::read_uncompressed_vertex_attributes(const ObjectState& object
 	if(lod.numVertices == 0 || lod.numVertAttribs == 0)
 		return;
 	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
+	BulkLoader attrBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
@@ -250,7 +250,7 @@ void BinaryLoader::read_uncompressed_face_attributes(const ObjectState& object, 
 	if((lod.numTriangles == 0 && lod.numQuads == 0) || lod.numFaceAttribs == 0)
 		return;
 	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
+	BulkLoader attrBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
@@ -276,7 +276,7 @@ void BinaryLoader::read_uncompressed_sphere_attributes(const ObjectState& object
 	if(lod.numSpheres == 0 || lod.numSphereAttribs == 0)
 		return;
 	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
+	BulkLoader attrBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
@@ -301,7 +301,7 @@ void BinaryLoader::read_uncompressed_face_materials(const ObjectState& object, c
 	if(lod.numTriangles == 0 && lod.numQuads == 0)
 		return;
 	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader matsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
+	BulkLoader matsBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	const u32 faces = lod.numTriangles + lod.numQuads;
 	if(polygon_set_material_idx_bulk(lod.lodHdl, static_cast<FaceHdl>(0u),
@@ -318,7 +318,7 @@ void BinaryLoader::read_uncompressed_sphere_materials(const ObjectState& object,
 	if(lod.numSpheres == 0)
 		return;
 	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader matsBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
+	BulkLoader matsBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(spheres_set_material_idx_bulk(lod.lodHdl, static_cast<SphereHdl>(0u),
 									 lod.numSpheres, &matsBulk) == INVALID_SIZE)
@@ -362,7 +362,7 @@ void BinaryLoader::read_uncompressed_spheres(const ObjectState& object, const Lo
 	if(lod.numSpheres == 0)
 		return;
 	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader spheresBulk{ BulkLoader::BULK_FILE, { m_fileDescs[0u].get() } };
+	BulkLoader spheresBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
 		util::pun<Vec3>(object.aabb.max)
@@ -412,9 +412,9 @@ void BinaryLoader::read_compressed_normal_compressed_vertices(const ObjectState&
 	const Vec2* uvs = reinterpret_cast<const Vec2*>(vertexData.data() + lod.numVertices
 													* (3u * sizeof(float) + sizeof(u32)));
 
-	BulkLoader pointsBulk{ BulkLoader::BULK_ARRAY, {} };
+	BulkLoader pointsBulk{ BulkType::BULK_ARRAY, {} };
 	pointsBulk.descriptor.bytes = reinterpret_cast<const char*>(points);
-	BulkLoader uvsBulk{ BulkLoader::BULK_ARRAY, {} };
+	BulkLoader uvsBulk{ BulkType::BULK_ARRAY, {} };
 	uvsBulk.descriptor.bytes = reinterpret_cast<const char*>(uvs);
 	std::size_t pointsRead = 0u;
 	std::size_t uvsRead = 0u;
@@ -451,9 +451,9 @@ void BinaryLoader::read_compressed_normal_uncompressed_vertices(const ObjectStat
 	std::size_t pointsRead = 0u;
 	std::size_t normalsRead = 0u;
 	std::size_t uvsRead = 0u;
-	BulkLoader pointsBulk{ BulkLoader::BULK_ARRAY, {} };
-	BulkLoader normalsBulk{ BulkLoader::BULK_ARRAY, {} };
-	BulkLoader uvsBulk{ BulkLoader::BULK_ARRAY, {} };
+	BulkLoader pointsBulk{ BulkType::BULK_ARRAY, {} };
+	BulkLoader normalsBulk{ BulkType::BULK_ARRAY, {} };
+	BulkLoader uvsBulk{ BulkType::BULK_ARRAY, {} };
 	pointsBulk.descriptor.bytes = reinterpret_cast<const char*>(points);
 	normalsBulk.descriptor.bytes = reinterpret_cast<const char*>(normals);
 	uvsBulk.descriptor.bytes = reinterpret_cast<const char*>(uvs);
@@ -509,9 +509,9 @@ void BinaryLoader::read_compressed_spheres(const ObjectState& object, const LodS
 														 * 4u * sizeof(float));
 
 	std::size_t readSpheres = 0u;
-	BulkLoader spheresBulk{ BulkLoader::BULK_ARRAY, {} };
+	BulkLoader spheresBulk{ BulkType::BULK_ARRAY, {} };
 	spheresBulk.descriptor.bytes = reinterpret_cast<const char*>(spheres);
-	BulkLoader matsBulk{ BulkLoader::BULK_ARRAY, {} };
+	BulkLoader matsBulk{ BulkType::BULK_ARRAY, {} };
 	matsBulk.descriptor.bytes = reinterpret_cast<const char*>(matIndices);
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
@@ -538,7 +538,7 @@ void BinaryLoader::read_compressed_vertex_attributes(const ObjectState& object, 
 
 	std::vector<unsigned char> attributeData = decompress();
 	const unsigned char* attributes = attributeData.data();
-	BulkLoader attrBulk{ BulkLoader::BULK_ARRAY, {} };
+	BulkLoader attrBulk{ BulkType::BULK_ARRAY, {} };
 	attrBulk.descriptor.bytes = reinterpret_cast<const char*>(attributes);
 
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
@@ -568,7 +568,7 @@ void BinaryLoader::read_compressed_face_attributes(const ObjectState& object, co
 
 	std::vector<unsigned char> attributeData = decompress();
 	const unsigned char* attributes = attributeData.data();
-	BulkLoader attrBulk{ BulkLoader::BULK_ARRAY, {} };
+	BulkLoader attrBulk{ BulkType::BULK_ARRAY, {} };
 	attrBulk.descriptor.bytes = reinterpret_cast<const char*>(attributes);
 
 	for(u32 i = 0u; i < lod.numFaceAttribs; ++i) {
@@ -593,7 +593,7 @@ void BinaryLoader::read_compressed_face_materials(const ObjectState& object, con
 
 	std::vector<unsigned char> matData = decompress();
 	const u16* matIndices = reinterpret_cast<const u16*>(matData.data());
-	BulkLoader matsBulk{ BulkLoader::BULK_ARRAY, {} };
+	BulkLoader matsBulk{ BulkType::BULK_ARRAY, {} };
 	matsBulk.descriptor.bytes = reinterpret_cast<const char*>(matIndices);
 
 	if(polygon_set_material_idx_bulk(lod.lodHdl, 0, lod.numTriangles + lod.numQuads, &matsBulk) == INVALID_SIZE)
@@ -612,7 +612,7 @@ void BinaryLoader::read_compressed_sphere_attributes(const ObjectState& object, 
 								 + std::string(object.name) + "'");
 	std::vector<unsigned char> attributeData = decompress();
 	const unsigned char* attributes = attributeData.data();
-	BulkLoader attrBulk{ BulkLoader::BULK_ARRAY, {} };
+	BulkLoader attrBulk{ BulkType::BULK_ARRAY, {} };
 	attrBulk.descriptor.bytes = reinterpret_cast<const char*>(attributes);
 
 	for(u32 i = 0u; i < lod.numSphereAttribs; ++i) {

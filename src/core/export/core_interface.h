@@ -3,8 +3,9 @@
 #include "core_api.h"
 #include "texture_data.h"
 
-
+#ifdef __cplusplus
 extern "C" {
+#endif // __cplusplus
 
 #include <stdint.h>
 #include <stddef.h>
@@ -261,12 +262,13 @@ typedef struct {
 struct MaterialParamsStruct;
 
 typedef struct {
-	typedef struct {
-		float factor;
-		struct MaterialParamsStruct* mat;
-	} Layer;
-	Layer a;
-	Layer b;
+	float factor;
+	struct MaterialParamsStruct* mat;
+} BlendLayer;
+
+typedef struct {
+	BlendLayer a;
+	BlendLayer b;
 } BlendParams;
 typedef struct {
 	Vec2 refractionIndex;
@@ -274,16 +276,18 @@ typedef struct {
 	struct MaterialParamsStruct* b;
 } FresnelParams;
 
+typedef struct {
+	TextureHdl map;
+	TextureHdl maxMips;
+	float bias;
+	float scale;
+} MaterialParamsDisplacement;
+
 typedef struct MaterialParamsStruct {
 	Medium outerMedium;
 	MaterialParamType innerType;
 	TextureHdl alpha;
-	struct {
-		TextureHdl map;
-		TextureHdl maxMips;
-		float bias;
-		float scale;
-	} displacement;
+	MaterialParamsDisplacement displacement;
 	union {
 		LambertParams lambert;
 		TorranceParams torrance;
@@ -296,31 +300,33 @@ typedef struct MaterialParamsStruct {
 } MaterialParams;
 
 // Renderer parameter data
-enum ParameterType {
+typedef enum {
 	PARAM_INT,
 	PARAM_FLOAT,
 	PARAM_BOOL,
 	PARAM_ENUM
-};
+} ParameterType;
 
+
+typedef enum {
+	BULK_FILE,
+	BULK_ARRAY
+} BulkType;
 // Abstraction for bulk load
-struct BulkLoader {
-	enum BulkType {
-		BULK_FILE,
-		BULK_ARRAY
-	} type;
+typedef struct {
+	BulkType type;
 	union {
 		FILE* file;
 		const char* bytes;
 	} descriptor;
-};
+} BulkLoader;
 
-enum RenderDevice {
+typedef enum {
 	DEVICE_NONE = 0u,
 	DEVICE_CPU = 1u,
 	DEVICE_CUDA = 2u,
 	DEVICE_OPENGL = 4u
-};
+} RenderDevice;
 
 // TODO: how to handle errors
 
@@ -393,7 +399,7 @@ CORE_API Boolean CDECL object_get_id(ObjectHdl hdl, uint32_t* id);
 
 // Instance interface
 CORE_API Boolean CDECL instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat,
-														  const bool isWorldToInst);
+														  const Boolean isWorldToInst);
 CORE_API Boolean CDECL instance_get_transformation_matrix(InstanceHdl inst, Mat3x4* mat);
 CORE_API Boolean CDECL instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max, LodLevel lod);
 
@@ -662,4 +668,6 @@ CORE_API const char* CDECL core_get_dll_error();
 CORE_API Boolean CDECL core_set_log_level(LogLevel level);
 CORE_API Boolean CDECL core_set_lod_loader(Boolean (CDECL *func)(ObjectHdl, uint32_t));
 
-}
+#ifdef __cplusplus
+} // extern "C"
+#endif // __cplusplus

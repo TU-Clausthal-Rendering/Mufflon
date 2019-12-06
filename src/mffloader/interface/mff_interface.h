@@ -3,7 +3,9 @@
 #include "mff_api.h"
 #include "core_interface.h"
 
+#ifdef __cplusplus
 extern "C" {
+#endif // __cplusplus
 #include <stdint.h>
 
 typedef uint32_t Boolean;
@@ -32,6 +34,8 @@ LOADER_API const char* CDECL loader_profiling_get_total();
 LOADER_API const char* CDECL loader_profiling_get_total_and_snapshots();
 LOADER_API void CDECL loader_profiling_reset();
 
+#ifdef __cplusplus
 } // extern "C"
+#endif // __cplusplus
 
 // TODO: C interface

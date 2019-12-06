@@ -424,21 +424,21 @@ VertexHdl polygon_add_vertex_bulk(LodHdl lvlDtl, size_t count, const BulkLoader*
 	std::unique_ptr<util::ArrayStreamBuffer> pointBuffer;
 	std::unique_ptr<util::ArrayStreamBuffer> normalBuffer;
 	std::unique_ptr<util::ArrayStreamBuffer> uvBuffer;
-	if(points->type == BulkLoader::BULK_FILE) {
+	if(points->type == BulkType::BULK_FILE) {
 		pointReader = std::make_unique<util::FileReader>(points->descriptor.file);
 	} else {
 		pointBuffer = std::make_unique<util::ArrayStreamBuffer>(points->descriptor.bytes, count * sizeof(Vec3));
 		pointStream = std::make_unique<std::istream>(pointBuffer.get());
 		pointReader = std::make_unique<util::StreamReader>(*pointStream);
 	}
-	if(normals != nullptr && normals->type == BulkLoader::BULK_FILE) {
+	if(normals != nullptr && normals->type == BulkType::BULK_FILE) {
 		normalReader = std::make_unique<util::FileReader>(normals->descriptor.file);
 	} else if(normals != nullptr) {
 		normalBuffer = std::make_unique<util::ArrayStreamBuffer>(normals->descriptor.bytes, count * sizeof(Vec3));
 		normalStream = std::make_unique<std::istream>(normalBuffer.get());
 		normalReader = std::make_unique<util::StreamReader>(*normalStream);
 	}
-	if(uvs->type == BulkLoader::BULK_FILE) {
+	if(uvs->type == BulkType::BULK_FILE) {
 		uvReader = std::make_unique<util::FileReader>(uvs->descriptor.file);
 	} else {
 		uvBuffer = std::make_unique<util::ArrayStreamBuffer>(uvs->descriptor.bytes, count * sizeof(Vec2));
@@ -611,7 +611,7 @@ size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const VertexAttributeHdl
 	std::unique_ptr<util::IByteReader> attrReader;
 	std::unique_ptr<util::ArrayStreamBuffer> attrBuffer;
 	std::unique_ptr<std::istream> attrStream;
-	if(stream->type == BulkLoader::BULK_FILE) {
+	if(stream->type == BulkType::BULK_FILE) {
 		attrReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
 		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * elemSize);
@@ -651,7 +651,7 @@ size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const FaceAttributeHdl att
 	std::unique_ptr<util::IByteReader> attrReader;
 	std::unique_ptr<util::ArrayStreamBuffer> attrBuffer;
 	std::unique_ptr<std::istream> attrStream;
-	if(stream->type == BulkLoader::BULK_FILE) {
+	if(stream->type == BulkType::BULK_FILE) {
 		attrReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
 		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * elemSize);
@@ -689,7 +689,7 @@ size_t polygon_set_material_idx_bulk(LodHdl lvlDtl, FaceHdl startFace, size_t co
 	std::unique_ptr<util::IByteReader> matReader;
 	std::unique_ptr<util::ArrayStreamBuffer> matBuffer;
 	std::unique_ptr<std::istream> matStream;
-	if(stream->type == BulkLoader::BULK_FILE) {
+	if(stream->type == BulkType::BULK_FILE) {
 		matReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
 		matBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * sizeof(MaterialIndex));
@@ -803,7 +803,7 @@ SphereHdl spheres_add_sphere_bulk(LodHdl lvlDtl, size_t count, const BulkLoader*
 	std::unique_ptr<util::IByteReader> sphereReader;
 	std::unique_ptr<util::ArrayStreamBuffer> sphereBuffer;
 	std::unique_ptr<std::istream> sphereStream;
-	if(stream->type == BulkLoader::BULK_FILE) {
+	if(stream->type == BulkType::BULK_FILE) {
 		sphereReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
 		sphereBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * sizeof(ei::Sphere));
@@ -894,7 +894,7 @@ size_t spheres_set_attribute_bulk(LodHdl lvlDtl, const SphereAttributeHdl attr,
 	std::unique_ptr<util::IByteReader> attrReader;
 	std::unique_ptr<util::ArrayStreamBuffer> attrBuffer;
 	std::unique_ptr<std::istream> attrStream;
-	if(stream->type == BulkLoader::BULK_FILE) {
+	if(stream->type == BulkType::BULK_FILE) {
 		attrReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
 		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * elemSize);
@@ -930,7 +930,7 @@ size_t spheres_set_material_idx_bulk(LodHdl lvlDtl, SphereHdl startSphere, size_
 	std::unique_ptr<util::IByteReader> matReader;
 	std::unique_ptr<util::ArrayStreamBuffer> matBuffer;
 	std::unique_ptr<std::istream> matStream;
-	if(stream->type == BulkLoader::BULK_FILE) {
+	if(stream->type == BulkType::BULK_FILE) {
 		matReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
 		matBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * sizeof(MaterialIndex));
@@ -993,7 +993,7 @@ Boolean object_get_id(ObjectHdl obj, uint32_t* id) {
 }
 
 Boolean instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat,
-										   const bool isWorldToInst) {
+										   const Boolean isWorldToInst) {
 	TRY
 	CHECK_NULLPTR(inst, "instance handle", false);
 	CHECK_NULLPTR(mat, "transformation matrix", false);
@@ -3484,7 +3484,7 @@ Boolean render_save_screenshot(const char* filename, const char* targetName, Boo
 	const int numChannels = s_imageOutput->get_num_channels(targetName);
 	ei::IVec2 res{ s_imageOutput->get_width(), s_imageOutput->get_height() };
 
-	TextureData texData;
+	TextureData texData{};
 	texData.data = reinterpret_cast<uint8_t*>(data.get());
 	texData.components = numChannels;
 	texData.format = numChannels == 1 ? FORMAT_R32F : FORMAT_RGB32F;
@@ -3575,7 +3575,7 @@ Boolean render_save_denoised_radiance(const char* filename) {
 					   "; the screenshot possibly may not be created");
 
 	const int numChannels = s_imageOutput->get_num_channels("Radiance");
-	TextureData texData;
+	TextureData texData{};
 	texData.data = reinterpret_cast<uint8_t*>(output.get());
 	texData.components = numChannels;
 	texData.format = numChannels == 1 ? FORMAT_R32F : FORMAT_RGB32F;
