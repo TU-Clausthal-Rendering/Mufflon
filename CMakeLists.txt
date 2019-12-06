@@ -40,7 +40,7 @@ endif()
 # For whatever reason the arch flags may be in the wrong format, so we gotta fix that
 string(REGEX REPLACE "gencode;" "gencode=" ARCH_FLAGS "${ARCH_FLAGS}")
 # Since CMake's target_link_options does not pass options to nvlink yet, we have to set them globally to the NVCC flags...
-list(APPEND CUDA_NVCC_FLAGS "${ARCH_FLAGS}")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${ARCH_FLAGS}")
 
 # Only MSVC generators have C# support
 if(MSVC)
@@ -253,7 +253,6 @@ set_target_properties(core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 set_target_properties(core PROPERTIES CUDA_STANDARD 14)
 set_target_properties(core PROPERTIES CUDA_STANDARD_REQUIRED ON)
 target_compile_options(core PRIVATE
-	$<$<COMPILE_LANGUAGE:CUDA>:${ARCH_FLAGS}>
 	$<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 
 set_target_properties(${CXX_TARGETS}
