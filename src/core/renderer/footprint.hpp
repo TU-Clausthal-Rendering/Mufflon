@@ -252,25 +252,28 @@ public:
 		//	const float xNoProj = sqrt(f.m_xx * ei::abs(prevInCos));
 		//	const float Hs = mean_curvature * xNoProj * (1 + 1.0f / ei::abs(prevInCos)) * ei::sign(prevInCos);
 		//	const float Hs = mean_curvature * xNoProj * ei::sign(prevInCos);
-		//	const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
+			//const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
 			const float Hs = mean_curvature * atan(sqrt(f.m_xx)) * ei::sign(prevInCos);
 			if(prevInCos * prevOutCos < 0.0f && ei::abs(eta) > 1e-5f) {
 				// Refraction
-			//	float da = Hs * sqrt(2 * ei::PI);
-			//	f.m_a = (f.m_a + Hs) * eta - Hs;
-			//	f.m_a = (f.m_a + Hs * ei::abs(prevInCos / prevOutCos)) * eta - Hs;
-			//	f.m_a = f.m_a + Hs * ei::abs(prevInCos / prevOutCos) * eta - Hs;
-			//	f.m_a = (f.m_a + Hs * ei::abs(prevInCos)) * eta - Hs * ei::abs(prevOutCos);
-			//	f.m_a = eta * f.m_a + (eta * prevInCos + prevOutCos) * Hs;
+				//float da = Hs * sqrt(2 * ei::PI);
+				//f.m_a = (f.m_a + Hs) * eta - Hs;
+				f.m_a = (f.m_a + Hs * ei::abs(prevInCos / prevOutCos)) * eta - Hs;
+				//f.m_a = f.m_a + Hs * ei::abs(prevInCos / prevOutCos) * eta - Hs;
+				//f.m_a = (f.m_a + Hs * ei::abs(prevInCos)) * eta - Hs * ei::abs(prevOutCos);
+				//f.m_a = eta * f.m_a + (eta * prevInCos + prevOutCos) * Hs;
+				//f.m_a = f.m_a * eta + a2sar(Hs * ei::abs(prevInCos / prevOutCos) * eta - Hs);
+				//f.m_a = f.m_a * eta - (1.0f - eta) * Hs * sqrt(2*ei::PI);
 			} else {
 				// Reflection
 				//f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx) * ei::sign(prevOutCos);
 				//f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx / ei::abs(prevInCos)) * ei::sign(prevOutCos);
 				//f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx) * (prevOutCos);
-			//	f.m_a = f.m_a + 2 * Hs;
+				f.m_a = f.m_a + 2 * Hs;
 				//f.m_a += 2.0f * Hs * prevInCos;
+				//f.m_a = f.m_a + a2sar(2 * Hs);
 			}
-			f.m_a += ei::abs(Hs);
+			//f.m_a += ei::abs(Hs);
 			// Leave tangent space
 			f.m_xx *= ei::abs(prevOutCos);
 			// BRDF
@@ -293,6 +296,12 @@ private:
 	float m_xx = 0.0f;
 	float m_a = 0.0f;
 	float m_P = 1.0f;
+
+	// Angle -> sqrt(Solid Angle)
+	float a2sar(float a) const {
+		float s = ei::sgn(a);
+		return s * sqrt(2*ei::PI*(1.0f - cos(ei::abs(a))));
+	}
 };
 
 class FootprintV2Sq {
@@ -377,6 +386,6 @@ private:
 
 
 //using Footprint2D = Footprint2DCov;
-using Footprint2D = FootprintV0;
+using Footprint2D = FootprintV2;
 
 }} // namespace mufflon::renderer
