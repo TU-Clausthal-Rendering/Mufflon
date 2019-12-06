@@ -183,6 +183,7 @@ CUDA_FUNCTION u64 clz(u64 v) {
 	_BitScanReverse64(&out, v);
 	return (v == 0) ? 64 : 63 - out;
 #else
+	// TODO: This will not result in the correct value, since float can represent MUCH less values than 64 bit ints!
 	return (v == 0) ? 64 : 63 - (u64)log2f((float)v);
 #endif // _MSC_VER
 #endif // __CUDA_ARCH__
