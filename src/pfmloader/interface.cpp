@@ -1,5 +1,6 @@
 #include "plugin/texture_plugin_interface.h"
 #include "util/log.hpp"
+#include <cstring>
 #include <fstream>
 #include <stdexcept>
 #include <mutex>

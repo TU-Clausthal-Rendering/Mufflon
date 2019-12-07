@@ -6,6 +6,7 @@
 #include <gli/gli.hpp>
 #include <ei/conversions.hpp>
 #include <cuda_fp16.h>
+#include <cstring>
 #include <mutex>
 
 // Helper macros for error checking and logging

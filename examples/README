@@ -10,3 +10,6 @@ gcc example.o -o example -L"." -lcore -L"." -mffloader -Wl,rpath="$ORIGIN/."
 C++:
 g++ -std=c++17 -c -g -I"include" example.cpp
 g++ example.o -o example -L"." -lcore -L"." -mffloader -lstdc++fs -Wl,rpath="$ORIGIN/."
+
+
+BEWARE: There is currently a bug when combining gcc-8.3 and libstdc++6 leading to segfaults in std::filesystem::path. Since CUDA 10 doesn't support gcc-9 yet, be careful to compile the examples with gcc-8.3 as well!

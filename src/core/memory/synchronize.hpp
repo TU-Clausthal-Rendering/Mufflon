@@ -4,6 +4,8 @@
 #include "core/cuda/error.hpp"
 #include "core/opengl/gl_texture.hpp"
 #include "core/opengl/gl_buffer.hpp"
+#include <cstdlib>
+#include <cstring>
 
 namespace mufflon { // There is no memory namespace on purpose
 

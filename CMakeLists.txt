@@ -352,9 +352,9 @@ if(MSVC)
 		set_target_properties(opendenoise PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/OpenImageDenoise.lib")
 		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/bin/OpenImageDenoise.dll")
 		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/bin/OpenImageDenoise.dll")
-		set_target_properties(tbb PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_TBB_DIRECTORY}/Debug/lib/tbb_debug.lib")
+		set_target_properties(tbb PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_TBB_DIRECTORY}/Debug/lib/tbb.lib")
 		set_target_properties(tbb PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_TBB_DIRECTORY}/Release/lib/tbb.lib")
-		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_TBB_DIRECTORY}/Debug/bin/tbb_debug.dll")
+		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_TBB_DIRECTORY}/Debug/bin/tbb.dll")
 		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_TBB_DIRECTORY}/Release/bin/tbb.dll")
 		set_target_properties(tbbmalloc PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_TBB_DIRECTORY}/Debug/lib/tbbmalloc.lib")
 		set_target_properties(tbbmalloc PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_TBB_DIRECTORY}/Release/lib/tbbmalloc.lib")
@@ -362,7 +362,7 @@ if(MSVC)
 		set_target_properties(tbbmalloc PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_TBB_DIRECTORY}/Release/bin/tbbmalloc.dll")
 		install(FILES
 				"${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/bin/OpenImageDenoise.dll"
-				"${MUFFLON_TBB_DIRECTORY}/Debug/bin/tbb_debug.dll"
+				"${MUFFLON_TBB_DIRECTORY}/Debug/bin/tbb.dll"
 				"${MUFFLON_TBB_DIRECTORY}/Debug/bin/tbbmalloc.dll"
 			DESTINATION "."
 			CONFIGURATIONS Debug
@@ -499,8 +499,8 @@ if(MUFFLON_BUILD_GUI)
 endif(MUFFLON_BUILD_GUI)
 
 # Inter-target dependencies
-target_link_libraries(mffloader PRIVATE core ${CXX_FS_LIBRARY})
-target_link_libraries(core PRIVATE openmesh_core openmesh_tools ${CXX_FS_LIBRARY})
+target_link_libraries(mffloader PRIVATE ${CXX_FS_LIBRARY} core)
+target_link_libraries(core PRIVATE ${CXX_FS_LIBRARY} openmesh_core openmesh_tools)
 if(MUFFLON_ENABLE_OPEN_DENOISE)
 	target_link_libraries(core PRIVATE opendenoise tbb)
 	set_property(SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/interface.cpp"
@@ -586,8 +586,8 @@ if(WIN32)
 		add_custom_command(TARGET core PRE_BUILD
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
 				"${MUFFLON_OPENDENOISE_DIRECTORY}/$<CONFIG>/bin/OpenImageDenoise.dll"
-				"${MUFFLON_TBB_DIRECTORY}/$<CONFIG>/bin/tbb$<$<CONFIG:Debug>:_debug>.dll"
-				"${MUFFLON_TBB_DIRECTORY}/$<CONFIG>/bin/tbbmalloc$<$<CONFIG:Debug>:_debug>.dll"
+				"${MUFFLON_TBB_DIRECTORY}/$<CONFIG>/bin/tbb$.dll"
+				"${MUFFLON_TBB_DIRECTORY}/$<CONFIG>/bin/tbbmalloc.dll"
 				"${CMAKE_BINARY_DIR}/build/$<CONFIG>"
 		)
 	endif()
