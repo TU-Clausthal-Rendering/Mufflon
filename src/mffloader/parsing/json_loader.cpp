@@ -426,8 +426,10 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 		// Read common values
 		// Default camera planes depend on scene bounding box size
 		const float sceneDiag = ei::abs(ei::len(aabb.max - aabb.min));
-		const float near = read_opt<float>(m_state, camera, "near", DEFAULT_NEAR_PLANE * sceneDiag);
-		const float far = read_opt<float>(m_state, camera, "far", DEFAULT_FAR_PLANE * sceneDiag);
+		const float near = read_opt<float>(m_state, camera, "near",
+										   m_absoluteCamNearFar ? DEFAULT_NEAR_PLANE : (DEFAULT_NEAR_PLANE_FACTOR * sceneDiag));
+		const float far = read_opt<float>(m_state, camera, "far",
+										  m_absoluteCamNearFar ? DEFAULT_FAR_PLANE : (DEFAULT_FAR_PLANE_FACTOR * sceneDiag));
 		StringView type = read<const char*>(m_state, get(m_state, camera, "type"));
 		std::vector<ei::Vec3> camPath;
 		std::vector<ei::Vec3> camViewDir;
@@ -443,7 +445,7 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 		if(camUp.size() == 1u && (camPath.size() != 1u || camViewDir.size() != 1u))
 			camUp = std::vector<ei::Vec3>(camPath.size(), camUp.front());
 		if(camPath.size() == 1u && (camViewDir.size() != 1u || camUp.size() != 1u))
-			camPath = std::vector<ei::Vec3>(camViewDir.size(), camUp.front());
+			camPath = std::vector<ei::Vec3>(camViewDir.size(), camPath.front());
 
 		if(camPath.size() != camViewDir.size())
 			throw std::runtime_error("Mismatched camera path size (view direction)");
@@ -1017,10 +1019,11 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 		m_version = read<const char*>(m_state, versionIter);
 		if(m_version.compare(FILE_VERSION) != 0 && m_version.compare("1.0") != 0
 		   && m_version.compare("1.1") != 0 && m_version.compare("1.2")
-		   && m_version.compare("1.3") != 0)
+		   && m_version.compare("1.3") != 0 && m_version.compare("1.4") != 0)
 			logWarning("[JsonLoader::load_file] Scene file: version mismatch (",
 					   m_version, "(file) vs ", FILE_VERSION, "(current))");
 		hasWorldToInstTrans = (m_version.compare("1.4") == 0);
+		m_absoluteCamNearFar = (m_version.compare("1.5") == 0);
 		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");
 	}
 	// Binary file path
@@ -1106,7 +1109,7 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 	const bool deinstance = read_opt<bool>(m_state, document, "deinstance", false);
 	// Load the binary file before we load the rest of the JSON
 	if(!m_binLoader.load_file(binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods,
-							  deinstance, hasWorldToInstTrans))
+							  deinstance, hasWorldToInstTrans, m_absoluteCamNearFar))
 		return false;
 
 	try {

@@ -18,7 +18,7 @@ In the case of multiple type choices, details on further mandatory properties wi
 Note that the number of scenarios is limited to 32.
 
     {
-        "version": "1.4",
+        "version": "1.5",
         "binary": "<file name relative to this json>",
         "defaultScenario": "<scenario name (from json.scenarios)>"  // OPTIONAL the scenario to load on startup.
                                                    // If none is given, the chosen scenario is unspecified
@@ -30,8 +30,8 @@ Note that the number of scenarios is limited to 32.
                 "path": [[x1,y1,z1], ...],    // List of vec3 (at least 1)
                 "viewDir": [[x1,y1,z1], ...], // List of vec3 with the same length as "path", not necessarily normalized
                 "up": [[x1,y1,z1], ...],      // OPTIONAL [0,1,0], must have the same length as "path" if defined, not necessarily normalized
-                "near": float,                // OPTIONAL >0 near clipping plane, Default: 1/10000 * scene size (diagonal of BB)
-                "far": float,                 // OPTIONAL >"near" far clipping plane, Default: 2 * scene size (diagonal of BB)
+                "near": float,                // OPTIONAL >0 near clipping plane, Default: 0.01
+                "far": float,                 // OPTIONAL >"near" far clipping plane, Default: 500
                 ...
             },
             "<name2>": {

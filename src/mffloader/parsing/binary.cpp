@@ -764,7 +764,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 
 		// We now have a valid instance: time to check if we have the required LoD
 		// Only do so for non-animated instances though to avoid loading all LoDs into memory
-		if(keyframe == 0xFFFFFFFF && !object_has_lod(m_objects[objId].objHdl, lod)) {
+		if((m_keepTrackOfAabb || keyframe == 0xFFFFFFFF) && !object_has_lod(m_objects[objId].objHdl, lod)) {
 			// We don't -> gotta load it
 			lod = read_lod(m_objects[objId], lod);
 		}
@@ -773,7 +773,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			throw std::runtime_error("Failed to set transformation matrix for instance of object ID "
 									 + std::to_string(objId));
 
-		if(keyframe == 0xFFFFFFFF) {
+		if(m_keepTrackOfAabb) {
 			ei::Box instanceAabb;
 			if(!instance_get_bounding_box(instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
 				throw std::runtime_error("Failed to get bounding box for instance of object ID "
@@ -819,11 +819,13 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 				read_lod(m_objects[i], lod);
 			}
 
-			ei::Box instanceAabb;
-			if(!instance_get_bounding_box(instHdl,  reinterpret_cast<Vec3*>(&instanceAabb.min),  reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
-				throw std::runtime_error("Failed to get bounding box for instance of object ID "
-										 + std::to_string(i));
-			m_aabb = ei::Box(m_aabb, instanceAabb);
+			if(m_keepTrackOfAabb) {
+				ei::Box instanceAabb;
+				if(!instance_get_bounding_box(instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
+					throw std::runtime_error("Failed to get bounding box for instance of object ID "
+											 + std::to_string(i));
+				m_aabb = ei::Box(m_aabb, instanceAabb);
+			}
 			++defaultCreatedInstances;
 		}
 	}
@@ -921,9 +923,11 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 							 const util::FixedHashMap<StringView, mufflon::u32>& objectLods,
 							 util::FixedHashMap<StringView, InstanceMapping>& instanceLods,
-							 const bool deinstance, const bool loadWorldToInstTrans) {
+							 const bool deinstance, const bool loadWorldToInstTrans,
+							 const bool keepTrackOfAabb) {
 	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::load_file");
 	m_loadWorldToInstTrans = loadWorldToInstTrans;
+	m_keepTrackOfAabb = keepTrackOfAabb;
 	m_filePath = std::move(file);
 	if(!fs::exists(m_filePath))
 		throw std::runtime_error("Binary file '" + m_filePath.string() + "' doesn't exist");

@@ -30,9 +30,11 @@ private:
 
 class JsonLoader {
 public:
-	static constexpr const char FILE_VERSION[] = "1.4";
-	static constexpr float DEFAULT_NEAR_PLANE = 1.e-4f;
-	static constexpr float DEFAULT_FAR_PLANE = 2.f;
+	static constexpr const char FILE_VERSION[] = "1.5";
+	static constexpr float DEFAULT_NEAR_PLANE_FACTOR = 1.e-4f;
+	static constexpr float DEFAULT_FAR_PLANE_FACTOR = 2.f;
+	static constexpr float DEFAULT_NEAR_PLANE = 0.01f;
+	static constexpr float DEFAULT_FAR_PLANE = 500.f;
 
 	JsonLoader(fs::path file) :
 		m_filePath(fs::canonical(file)),
@@ -83,6 +85,8 @@ private:
 	ParserState m_state;
 
 	binary::BinaryLoader m_binLoader;
+
+	bool m_absoluteCamNearFar = false;
 
 	// These are for aborting a load and keeping track of progress
 	std::atomic_bool m_abort = false;
