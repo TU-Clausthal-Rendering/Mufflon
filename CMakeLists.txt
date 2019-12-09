@@ -22,6 +22,7 @@ if(NOT OpenMP_CXX_FOUND)
 	message(WARNING "OpenMP is strongly recommended, as all CPU-side parallel code relies on it and will run serially without it")
 endif()
 
+option(BUILD_SHARED_LIBS "Build shared library" ON)
 # Option to be more strict on compilation
 option(MUFFLON_STRICT_COMPILATION "Enable W4/Wextra and WX/Werror" OFF)
 option(MUFFLON_ENABLE_OPEN_DENOISE "Enable OpenDenoise" ON)
@@ -181,9 +182,9 @@ source_group(deps\\stbi FILES ${STBI_SOURCE_LIST})
 source_group(bindings FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/pythonbinding/bindings.py")
 
 # Build artifacts (we include the deps sources to get them to show up in visual studio)
-add_library(core SHARED ${MUFFLON_CORE_SOURCE_LIST} ${CHINOISE_SOURCE_LIST} ${EPSILON_SOURCE_LIST} ${GLAD_SOURCE_LIST} ${CUB_SOURCE_LIST})
+add_library(core ${MUFFLON_CORE_SOURCE_LIST} ${CHINOISE_SOURCE_LIST} ${EPSILON_SOURCE_LIST} ${GLAD_SOURCE_LIST} ${CUB_SOURCE_LIST})
 add_library(gliloader MODULE ${MUFFLON_GLILOADER_SOURCE_LIST} ${EPSILON_SOURCE_LIST})
-add_library(mffloader SHARED ${MUFFLON_MFFLOADER_SOURCE_LIST} ${CHINOISE_SOURCE_LIST} ${EPSILON_SOURCE_LIST} ${MINIZ_SOURCE_LIST})
+add_library(mffloader ${MUFFLON_MFFLOADER_SOURCE_LIST} ${CHINOISE_SOURCE_LIST} ${EPSILON_SOURCE_LIST} ${MINIZ_SOURCE_LIST})
 add_library(pfmloader MODULE ${MUFFLON_PFMLOADER_SOURCE_LIST} ${EPSILON_SOURCE_LIST})
 add_library(stbiloader MODULE ${MUFFLON_STBILOADER_SOURCE_LIST} ${EPSILON_SOURCE_LIST} ${STBI_SOURCE_LIST})
 # Dependency library targets
@@ -193,6 +194,17 @@ if(MUFFLON_ENABLE_OPEN_DENOISE)
 	add_library(opendenoise SHARED IMPORTED)
 	add_library(tbb SHARED IMPORTED)
 	add_library(tbbmalloc SHARED IMPORTED)
+endif()
+
+# Check for link-time optimization support
+include(CheckIPOSupported)
+check_ipo_supported(RESULT LTO_SUPPORTED OUTPUT error)
+if(LTO_SUPPORTED)
+	message(STATUS "LTO supported and enabled")
+	set_property(TARGET core PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+	set_property(TARGET mffloader PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+else()
+	message(STATUS "LTO not supported")
 endif()
 
 # Set the libraries' headers for inclusion
@@ -295,7 +307,8 @@ if (MSVC)
 else()
 	foreach(TAR ${CXX_TARGETS})
 		# Enable warnings and treat them as errors
-		set(MUFFLON_WARNING_FLAGS -Wall -Wextra -Wno-comment -Wno-unknown-pragmas -Wno-class-memaccess)
+		set(MUFFLON_WARNING_FLAGS -Wall -Wextra -Wno-comment -Wno-unknown-pragmas -Wno-class-memaccess -Wno-unused-parameter
+		-Wno-unused-variable CACHE STRING "Standard warning flags")
 		if(MUFFLON_STRICT_COMPILATION)
 			target_compile_options(${TAR} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${MUFFLON_WARNING_FLAGS} -Werror>)
 		else(MUFFLON_STRICT_COMPILATION)
