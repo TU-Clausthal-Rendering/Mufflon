@@ -580,10 +580,11 @@ add_dependencies(core pythonbindings)
 # We could copy the shaders in one go, but on Windows there is a limit for the number of characters
 # a single command may have, so a loop is the safer call
 foreach(shader ${MUFFLON_SHADER_SOURCE_LIST})
+	get_filename_component(shader_name ${shader} NAME)
 	add_custom_command(TARGET core PRE_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
 			"${shader}"
-			"${CMAKE_BINARY_DIR}/build/$<CONFIG>/shader"
+			"${CMAKE_BINARY_DIR}/build/$<CONFIG>/shader/${shader_name}"
 	)
 endforeach()
 
@@ -599,7 +600,7 @@ if(WIN32)
 		add_custom_command(TARGET core PRE_BUILD
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
 				"${MUFFLON_OPENDENOISE_DIRECTORY}/$<CONFIG>/bin/OpenImageDenoise.dll"
-				"${MUFFLON_TBB_DIRECTORY}/$<CONFIG>/bin/tbb$.dll"
+				"${MUFFLON_TBB_DIRECTORY}/$<CONFIG>/bin/tbb.dll"
 				"${MUFFLON_TBB_DIRECTORY}/$<CONFIG>/bin/tbbmalloc.dll"
 				"${CMAKE_BINARY_DIR}/build/$<CONFIG>"
 		)
