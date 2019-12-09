@@ -14,18 +14,16 @@ TextureLoaderPlugin::TextureLoaderPlugin(fs::path path) :
 		if(has_function("can_load_texture_format")
 		   && has_function("can_store_texture_format")
 		   && has_function("load_texture")
-		   && has_function("store_texture")
-		   && has_function("set_logger")) {
+		   && has_function("store_texture")) {
 			m_canLoadFunc = load_function<bool, const char*>("can_load_texture_format");
 			m_canStoreFunc = load_function<bool, const char*>("can_store_texture_format");
 			m_loadFunc = load_function<bool, const char*, TextureData*>("load_texture");
 			m_storeFunc = load_function<bool, const char*, const TextureData*>("store_texture");
-			m_setLogger = load_function<void, void(*)(const char*, int)>("set_logger");
 		}
 
 		// If not (or something went wrong), we immediately close it again
 		if(m_canLoadFunc == nullptr || m_canStoreFunc == nullptr 
-		   || m_loadFunc == nullptr || m_storeFunc == nullptr || m_setLogger == nullptr)
+		   || m_loadFunc == nullptr || m_storeFunc == nullptr)
 			close();
 	}
 }
@@ -52,12 +50,6 @@ bool TextureLoaderPlugin::store(StringView filePath, const TextureData* texData)
 	if(!m_storeFunc)
 		throw std::runtime_error("No function bound for 'store'");
 	return m_storeFunc(&filePath[0u], texData);
-}
-
-void TextureLoaderPlugin::set_logger(void(*logCallback)(const char*, int)) {
-	if(!m_setLogger)
-		throw std::runtime_error("No function bound for 'set_logger'");
-	return m_setLogger(logCallback);
 }
 
 } // namespace mufflon

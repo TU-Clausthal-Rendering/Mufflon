@@ -134,12 +134,12 @@ private:
 };
 
 // Returns the texture size (see texture.hpp)
-inline __host__ __forceinline__ Pixel get_texture_size(const textures::ConstTextureDevHandle_t<Device::CPU>& texture) noexcept {
+__host__ __forceinline__ Pixel get_texture_size(const textures::ConstTextureDevHandle_t<Device::CPU>& texture) noexcept {
 	return { texture->get_width(), texture->get_height() };
 }
 
 // Returns the texture layer count (see texture.hpp)
-inline __host__ __forceinline__ u16 get_texture_layers(const textures::ConstTextureDevHandle_t<Device::CPU>& texture) noexcept {
+__host__ __forceinline__ u16 get_texture_layers(const textures::ConstTextureDevHandle_t<Device::CPU>& texture) noexcept {
 	return texture->get_num_layers();
 }
 

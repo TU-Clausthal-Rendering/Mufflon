@@ -2,7 +2,7 @@
 #include <glad/glad.h>
 #include "core/opengl/program_builder.hpp"
 #include "core/opengl/vertex_array_builder.hpp"
-#include "core/export/interface.h"
+#include "core/export/core_interface.h"
 
 namespace mufflon::renderer
 {

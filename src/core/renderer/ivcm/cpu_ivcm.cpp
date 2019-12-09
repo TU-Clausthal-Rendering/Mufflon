@@ -10,6 +10,7 @@
 #include "core/scene/lights/light_tree_sampling.hpp"
 
 #include <cn/rnd.hpp>
+#include <cmath>
 
 namespace mufflon::renderer {
 
@@ -17,6 +18,8 @@ namespace {
 
 static float s_curvScale;
 static int s_numPhotons;
+
+}
 
 // Extension which stores a partial result of the MIS-weight computation for speed-up.
 struct IvcmVertexExt {
@@ -30,7 +33,7 @@ struct IvcmVertexExt {
 	Footprint2D footprint;
 
 
-	CUDA_FUNCTION void init(const IvcmPathVertex& thisVertex,
+	inline CUDA_FUNCTION void init(const IvcmPathVertex& /*thisVertex*/,
 							const AreaPdf inAreaPdf,
 							const AngularPdf inDirPdf,
 							const float pChoice) {
@@ -40,15 +43,16 @@ struct IvcmVertexExt {
 		this->footprint.init(1.0f / (float(inAreaPdf) * sourceCount), 1.0f / (float(inDirPdf) * sourceCount), pChoice);
 	}
 
-	CUDA_FUNCTION void update(const IvcmPathVertex& prevVertex,
-							  const IvcmPathVertex& thisVertex,
-							  const math::PdfPair pdf,
-							  const Connection& incident,
-							  const Spectrum& throughput,
-							  const float continuationPropability,
-							  const Spectrum& transmission,
-							  const scene::SceneDescriptor<Device::CPU>& scene,
-							  int numPhotons) {
+	
+	inline CUDA_FUNCTION void update(const IvcmPathVertex& prevVertex,
+									 const IvcmPathVertex& thisVertex,
+									 const math::PdfPair pdf,
+									 const Connection& incident,
+									 const Spectrum& throughput,
+									 const float /*continuationPropability*/,
+									 const Spectrum& /*transmission*/,
+									 const scene::SceneDescriptor<Device::CPU>& scene,
+									 int numPhotons) {
 		float inCos = thisVertex.get_geometric_factor(incident.dir);
 		float outCos = prevVertex.get_geometric_factor(incident.dir);
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
@@ -77,11 +81,11 @@ struct IvcmVertexExt {
 			prevEta.eta, incident.distance, inCos, 1.0f);
 	}
 
-	CUDA_FUNCTION void update(const IvcmPathVertex& thisVertex,
-							  const scene::Direction& excident,
+	inline CUDA_FUNCTION void update(const IvcmPathVertex& /*thisVertex*/,
+							  const scene::Direction& /*excident*/,
 							  const VertexSample& sample,
-							  const scene::SceneDescriptor<Device::CPU>& scene,
-							  int numPhotons) {
+							  const scene::SceneDescriptor<Device::CPU>& /*scene*/,
+							  int /*numPhotons*/) {
 		pdfBack = sample.pdf.back;
 	}
 };
@@ -122,6 +126,8 @@ public:
 		return m_vertex ? m_vertex->get_eta(media) : IvcmPathVertex::RefractionInfo{1.0f, 0.0f};
 	}
 };
+
+namespace {
 
 // incidentF/incidentB: per vertex area pdfs
 // n: path length in segments
@@ -223,7 +229,7 @@ CpuIvcm::connect(const IvcmPathVertex& path0, const IvcmPathVertex& path1,
 	Spectrum bxdfProd = val0.value * val1.value;
 	float cosProd = val0.cosOut * val1.cosOut;//TODO: abs?
 	mAssert(cosProd >= 0.0f);
-	mAssert(!isnan(bxdfProd.x));
+	mAssert(!std::isnan(bxdfProd.x));
 	// Early out if there would not be a contribution (estimating the materials is usually
 	// cheaper than the any-hit test).
 	if(any(greater(bxdfProd, 0.0f)) && cosProd > 0.0f) {
@@ -305,8 +311,8 @@ void CpuIvcm::pre_reset() {
 }
 
 void CpuIvcm::post_reset() {
-	ResetEvent resetFlags { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
-								ResetEvent::ALL : get_reset_event() };
+	ResetEvent resetFlags { { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
+								ResetEvent::ALL : get_reset_event() } };
 	init_rngs(m_outputBuffer.get_num_pixels());
 	if(resetFlags.resolution_changed()) {
 		m_photonMapManager.resize(m_outputBuffer.get_num_pixels() * m_params.maxPathLength);
@@ -337,7 +343,7 @@ void CpuIvcm::post_reset() {
 }
 
 
-float CpuIvcm::get_density(const ei::Vec3& pos, const ei::Vec3& normal, float currentMergeRadius) const {
+float CpuIvcm::get_density(const ei::Vec3& pos, const ei::Vec3& normal, float /*currentMergeRadius*/) const {
 	//return m_density->get_density(pos, normal);
 	return m_density->get_density_interpolated(pos, normal);
 	/*currentMergeRadius *= currentMergeRadius;
@@ -364,7 +370,7 @@ float CpuIvcm::get_density(const ei::Vec3& pos, const ei::Vec3& normal, float cu
 }
 
 void CpuIvcm::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU IVCM iteration", ProfileLevel::LOW);
+	auto scope = Profiler::core().start<CpuProfileState>("CPU IVCM iteration", ProfileLevel::LOW);
 
 	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
 	if(m_params.progressive)
@@ -411,7 +417,7 @@ void CpuIvcm::iterate() {
 }
 
 
-void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeRadius) {
+void CpuIvcm::trace_photon(int idx, int numPhotons, u64 /*seed*/, float /*currentMergeRadius*/) {
 	math::RndSet2 rndStart { m_rngs[idx].next() };
 	u64 lightTreeRnd = m_rngs[idx].next();
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, lightTreeRnd, rndStart);
@@ -419,7 +425,7 @@ void CpuIvcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMerge
 	IvcmPathVertex::create_light(&vertex, nullptr, p);
 	const IvcmPathVertex* previous = m_photonMap.insert(p.initVec, vertex);
 	Spectrum throughput { 1.0f };
-	float mergeArea = ei::PI * currentMergeRadius * currentMergeRadius;
+	//float mergeArea = ei::PI * currentMergeRadius * currentMergeRadius;
 
 	int pathLen = 0;
 	while(pathLen < m_params.maxPathLength-1) { // -1 because there is at least one segment on the view path
@@ -467,7 +473,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 				Pixel outCoord = coord;
 				auto conVal = connect(*currentVertex, *lightVertex, outCoord, mergeArea, numPhotons, reuseCount, incidentF, incidentB);
 				if(outCoord.x != -1) {
-					mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.x) && !isnan(currentVertex->ext().throughput.x));
+					mAssert(!std::isnan(conVal.cosines) && !std::isnan(conVal.bxdfs.x) && !std::isnan(throughput.x) && !std::isnan(currentVertex->ext().throughput.x));
 					m_outputBuffer.contribute<RadianceTarget>(outCoord, throughput * lightVertex->ext().throughput * conVal.cosines * conVal.bxdfs);
 				}
 			}
@@ -531,7 +537,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 				emission.value *= misWeight;
 				m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 			}
-			mAssert(!isnan(emission.value.x));
+			mAssert(!std::isnan(emission.value.x));
 		}//*/
 		if(currentVertex->is_end_point()) break;
 
@@ -562,8 +568,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 						float newCos = dot(currentVertex->get_geometric_normal(), photonDir);
 						area *= ei::max(0.0f, origCos / newCos);
 						if(area > 0.0f && dot(currentVertex->get_geometric_normal(), photon.get_geometric_normal()) > 0.0f) {
-							if(std::isnan(area))
-								__debugbreak();
+							mAssert(!std::isnan(area));
 							if(photonDist < closestDensityMerge) {
 							//if(1/area > density) {
 								density = 1.0f / (area + 1e-8f);
@@ -593,8 +598,7 @@ static float ivcm_heuristic(int numPhotons, float a0, float a1) {
 	aR *= aR;
 	float count = (1.0f + aR) / (1.0f / numPhotons + aR);
 	mAssert(count >= 1.0f);
-//	if(std::isnan(count))
-//		__debugbreak();
+//	mAssert(!std::isnan(count));
 	return count;
 }
 

@@ -9,7 +9,7 @@ namespace mufflon { namespace scene { namespace lights {
 
 // Sets the medium of a given light by tracing a ray in the scene and determining
 // the medium of the hitpoint
-CUDA_FUNCTION void set_light_medium(char* mem, LightType type, const SceneDescriptor<CURRENT_DEV>& scene) {
+inline CUDA_FUNCTION void set_light_medium(char* mem, LightType type, const SceneDescriptor<CURRENT_DEV>& scene) {
 	switch(type) {
 		case LightType::POINT_LIGHT:
 			reinterpret_cast<PointLight*>(mem)->mediumIndex = materials::get_point_medium(scene, reinterpret_cast<PointLight*>(mem)->position);

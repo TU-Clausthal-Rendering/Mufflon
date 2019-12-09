@@ -1,5 +1,3 @@
-#pragma once
-
 #include "hybrid_pt.hpp"
 #include "pt_common.hpp"
 #include "profiler/cpu_profiler.hpp"
@@ -48,7 +46,7 @@ void HybridPathTracer::iterate() {
 }
 
 void HybridPathTracer::iterate_cpu() {
-	//auto scope = Profiler::instance().start<CpuProfileState>("Hybrid PT CPU iteration", ProfileLevel::HIGH);
+	//auto scope = Profiler::core().start<CpuProfileState>("Hybrid PT CPU iteration", ProfileLevel::HIGH);
 
 	m_sceneDescCpu.lightTree.posGuide = m_params.neeUsePositionGuide;
 
@@ -65,9 +63,9 @@ void HybridPathTracer::iterate_cpu() {
 
 void HybridPathTracer::iterate_cuda(const std::chrono::high_resolution_clock::time_point& begin,
 									std::promise<std::chrono::high_resolution_clock::duration>&& duration) {
-	//auto scope = Profiler::instance().start<CpuProfileState>("Hybrid PT CUDA iteration", ProfileLevel::HIGH);
+	//auto scope = Profiler::core().start<CpuProfileState>("Hybrid PT CUDA iteration", ProfileLevel::HIGH);
 
-	//auto scope = Profiler::instance().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
+	//auto scope = Profiler::core().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
 	copy(&m_sceneDescCuda->lightTree.posGuide, &m_params.neeUsePositionGuide, sizeof(bool));
 	cuda::check_error(hybridpt_detail::call_kernel(std::move(m_outputBufferCuda),
 												   m_sceneDescCuda.get(), m_rngsCuda.get(),

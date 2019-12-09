@@ -52,7 +52,7 @@ public:
 	const StringView get_key(std::size_t index) const {
 		return *m_mapKeyStore.at(index);
 	}
-	const std::size_t get_index(StringView name) const {
+	std::size_t get_index(StringView name) const {
 		return m_map.at(name);
 	}
 

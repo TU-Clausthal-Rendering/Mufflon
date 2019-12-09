@@ -31,26 +31,26 @@ enum class Interaction : u16 {
 	LIGHT_AREA,			// An area-light vertex
 };
 
-CUDA_FUNCTION bool is_end_point(Interaction type) {
+inline CUDA_FUNCTION bool is_end_point(Interaction type) {
 	return type != Interaction::SURFACE;
 }
-CUDA_FUNCTION bool is_surface(Interaction type) {
+inline CUDA_FUNCTION bool is_surface(Interaction type) {
 	return type == Interaction::SURFACE
 		|| type == Interaction::LIGHT_AREA;
 }
-CUDA_FUNCTION bool is_orthographic(Interaction type) {
+inline CUDA_FUNCTION bool is_orthographic(Interaction type) {
 	return type == Interaction::LIGHT_DIRECTIONAL
 		|| type == Interaction::LIGHT_ENVMAP
 		|| type == Interaction::CAMERA_ORTHO
 		|| type == Interaction::VOID;
 }
-CUDA_FUNCTION bool is_camera(Interaction type) {
+inline CUDA_FUNCTION bool is_camera(Interaction type) {
 	return type == Interaction::CAMERA_PINHOLE
 		|| type == Interaction::CAMERA_FOCUS
 		|| type == Interaction::CAMERA_ORTHO;
 }
 
-CUDA_FUNCTION bool is_hitable(Interaction type) {
+inline CUDA_FUNCTION bool is_hitable(Interaction type) {
 	return type == Interaction::SURFACE
 		|| type == Interaction::LIGHT_AREA
 		|| type == Interaction::LIGHT_ENVMAP
@@ -60,7 +60,7 @@ CUDA_FUNCTION bool is_hitable(Interaction type) {
 // Braced-inherited initialization is only part of C++17...
 struct VertexSample : public math::PathSample {
 	VertexSample() = default;
-	CUDA_FUNCTION VertexSample(math::PathSample pathSample, scene::Point origin,
+	inline CUDA_FUNCTION VertexSample(math::PathSample pathSample, scene::Point origin,
 				 scene::materials::MediumHandle medium) :
 		math::PathSample(pathSample),
 		origin(origin),
@@ -79,7 +79,7 @@ struct Connection : public ConnectionDir {
 	scene::Point v0;			// Origin / reference location of the first vertex
 	float distance;				// Distance between v0 and v1 or MAX_SCENE_SIZE for orthographic connections
 
-	CUDA_FUNCTION Connection(const scene::Direction& dir, float distanceSq,
+	inline CUDA_FUNCTION Connection(const scene::Direction& dir, float distanceSq,
 							 const scene::Point& v0, float distance) :
 		ConnectionDir{dir, distanceSq},
 		v0{v0},
@@ -88,12 +88,12 @@ struct Connection : public ConnectionDir {
 };
 
 struct EmissionValue : public math::SampleValue, public scene::lights::LightPdfs {
-	CUDA_FUNCTION EmissionValue(const Spectrum& radiance, AngularPdf pdf, AreaPdf emitPdf, AreaPdf connectPdf) :
+	inline CUDA_FUNCTION EmissionValue(const Spectrum& radiance, AngularPdf pdf, AreaPdf emitPdf, AreaPdf connectPdf) :
 		math::SampleValue{radiance, pdf},
 		scene::lights::LightPdfs{emitPdf, connectPdf}
 	{}
 
-	CUDA_FUNCTION EmissionValue() :
+	inline CUDA_FUNCTION EmissionValue() :
 		math::SampleValue{Spectrum{0.0f}, AngularPdf{0.0f}},
 		scene::lights::LightPdfs{AreaPdf{0.0f}, AreaPdf{0.0f}}
 	{}
@@ -116,18 +116,18 @@ struct EmissionValue : public math::SampleValue, public scene::lights::LightPdfs
 template < typename ExtensionT >
 class PathVertex {
 public:
-	CUDA_FUNCTION PathVertex() : m_type(Interaction::VOID) {}
+	inline CUDA_FUNCTION PathVertex() : m_type(Interaction::VOID) {}
 
-	CUDA_FUNCTION bool is_end_point() const { return renderer::is_end_point(m_type); }
-	CUDA_FUNCTION bool is_surface() const { return renderer::is_surface(m_type); }
-	CUDA_FUNCTION bool is_orthographic() const { return renderer::is_orthographic(m_type); }
-	CUDA_FUNCTION bool is_camera() const { return renderer::is_camera(m_type); }
-	CUDA_FUNCTION bool is_hitable() const { return renderer::is_hitable(m_type); }
-	CUDA_FUNCTION Interaction get_type() const { return m_type; }
+	inline CUDA_FUNCTION bool is_end_point() const { return renderer::is_end_point(m_type); }
+	inline CUDA_FUNCTION bool is_surface() const { return renderer::is_surface(m_type); }
+	inline CUDA_FUNCTION bool is_orthographic() const { return renderer::is_orthographic(m_type); }
+	inline CUDA_FUNCTION bool is_camera() const { return renderer::is_camera(m_type); }
+	inline CUDA_FUNCTION bool is_hitable() const { return renderer::is_hitable(m_type); }
+	inline CUDA_FUNCTION Interaction get_type() const { return m_type; }
 
 	// Get the position of the vertex. For orthographic vertices this
 	// position is computed with respect to a referencePosition.
-	CUDA_FUNCTION scene::Point get_position(const scene::Point& referencePosition) const {
+	inline CUDA_FUNCTION scene::Point get_position(const scene::Point& referencePosition) const {
 		if(m_type == Interaction::LIGHT_DIRECTIONAL
 			|| m_type == Interaction::LIGHT_ENVMAP)
 			return referencePosition - get_incident_direction() * scene::MAX_SCENE_SIZE; // Go max entities out -- should be far enough away for shadow tests
@@ -137,18 +137,18 @@ public:
 	}
 
 	// Get the position of the vertex. For orthographic vertices zero is returned
-	CUDA_FUNCTION scene::Point get_position() const {
+	inline CUDA_FUNCTION scene::Point get_position() const {
 		if(is_orthographic()) return scene::Point{0.0f};
 		return m_position;
 	}
 
 	// The incident direction, or undefined for end vertices (may be abused by end vertices).
 	// The direction points towards the surface.
-	CUDA_FUNCTION scene::Direction get_incident_direction() const {
+	inline CUDA_FUNCTION scene::Direction get_incident_direction() const {
 		float z = ei::sgn(m_incidentEncoded.z) * sqrt(ei::clamp(1.0f - m_incidentEncoded.x * m_incidentEncoded.x - m_incidentEncoded.y * m_incidentEncoded.y, 0.0f, 1.0f));
 		return {m_incidentEncoded.x, m_incidentEncoded.y, z};
 	}
-	CUDA_FUNCTION void set_incident_direction(const scene::Direction& incident, const float distance) {
+	inline CUDA_FUNCTION void set_incident_direction(const scene::Direction& incident, const float distance) {
 		m_incidentEncoded.x = incident.x;
 		m_incidentEncoded.y = incident.y;
 		m_incidentEncoded.z = distance * ei::sgn(incident.z);
@@ -157,7 +157,7 @@ public:
 	// Get the 'cosθ' of the vertex for the purpose of AreaPdf::to_area_pdf(cosθ, distSq);
 	// This method ensures compatibility with any kind of interaction.
 	// connection: a direction with arbitrary orientation
-	CUDA_FUNCTION float get_geometric_factor(const scene::Direction& connection) const {
+	inline CUDA_FUNCTION float get_geometric_factor(const scene::Direction& connection) const {
 		switch(m_type) {
 			case Interaction::LIGHT_AREA: {
 				return dot(connection, m_incidentEncoded);
@@ -170,12 +170,13 @@ public:
 			case Interaction::VOID: {
 				return 1.0f;
 			}
+			default: mAssert(false); break;
 		}
 		return 0.0f;
 	}
 
 	// Get a normal if there is any. Otherwise returns a 0-vector.
-	CUDA_FUNCTION scene::Direction get_normal() const {
+	inline CUDA_FUNCTION scene::Direction get_normal() const {
 		if(m_type == Interaction::LIGHT_AREA) {
 			return m_incidentEncoded;
 		}
@@ -184,7 +185,7 @@ public:
 		}
 		return scene::Direction{0.0f};
 	}
-	CUDA_FUNCTION scene::Direction get_geometric_normal() const {
+	inline CUDA_FUNCTION scene::Direction get_geometric_normal() const {
 		if(m_type == Interaction::LIGHT_AREA) {
 			return m_incidentEncoded;
 		}
@@ -194,7 +195,7 @@ public:
 		return scene::Direction{0.0f};
 	}
 
-	CUDA_FUNCTION const scene::TangentSpace* get_tangent_space() const {
+	inline CUDA_FUNCTION const scene::TangentSpace* get_tangent_space() const {
 		if(m_type == Interaction::SURFACE) {
 			return &m_desc.surface.tangentSpace;
 		}
@@ -204,7 +205,7 @@ public:
 	// Convert a sampling pdf (areaPdf for orthographic vertices, angular otherwise)
 	// into an areaPdf at this vertex.
 	struct PdfConversionResult{ AreaPdf pdf; float geoFactor; };
-	CUDA_FUNCTION PdfConversionResult
+	inline CUDA_FUNCTION PdfConversionResult
 	convert_pdf(Interaction sourceType, AngularPdf samplePdf,
 				const ConnectionDir& connection) const {
 		if(sourceType == Interaction::VIRTUAL)
@@ -221,9 +222,9 @@ public:
 	}
 
 	// Get the path length in segments up to this vertex.
-	CUDA_FUNCTION int get_path_len() const { return m_pathLen; }
+	inline CUDA_FUNCTION int get_path_len() const { return m_pathLen; }
 	// Overwrite path length (e.g. if the previous element is not set/changed for this vertex)
-	CUDA_FUNCTION void set_path_len(int l) { m_pathLen = l; }
+	inline CUDA_FUNCTION void set_path_len(int l) { m_pathLen = l; }
 
 	// Get the sampling PDFs of this vertex (not defined, if
 	// the vertex is an end point on a surface). Details at the members
@@ -241,7 +242,7 @@ public:
 	//		For shading normal correction in merges it is necessary to know the
 	//		cosines at the other vertex. Note that merges are always evaluated
 	//		at the view path vertex.
-	CUDA_FUNCTION math::EvalValue evaluate(const scene::Direction& excident,
+	inline CUDA_FUNCTION math::EvalValue evaluate(const scene::Direction& excident,
 							 const scene::materials::Medium* media,
 							 Pixel& coord,
 							 bool adjoint = false,
@@ -271,19 +272,20 @@ public:
 				cameras::ProjectionResult proj = pinholecam_project(m_desc.pinholeCam, excident);
 				coord = proj.coord;
 				return math::EvalValue{ Spectrum{ proj.w }, 1.0f,
-										proj.pdf, AngularPdf{ 0.0f } };
+										{ proj.pdf, AngularPdf{ 0.0f } } };
 			}
 			case Interaction::CAMERA_FOCUS: {
 				// TODO: fractional pixel coords?
 				cameras::ProjectionResult proj = focuscam_project(m_desc.focusCam, m_position, excident);
 				coord = proj.coord;
 				return math::EvalValue{ Spectrum{ proj.w }, 1.0f,
-										proj.pdf, AngularPdf{ 0.0f } };
+										{ proj.pdf, AngularPdf{ 0.0f } } };
 			}
 			case Interaction::SURFACE: {
 				return materials::evaluate(m_desc.surface.tangentSpace, m_desc.surface.material,
 										   get_incident_direction(), excident, media, adjoint, lightNormal);
 			}
+			default: mAssert(false); break;
 		}
 		return math::EvalValue{};
 	}
@@ -292,7 +294,7 @@ public:
 	 * Create a new outgoing direction. This method can be used in a loop
 	 * to fully Monte Carlo integrate the rendering equation at this vertex.
 	 */
-	CUDA_FUNCTION VertexSample sample(const ei::Box& sceneBounds,
+	inline CUDA_FUNCTION VertexSample sample(const ei::Box& sceneBounds,
 						const scene::materials::Medium* media,
 						const math::RndSet2_1& rndSet,
 						bool adjoint = false
@@ -347,42 +349,42 @@ public:
 				float side = dot(s.excident, m_desc.surface.tangentSpace.geoN);
 				return VertexSample{ s, m_position, m_desc.surface.material.get_medium(side) };
 			}
+			default: mAssert(false); break;
 		}
 		return VertexSample{};
 	}
 
 	// Compute the squared distance to the previous vertex. 0 if this is a start vertex.
-	CUDA_FUNCTION float get_incident_dist_sq() const {
+	inline CUDA_FUNCTION float get_incident_dist_sq() const {
 		if(is_end_point()) return 0.0f;
 		return ei::sq(m_incidentEncoded.z);
 	}
-	CUDA_FUNCTION float get_incident_dist() const {
+	inline CUDA_FUNCTION float get_incident_dist() const {
 		if(is_end_point()) return 0.0f;
 		return ei::abs(m_incidentEncoded.z);
 	}
 
-	CUDA_FUNCTION ConnectionDir get_incident_connection() const {
+	inline CUDA_FUNCTION ConnectionDir get_incident_connection() const {
 		return { get_incident_direction(), get_incident_dist_sq() };
 	}
 
 	// Get the previous path vertex or nullptr if this is a start vertex.
-	CUDA_FUNCTION const PathVertex* previous() const {
+	inline CUDA_FUNCTION const PathVertex* previous() const {
 		return m_previous;
 	}
 
 	// Access to the renderer dependent extension
-	CUDA_FUNCTION ExtensionT& ext() const { return m_extension; }
+	inline CUDA_FUNCTION ExtensionT& ext() const { return m_extension; }
 
 	/*
 	* Compute the connection vector from path0 to path1.
 	* This is a non-trivial operation because of special cases like directional lights and
 	* orthographic cammeras.
 	*/
-	CUDA_FUNCTION static Connection get_connection(const PathVertex& path0, const PathVertex& path1) {
+	inline CUDA_FUNCTION static Connection get_connection(const PathVertex& path0, const PathVertex& path1) {
 		mAssert(is_connection_possible(path0, path1));
 		// Special cases
 		if(path0.is_orthographic()) {	// p0 has no position
-			const scene::Direction incident = path0.get_incident_direction();
 			return { path0.m_incidentEncoded, 1.0f,
 					 path1.m_position - path0.m_incidentEncoded * scene::MAX_SCENE_SIZE, scene::MAX_SCENE_SIZE };
 		}
@@ -397,18 +399,18 @@ public:
 		return { sdiv(connection, dist), distSq, path0.m_position, dist };
 	}
 
-	CUDA_FUNCTION static bool is_connection_possible(const PathVertex& path0, const PathVertex& path1) {
+	inline CUDA_FUNCTION static bool is_connection_possible(const PathVertex& path0, const PathVertex& path1) {
 		// Enumerate cases which are not connectible
 		return !(
-			path0.is_orthographic() && path1.is_orthographic()	// Two orthographic vertices
-		 || path0.is_orthographic() && path1.is_camera()		// Orthographic light source with camera
-		 || path0.is_camera() && path1.is_orthographic()
+			(path0.is_orthographic() && path1.is_orthographic())	// Two orthographic vertices
+		 || (path0.is_orthographic() && path1.is_camera())			// Orthographic light source with camera
+		 || (path0.is_camera() && path1.is_orthographic())
 		);
 		// TODO: camera clipping here? Seems to be the best location
 	}
 
 	// connectPdf: compute the emit_pdf() for area lights, otherwise compute connect_pdf()
-	CUDA_FUNCTION EmissionValue get_emission(const scene::SceneDescriptor<CURRENT_DEV>& scene, const ei::Vec3& prevPosition) const {
+	inline CUDA_FUNCTION EmissionValue get_emission(const scene::SceneDescriptor<CURRENT_DEV>& scene, const ei::Vec3& prevPosition) const {
 		switch(m_type) {
 			case Interaction::VOID: {
 				math::EvalValue background = evaluate_background(scene.lightTree.background, m_incidentEncoded);
@@ -443,11 +445,12 @@ public:
 				}
 				return { matValue.value, matValue.pdf, startPdf.emitPdf, startPdf.connectPdf };
 			}
+			default: mAssert(false); break;
 		}
 		return EmissionValue{};
 	}
 
-	CUDA_FUNCTION Spectrum get_albedo() const {
+	inline CUDA_FUNCTION Spectrum get_albedo() const {
 		if(m_type == Interaction::SURFACE) {
 			return scene::materials::albedo(m_desc.surface.material);
 		}
@@ -457,7 +460,7 @@ public:
 		return Spectrum{0.0f};
 	}
 
-	CUDA_FUNCTION scene::materials::MediumHandle get_medium(const scene::Direction& dir) const {
+	inline CUDA_FUNCTION scene::materials::MediumHandle get_medium(const scene::Direction& dir) const {
 		switch(m_type) {
 			case Interaction::VOID: return scene::materials::MediumHandle{};
 			case Interaction::LIGHT_POINT: return m_desc.pointLight.medium;
@@ -471,11 +474,12 @@ public:
 				float side = dot(dir, m_desc.surface.tangentSpace.geoN);
 				return m_desc.surface.material.get_medium(side);
 			}
+			default: mAssert(false); break;
 		}
 		return scene::materials::MediumHandle{};
 	}
 
-	CUDA_FUNCTION scene::PrimitiveHandle get_primitive_id() const {
+	inline CUDA_FUNCTION scene::PrimitiveHandle get_primitive_id() const {
 		if(m_type == Interaction::SURFACE) {
 			return m_desc.surface.primitiveId;
 		}
@@ -485,7 +489,7 @@ public:
 
 	// Get the surface parametrization (st) of the primitive. Only defined for
 	// surface vertices
-	CUDA_FUNCTION ei::Vec2 get_surface_params() const {
+	inline CUDA_FUNCTION ei::Vec2 get_surface_params() const {
 		if(m_type == Interaction::SURFACE) {
 			return m_desc.surface.surfaceParams;
 		}
@@ -493,7 +497,7 @@ public:
 	}
 
 	// TODO: for other vertices than surfaces
-	CUDA_FUNCTION float get_pdf_max() const {
+	inline CUDA_FUNCTION float get_pdf_max() const {
 		if(m_type == Interaction::SURFACE) {
 			return pdf_max(m_desc.surface.material);
 		}
@@ -506,7 +510,7 @@ public:
 		float inCos;	// Incident cosine
 	//	float outCos;	// Outgoing cosine after Fresnel
 	};
-	CUDA_FUNCTION RefractionInfo get_eta(const scene::materials::Medium* media) const {
+	inline CUDA_FUNCTION RefractionInfo get_eta(const scene::materials::Medium* media) const {
 		if(m_type == Interaction::SURFACE) {
 			float inCos = -dot(get_incident_direction(), m_desc.surface.tangentSpace.shadingN);
 			scene::materials::MediumHandle mIn = m_desc.surface.material.get_medium(inCos);
@@ -528,7 +532,7 @@ public:
 	 * instances.															   *
 	 * Return the size of the created vertex								   *
 	************************************************************************* */
-	CUDA_FUNCTION static int create_camera(void* mem, const void* previous,
+	inline CUDA_FUNCTION static int create_camera(void* mem, const void* previous,
 		const cameras::CameraParams& camera,
 		const Pixel& pixel,
 		const math::RndSet2& rndSet
@@ -561,7 +565,7 @@ public:
 		return 0;
 	}
 
-	CUDA_FUNCTION static int create_light(void* mem, const void* previous,
+	inline CUDA_FUNCTION static int create_light(void* mem, const void* previous,
 		const scene::lights::Emitter& lightSample	// Positional sample for the starting point on a light source
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
@@ -617,19 +621,20 @@ public:
 				vert->ext().init(*vert, AreaPdf::infinite(), AngularPdf{lightSample.pdf}, lightSample.pChoice);
 				return (int)round_to_align<8u>( this_size() + sizeof(DirLightDesc) );
 			}
+			default: mAssert(false); break;
 		}
 		return 0;
 	}
 
-	CUDA_FUNCTION static int create_surface(void* mem, const void* previous,
+	inline CUDA_FUNCTION static int create_surface(void* mem, const void* previous,
 		const scene::accel_struct::RayIntersectionResult& hit,
 		const scene::materials::MaterialDescriptorBase& material,
 		const scene::Point& position,
 		const scene::TangentSpace& tangentSpace,
 		const scene::Direction& incident
 	) {
-		Interaction prevEventType = (previous != nullptr) ?
-			as<PathVertex>(previous)->get_type() : Interaction::VIRTUAL;
+		//Interaction prevEventType = (previous != nullptr) ?
+		//	as<PathVertex>(previous)->get_type() : Interaction::VIRTUAL;
 		PathVertex* vert = as<PathVertex>(mem);
 		vert->m_position = position;
 		vert->m_previous = mem != previous ? static_cast<const PathVertex*>(previous) : nullptr;
@@ -646,7 +651,7 @@ public:
 			+ size);
 	}
 
-	CUDA_FUNCTION static int create_void(void* mem, const void* previous,
+	inline CUDA_FUNCTION static int create_void(void* mem, const void* previous,
 										 const scene::Direction& incident
 	) {
 		PathVertex* vert = as<PathVertex>(mem);
@@ -725,7 +730,7 @@ private:
 
 	// Dynamic sized descriptor. Must be the last member!
 	union Desc {
-		CUDA_FUNCTION Desc() {}
+		inline CUDA_FUNCTION Desc() {}
 		AreaLightDesc areaLight;
 		SpotLightDesc spotLight;
 		PointLightDesc pointLight;
@@ -748,14 +753,14 @@ private:
 struct VertexExtension {
 	// The init function gets called at the end of vertex creation
 	// for start vertices (lights and cameras).
-	CUDA_FUNCTION void init(const PathVertex<VertexExtension>& thisVertex,
-							const AreaPdf incidentAreaPdf,
-							const AngularPdf incidentDirPdf,
-							const float pChoice)
+	inline CUDA_FUNCTION void init(const PathVertex<VertexExtension>& /*thisVertex*/,
+							const AreaPdf /*incidentAreaPdf*/,
+							const AngularPdf /*incidentDirPdf*/,
+							const float /*pChoice*/)
 	{}
 
 	// Helper to convert the parameters of the init call into a start-pdf for mis
-	CUDA_FUNCTION static AreaPdf mis_start_pdf(const AreaPdf inAreaPdf,
+	inline CUDA_FUNCTION static AreaPdf mis_start_pdf(const AreaPdf inAreaPdf,
 								 const AngularPdf inDirPdf,
 								 const float pChoice) {
 		if(!inAreaPdf.is_infinite())
@@ -770,17 +775,17 @@ struct VertexExtension {
 	// throughput: Throughput of entire subpath (all events + absorption)
 	// continuationPropability: The probability of Russion roulette after
 	//	sampling at prevVertex.
-	CUDA_FUNCTION void update(const PathVertex<VertexExtension>& prevVertex,
-							  const PathVertex<VertexExtension>& thisVertex,
-							  const math::PdfPair pdf,
-							  const Connection& inDir,
-							  const Spectrum& throughput,
-							  const float continuationPropability,
-							  const Spectrum& transmission)
+	inline CUDA_FUNCTION void update(const PathVertex<VertexExtension>& /*prevVertex*/,
+							  const PathVertex<VertexExtension>& /*thisVertex*/,
+							  const math::PdfPair /*pdf*/,
+							  const Connection& /*inDir*/,
+							  const Spectrum& /*throughput*/,
+							  const float /*continuationPropability*/,
+							  const Spectrum& /*transmission*/)
 	{}
 
 	// Helper to convert the parameters of the update call into an incident pdf for mis
-	CUDA_FUNCTION static AreaPdf mis_pdf(const AngularPdf pdf, bool orthographic,
+	inline CUDA_FUNCTION static AreaPdf mis_pdf(const AngularPdf pdf, bool orthographic,
 		const float inDistance, const float inCosAbs) {
 		// Orthographic interactions get directly projected.
 		if(orthographic)
@@ -795,9 +800,9 @@ struct VertexExtension {
 	// excident: The new outgoing direction (normalized)
 	// pdf: Sampling PDF in both direction (forw = producing the excident vector,
 	//		back = producing the incident vector)
-	CUDA_FUNCTION void update(const PathVertex<VertexExtension>& thisVertex,
-							  const scene::Direction& excident,
-							  const VertexSample& sample) // TODO: ex cosine?, BRDF?
+	inline CUDA_FUNCTION void update(const PathVertex<VertexExtension>& /*thisVertex*/,
+							  const scene::Direction& /*excident*/,
+							  const VertexSample& /*sample*/) // TODO: ex cosine?, BRDF?
 	{}
 };
 

@@ -786,9 +786,6 @@
     <ClInclude Include="..\..\deps\cub\cub\warp\specializations\warp_scan_smem.cuh">
       <Filter>Source Files\deps\cub\warp\specializations</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\export\interface.h">
-      <Filter>Source Files\core\export</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\util\degrad.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
@@ -833,9 +830,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\renderer\parameter.hpp">
       <Filter>Source Files\core\renderer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\export\api.h">
-      <Filter>Source Files\core\export</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\lights\background.hpp">
       <Filter>Source Files\core\scene\lights</Filter>
@@ -1134,6 +1128,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\attributes\attribute_sizes.hpp">
       <Filter>Source Files\core\scene\attributes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\export\core_interface.h">
+      <Filter>Source Files\core\export</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\export\core_api.h">
+      <Filter>Source Files\core\export</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

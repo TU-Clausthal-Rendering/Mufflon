@@ -3,9 +3,10 @@
 #include "util/int_types.hpp"
 #include "util/tagged_tuple.hpp"
 #include "core/cuda/cuda_utils.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include <ei/vector.hpp>
+#include <math.h>
 #include <type_traits>
 
 namespace mufflon { namespace renderer {
@@ -50,7 +51,7 @@ public:
 		m_nanCounter(nanCounterPtr) {}
 
 	/*template < class T, class... Args >
-	CUDA_FUNCTION void contribute(Pixel pixel, Args&& ...args) {
+	inline CUDA_FUNCTION void contribute(Pixel pixel, Args&& ...args) {
 		using PixelType = typename T::PixelType;
 		auto& target = m_targets.template get<Target<T>>();
 		auto& pixels = reinterpret_cast<cuda::Atomic<dev, PixelType>(*)[T::NUM_CHANNELS]>(target.pixels)[pixel.x + pixel.y * m_resolution.x];
@@ -60,7 +61,7 @@ public:
 	}*/
 
 	template < class T >
-	CUDA_FUNCTION void contribute(const Pixel pixel, const ei::Vec<typename T::PixelType, T::NUM_CHANNELS>& value) {
+	inline CUDA_FUNCTION void contribute(const Pixel pixel, const ei::Vec<typename T::PixelType, T::NUM_CHANNELS>& value) {
 		static_assert(TargetTupleType::template has<Target<T>>(), "Requested render target doesn't exist");
 		mAssert(pixel.x < m_resolution.x && pixel.y < m_resolution.y);
 		using PixelType = typename T::PixelType;
@@ -74,7 +75,7 @@ public:
 	}
 	// Overload for single-value targets
 	template < class T >
-	CUDA_FUNCTION void contribute(const Pixel pixel, const typename T::PixelType& value) {
+	inline CUDA_FUNCTION void contribute(const Pixel pixel, const typename T::PixelType& value) {
 		this->contribute<T>(pixel, ei::Vec<typename T::PixelType, T::NUM_CHANNELS>{ value });
 	}
 
@@ -87,7 +88,7 @@ public:
 	// CAREFUL: no clamping is performed, so you have to make sure that the coordinates
 	// are within screen limits
 	template < class T >
-	CUDA_FUNCTION std::enable_if_t<T::NUM_CHANNELS != 1, ei::Vec<typename T::PixelType, T::NUM_CHANNELS>> get(const Pixel pixel) const {
+	inline CUDA_FUNCTION std::enable_if_t<T::NUM_CHANNELS != 1, ei::Vec<typename T::PixelType, T::NUM_CHANNELS>> get(const Pixel pixel) const {
 		static_assert(TargetTupleType::template has<Target<T>>(), "Requested render target doesn't exist");
 		mAssert(pixel.x < m_resolution.x && pixel.y < m_resolution.y);
 		using PixelType = typename T::PixelType;
@@ -102,7 +103,7 @@ public:
 	}
 	// Overload for single-value targets
 	template < class T >
-	CUDA_FUNCTION std::enable_if_t<T::NUM_CHANNELS == 1, typename T::PixelType> get(const Pixel pixel) const {
+	inline CUDA_FUNCTION std::enable_if_t<T::NUM_CHANNELS == 1, typename T::PixelType> get(const Pixel pixel) const {
 		static_assert(TargetTupleType::template has<Target<T>>(), "Requested render target doesn't exist");
 		mAssert(pixel.x < m_resolution.x && pixel.y < m_resolution.y);
 		using PixelType = typename T::PixelType;
@@ -116,11 +117,11 @@ public:
 	}
 
 	template < class T >
-	CUDA_FUNCTION bool is_target_enabled() const noexcept {
+	inline CUDA_FUNCTION bool is_target_enabled() const noexcept {
 		return m_targets.template get<Target<T>>().pixels;
 	}
 
-	CUDA_FUNCTION bool is_target_enabled(const u32 index) const noexcept {
+	inline CUDA_FUNCTION bool is_target_enabled(const u32 index) const noexcept {
 		if(index >= TARGET_COUNT)
 			return false;
 		u32 i = 0u;
@@ -134,7 +135,7 @@ public:
 		return enabled;
 	}
 
-	CUDA_FUNCTION ConstRenderTargetBuffer<dev, char> get_target(const u32 index) {
+	inline CUDA_FUNCTION ConstRenderTargetBuffer<dev, char> get_target(const u32 index) {
 		if(index >= TARGET_COUNT)
 			return {};
 
@@ -148,10 +149,10 @@ public:
 		return targetBuffer;
 	}
 
-	CUDA_FUNCTION int get_width() const { return m_resolution.x; }
-	CUDA_FUNCTION int get_height() const { return m_resolution.y; }
-	CUDA_FUNCTION ei::IVec2 get_resolution() const { return m_resolution; }
-	CUDA_FUNCTION int get_num_pixels() const { return m_resolution.x * m_resolution.y; }
+	inline CUDA_FUNCTION int get_width() const { return m_resolution.x; }
+	inline CUDA_FUNCTION int get_height() const { return m_resolution.y; }
+	inline CUDA_FUNCTION ei::IVec2 get_resolution() const { return m_resolution; }
+	inline CUDA_FUNCTION int get_num_pixels() const { return m_resolution.x * m_resolution.y; }
 
 private:
 	template < class T >
@@ -166,7 +167,7 @@ private:
 	// Two versions with enable_if so we don't have to use helper structs again: one
 	// for floating-point types, one for the rest (which doesn't have NaN-checks)
 	template < class T >
-	CUDA_FUNCTION std::enable_if_t<std::is_floating_point<T>::value, T> check_nan(const T x) {
+	inline CUDA_FUNCTION std::enable_if_t<std::is_floating_point<T>::value, T> check_nan(const T x) {
 		if(isnan(x)) {
 			cuda::atomic_add<dev>(*m_nanCounter, 1u);
 			return T{ 0 };

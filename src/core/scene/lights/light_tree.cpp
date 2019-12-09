@@ -60,7 +60,7 @@ public:
 		return m_globalOffset + m_lightCount * sizeof(DirectionalLight);
 	}
 
-	u16 type(std::size_t lightIndex) const noexcept {
+	u16 type(std::size_t /*lightIndex*/) const noexcept {
 		return u16(LightType::DIRECTIONAL_LIGHT);
 	}
 private:
@@ -79,11 +79,11 @@ public:
 		u32 prevOffset = u32(globalOffset);
 		for(std::size_t i = 0u; i < lights.size(); ++i) {
 			m_offsets[i] = std::visit(overloaded{
-					[&prevOffset](const PointLight& light) constexpr { LightRef res{prevOffset, u16(LightType::POINT_LIGHT)}; prevOffset += sizeof(PointLight); return res; },
-					[&prevOffset](const SpotLight& light) constexpr { LightRef res{prevOffset, u16(LightType::SPOT_LIGHT)}; prevOffset += sizeof(SpotLight); return res; },
-					[&prevOffset](const AreaLightTriangleDesc& light) constexpr { LightRef res{prevOffset, u16(LightType::AREA_LIGHT_TRIANGLE)}; prevOffset += sizeof(AreaLightTriangle<Device::CPU>); return res; },
-					[&prevOffset](const AreaLightQuadDesc& light) constexpr { LightRef res{prevOffset, u16(LightType::AREA_LIGHT_QUAD)}; prevOffset += sizeof(AreaLightQuad<Device::CPU>); return res; },
-					[&prevOffset](const AreaLightSphereDesc& light) constexpr { LightRef res{prevOffset, u16(LightType::AREA_LIGHT_SPHERE)}; prevOffset += sizeof(AreaLightSphere<Device::CPU>); return res; }
+					[&prevOffset](const PointLight& /*light*/) constexpr { LightRef res{prevOffset, u16(LightType::POINT_LIGHT)}; prevOffset += sizeof(PointLight); return res; },
+					[&prevOffset](const SpotLight& /*light*/) constexpr { LightRef res{prevOffset, u16(LightType::SPOT_LIGHT)}; prevOffset += sizeof(SpotLight); return res; },
+					[&prevOffset](const AreaLightTriangleDesc& /*light*/) constexpr { LightRef res{prevOffset, u16(LightType::AREA_LIGHT_TRIANGLE)}; prevOffset += sizeof(AreaLightTriangle<Device::CPU>); return res; },
+					[&prevOffset](const AreaLightQuadDesc& /*light*/) constexpr { LightRef res{prevOffset, u16(LightType::AREA_LIGHT_QUAD)}; prevOffset += sizeof(AreaLightQuad<Device::CPU>); return res; },
+					[&prevOffset](const AreaLightSphereDesc& /*light*/) constexpr { LightRef res{prevOffset, u16(LightType::AREA_LIGHT_SPHERE)}; prevOffset += sizeof(AreaLightSphere<Device::CPU>); return res; }
 				}, lights[i].light);
 		}
 		m_memSize = prevOffset;
@@ -546,7 +546,9 @@ void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 				dst.intensity = light->irradiance;
 				dst.direction = light->direction;
 			} break;
-			case LightType::ENVMAP_LIGHT: break;
+			case LightType::ENVMAP_LIGHT:
+			default:
+				break;
             }
 		};
 

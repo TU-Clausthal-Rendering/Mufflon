@@ -7,8 +7,6 @@
 #include "core/scene/tessellation/cam_dist.hpp"
 #include <iostream>
 #include <ei/conversions.hpp>
-#include <execution>
-#include <windows.h>
 
 namespace mufflon::scene {
 
@@ -1023,7 +1021,7 @@ bool WorldContainer::load_scene_lights() {
 	return reloaded;
 }
 
-void WorldContainer::set_lod_loader_function(bool (CDECL*func)(ObjectHandle, u32)) {
+void WorldContainer::set_lod_loader_function(LodLoadFuncPtr func) {
 	m_load_lod = func;
 }
 

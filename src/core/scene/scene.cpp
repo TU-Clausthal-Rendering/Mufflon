@@ -17,7 +17,11 @@
 #include "core/scene/tessellation/uniform.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include <ei/3dintersection.hpp>
+#ifdef __cpp_lib_execution
 #include <execution>
+#else // __cpp_lib_execution
+#warning "Parallel STL algorithms are not supported by your standard library. This may result in a slight renderer slowdown"
+#endif // __cpp_lib_execution
 
 namespace mufflon { namespace scene {
 
@@ -53,7 +57,7 @@ void Scene::load_materials() {
 	const std::size_t MAT_SLOTS = m_scenario.get_num_material_slots();
 	std::size_t offset = round_to_align<alignof(materials::MaterialDescriptorBase)>(sizeof(int) * MAT_SLOTS);
 	for(MaterialIndex i = 0; i < m_scenario.get_num_material_slots(); ++i) {
-		mAssert(offset <= std::numeric_limits<i32>::max());
+		mAssert(offset <= static_cast<std::size_t>(std::numeric_limits<i32>::max()));
 		offsets.push_back(i32(offset));
 		//offset += materials::get_handle_pack_size();
 		offset += m_scenario.get_assigned_material(i)->get_descriptor_size(dev);
@@ -250,7 +254,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 
 		// Allocate the device memory and copy over the descriptors
 		// Some of these don't need to be copied can be just taken when we're on the CPU
-		auto& lodDevDesc = m_lodDevDesc.template get<unique_device_ptr<NotGl<dev>, LodDescriptor<dev>[]>>();
+		auto& lodDevDesc = m_lodDevDesc.template get<unique_device_ptr<NotGl<dev>(), LodDescriptor<dev>[]>>();
 		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
 		if constexpr(dev == Device::CPU) {
 			lodDevDesc.reset(Allocator<Device::CPU>::realloc(lodDescs.release(), descCountEstimate, lodIndex.load()));
@@ -258,7 +262,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 			sceneDescriptor.worldToInstance = m_worldToInstanceTransformation.data();
 		} else {
 			auto& instTransformsDesc = m_instTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
-			lodDevDesc = make_udevptr_array<NotGl<dev>, LodDescriptor<dev>>(lodIndex.load());
+			lodDevDesc = make_udevptr_array<NotGl<dev>(), LodDescriptor<dev>>(lodIndex.load());
 			lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodIndex.load());
 			copy(lodDevDesc.get(), lodDescs.get(), sizeof(LodDescriptor<dev>) * lodIndex.load());
 			copy(lodAabbsDesc.get(), lodAabbs.get(), sizeof(ei::Box) * lodIndex.load());
@@ -279,7 +283,11 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 				const auto begin = m_worldToInstanceTransformation.data();
 				const auto end = begin + totalInstanceCount;
 				const auto outBegin = instToWorldTransformation.get();
-				std::transform(std::execution::par_unseq, begin, end, outBegin, [](const ei::Mat3x4& matrix) {
+				std::transform(
+#ifdef __cpp_lib_execution
+							   std::execution::par_unseq,
+#endif // __cpp_lib_execution
+							   begin, end, outBegin, [](const ei::Mat3x4& matrix) {
 					return InstanceData<Device::CPU>::compute_instance_to_world_transformation(matrix);
 				});
 
@@ -335,7 +343,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
     if(dev != Device::OPENGL) {
 		// Rebuild Instance BVH?
 		if (m_accelStruct.needs_rebuild()) {
-			auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
+			auto scope = Profiler::core().start<CpuProfileState>("build_instance_bvh");
 
 			const auto t0 = std::chrono::high_resolution_clock::now();
 			m_accelStruct.build(sceneDescriptor, static_cast<u32>(m_instances.size()));

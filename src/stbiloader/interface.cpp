@@ -1,5 +1,6 @@
 #include "plugin/texture_plugin_interface.h"
 #include "util/log.hpp"
+#include <cstring>
 #include <mutex>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -28,8 +29,6 @@ using namespace mufflon;
 
 namespace {
 
-void(*s_logCallback)(const char*, int);
-
 TextureFormat get_int_format(int components) {
 	switch(components) {
 		case 1: return TextureFormat::FORMAT_R8U;
@@ -48,34 +47,7 @@ TextureFormat get_float_format(int components) {
 	}
 }
 
-// Function delegating the logger output to the applications handle, if applicable
-void delegateLog(LogSeverity severity, const std::string& message) {
-	try {
-		if(s_logCallback != nullptr)
-			s_logCallback(message.c_str(), static_cast<int>(severity));
-	} catch(const std::exception& e) {
-		logError("[", FUNCTION_NAME, "] Caught exception: ", e.what());
-		return;
-	}
-}
-
 } // namespace
-
-Boolean set_logger(void(*logCallback)(const char*, int)) {
-	try {
-		static bool initialized = false;
-		s_logCallback = logCallback;
-		if(!initialized) {
-			registerMessageHandler(delegateLog);
-			disableStdHandler();
-			initialized = true;
-		}
-		return true;
-	} catch(const std::exception& e) {
-		logError("[", FUNCTION_NAME, "] Caught exception: ", e.what());
-		return false;
-	}
-}
 
 Boolean can_load_texture_format(const char* ext) {
 	return std::strncmp(ext, ".hdr", 4u) == 0
@@ -128,7 +100,7 @@ Boolean load_texture(const char* path, TextureData* texData) {
 			// Copy over the image data one by one
 			std::size_t bytes = perElemBytes * width * height * components;
 			texData->data = new uint8_t[bytes];
-			for(std::size_t t = 0u; t < width * height; ++t) {
+			for(std::size_t t = 0u; t < static_cast<std::size_t>(width * height); ++t) {
 				std::memcpy(&texData->data[components * perElemBytes * t],
 							&data[3u * perElemBytes * t],
 							3u * perElemBytes);

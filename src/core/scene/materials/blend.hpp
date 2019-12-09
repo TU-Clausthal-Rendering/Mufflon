@@ -1,13 +1,13 @@
 #pragma once
 
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/math/sampling.hpp"
 #include "material_definitions.hpp"
 
 namespace mufflon { namespace scene { namespace materials {
 
 template<class LayerA, class LayerB>
-CUDA_FUNCTION typename MatBlend<LayerA, LayerB>::SampleType
+inline CUDA_FUNCTION typename MatBlend<LayerA, LayerB>::SampleType
 fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
 	  const ei::Vec4* texValues,
 	  int texOffset,
@@ -22,7 +22,7 @@ fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
 
 // The importance sampling routine
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION math::PathSample sample(const MatSampleBlend<LayerASample, LayerBSample>& params,
+inline CUDA_FUNCTION math::PathSample sample(const MatSampleBlend<LayerASample, LayerBSample>& params,
 									  const Direction& incidentTS,
 									  Boundary& boundary,
 									  math::RndSet2_1 rndSet,
@@ -56,7 +56,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleBlend<LayerASample, LayerBS
 	}
 
 	// Blend values and pdfs.
-	float origPdf = float(sampleVal.pdf.forw);
+	//float origPdf = float(sampleVal.pdf.forw);
 	sampleVal.pdf.forw = AngularPdf{ ei::lerp(float(otherVal.pdf.forw), float(sampleVal.pdf.forw), p) };
 	sampleVal.pdf.back = AngularPdf{ ei::lerp(float(otherVal.pdf.back), float(sampleVal.pdf.back), p) };
 	sampleVal.throughput = (sampleVal.throughput * scaleS + otherVal.value * scaleE)
@@ -66,7 +66,7 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleBlend<LayerASample, LayerBS
 
 // The evaluation routine
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleBlend<LayerASample, LayerBSample>& params,
+inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleBlend<LayerASample, LayerBSample>& params,
 											  const Direction& incidentTS,
 											  const Direction& excidentTS,
 											  Boundary& boundary) {
@@ -86,13 +86,13 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleBlend<LayerASample,
 
 // The albedo routine
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION Spectrum albedo(const MatSampleBlend<LayerASample, LayerBSample>& params) {
+inline CUDA_FUNCTION Spectrum albedo(const MatSampleBlend<LayerASample, LayerBSample>& params) {
 	return albedo(params.a) * params.factorA
 		 + albedo(params.b) * params.factorB;
 }
 
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION math::SampleValue emission(const MatSampleBlend<LayerASample, LayerBSample>& params, const scene::Direction& geoN, const scene::Direction& excident) {
+inline CUDA_FUNCTION math::SampleValue emission(const MatSampleBlend<LayerASample, LayerBSample>& params, const scene::Direction& geoN, const scene::Direction& excident) {
 	// Evaluate both sub-layers
 	auto valA = emission(params.a, geoN, excident);
 	auto valB = emission(params.b, geoN, excident);
@@ -105,7 +105,7 @@ CUDA_FUNCTION math::SampleValue emission(const MatSampleBlend<LayerASample, Laye
 }
 
 template<class LayerASample, class LayerBSample>
-CUDA_FUNCTION float pdf_max(const MatSampleBlend<LayerASample, LayerBSample>& params) {
+inline CUDA_FUNCTION float pdf_max(const MatSampleBlend<LayerASample, LayerBSample>& params) {
 	// TODO: p based blending as above?
 	return ei::max(pdf_max(params.a), pdf_max(params.b));
 }

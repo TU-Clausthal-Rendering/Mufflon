@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/math/sampling.hpp"
 #include "material_definitions.hpp"
 #include "core/scene/textures/texture.hpp"
@@ -9,8 +9,8 @@ namespace mufflon { namespace scene { namespace materials {
 
 //#define ONLAMBERT_SAMPLING
 
-CUDA_FUNCTION MatSampleOrenNayar
-fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
+inline CUDA_FUNCTION MatSampleOrenNayar
+fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* /*textures*/,
 	  const ei::Vec4* texValues,
 	  int texOffset,
 	  const typename MatOrenNayar::NonTexParams& params) {
@@ -25,10 +25,10 @@ CUDA_FUNCTION __forceinline__ float adjTrig(float x) {
 	return sqrt(ei::max(0.0f, (1.0f - x) * (1.0f + x)));
 }
 
-CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleOrenNayar& params,
+inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleOrenNayar& params,
 											  const Direction& incidentTS,
 											  const Direction& excidentTS ,
-											  Boundary& boundary) {
+											  Boundary& /*boundary*/) {
 	// No transmission - already checked by material, but in a combined model we might get a call
 	if(incidentTS.z * excidentTS.z < 0.0f) return math::BidirSampleValue{};
 
@@ -61,17 +61,17 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleOrenNayar& params,
 #else // ONLAMBERT_SAMPLING
 		//AngularPdf{ (pF / ei::PI + (1-pF) * 1.5f * cosDeltaPhi * sinThetaO) * cosThetaO },
 		//AngularPdf{ (pB / ei::PI + (1-pB) * 1.5f * cosDeltaPhi * sinThetaI) * cosThetaI }
-		AngularPdf{ (pF / ei::PI * cosThetaO + (1-pF) * 0.40596962562901f * cosDeltaPhi * sdiv(powf(acosf(cosThetaO), 1.4f), sinThetaO)) },
-		AngularPdf{ (pB / ei::PI * cosThetaI + (1-pB) * 0.40596962562901f * cosDeltaPhi * sdiv(powf(acosf(cosThetaI), 1.4f), sinThetaI)) }
+		{ AngularPdf{ (pF / ei::PI * cosThetaO + (1-pF) * 0.40596962562901f * cosDeltaPhi * sdiv(powf(acosf(cosThetaO), 1.4f), sinThetaO)) },
+		  AngularPdf{ (pB / ei::PI * cosThetaI + (1-pB) * 0.40596962562901f * cosDeltaPhi * sdiv(powf(acosf(cosThetaI), 1.4f), sinThetaI)) } }
 #endif // ONLAMBERT_SAMPLING
 	};
 }
 
-CUDA_FUNCTION math::PathSample sample(const MatSampleOrenNayar& params,
+inline CUDA_FUNCTION math::PathSample sample(const MatSampleOrenNayar& params,
 									  const Direction& incidentTS,
-									  Boundary& boundary,
+									  Boundary& /*boundary*/,
 									  const math::RndSet2_1& rndSet,
-									  bool adjoint) {
+									  bool /*adjoint*/) {
 #ifdef ONLAMBERT_SAMPLING
 	// Importance sampling for lambert: BRDF * cos(theta)
 	Direction excidentTS = math::sample_dir_cosine(rndSet.u0, rndSet.u1).direction;
@@ -139,24 +139,24 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleOrenNayar& params,
 		{AngularPdf{pdfF}, AngularPdf{pdfB}}
 	};
 
-#endif ONLAMBERT_SAMPLING
+#endif // ONLAMBERT_SAMPLING
 }
 
-CUDA_FUNCTION Spectrum albedo(const MatSampleOrenNayar& params) {
+inline CUDA_FUNCTION Spectrum albedo(const MatSampleOrenNayar& params) {
 	return params.albedo;
 }
 
-CUDA_FUNCTION math::SampleValue emission(const MatSampleOrenNayar& params, const scene::Direction& geoN, const scene::Direction& excident) {
+inline CUDA_FUNCTION math::SampleValue emission(const MatSampleOrenNayar& /*params*/, const scene::Direction& /*geoN*/, const scene::Direction& /*excident*/) {
 	return math::SampleValue{};
 }
 
-CUDA_FUNCTION float pdf_max(const MatSampleOrenNayar& params) {
+inline CUDA_FUNCTION float pdf_max(const MatSampleOrenNayar& /*params*/) {
 	// TODO: proper maximum
 	return 1.0f / ei::PI;
 }
 
-template MaterialSampleConcept<MatSampleOrenNayar>;
-template MaterialConcept<MatOrenNayar>;
+template class MaterialSampleConcept<MatSampleOrenNayar>;
+template class MaterialConcept<MatOrenNayar>;
 
 #undef ONLAMBERT_SAMPLING
 

@@ -14,7 +14,7 @@ CpuLightTracer::CpuLightTracer() {
 }
 
 void CpuLightTracer::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU LT iteration", ProfileLevel::HIGH);
+	auto scope = Profiler::core().start<CpuProfileState>("CPU LT iteration", ProfileLevel::HIGH);
 
 #pragma PARALLEL_FOR
 	for(int photon = 0; photon < m_outputBuffer.get_num_pixels(); ++photon) {

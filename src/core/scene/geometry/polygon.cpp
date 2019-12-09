@@ -15,6 +15,7 @@
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include "core/scene/tessellation/tessellater.hpp"
 #include "core/scene/tessellation/displacement_mapper.hpp"
+#include <cmath>
 
 namespace mufflon::scene::geometry {
 
@@ -360,14 +361,14 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 
 void Polygons::tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
 						  const bool usePhong) {
-	auto profileTimer = Profiler::instance().start<CpuProfileState>("Polygons::tessellate");
+	auto profileTimer = Profiler::core().start<CpuProfileState>("Polygons::tessellate");
 	this->synchronize<Device::CPU>();
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
 
 	// This is necessary since we'd otherwise need to pass an accessor into the tessellater
 	tessellation::Tessellater tessellater(oracle);
-	tessellater.set_phong_tessellation(true);
+	tessellater.set_phong_tessellation(usePhong);
 
 	if(scenario != nullptr) {
 		OpenMesh::FPropHandleT<MaterialIndex> matIdxProp;
@@ -384,7 +385,7 @@ void Polygons::tessellate(tessellation::TessLevelOracle& oracle, const Scenario*
 }
 
 void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario) {
-	auto profileTimer = Profiler::instance().start<CpuProfileState>("Polygons::displace");
+	auto profileTimer = Profiler::core().start<CpuProfileState>("Polygons::displace");
 	this->synchronize<Device::CPU>();
 	// Then perform tessellation
 	const std::size_t prevTri = m_triangles;
@@ -774,8 +775,8 @@ void Polygons::resizeAttribBuffer(std::size_t v, std::size_t f) {
 // Explicit instantiations
 template void Polygons::reserve_index_buffer<Device::CPU, true>(std::size_t capacity);
 template void Polygons::reserve_index_buffer<Device::CUDA, true>(std::size_t capacity);
-template void Polygons::reserve_index_buffer<Device::CPU, true>(std::size_t capacity);
-template void Polygons::reserve_index_buffer<Device::OPENGL, false>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::OPENGL, true>(std::size_t capacity);
+template void Polygons::reserve_index_buffer<Device::CPU, false>(std::size_t capacity);
 template void Polygons::reserve_index_buffer<Device::CUDA, false>(std::size_t capacity);
 template void Polygons::reserve_index_buffer<Device::OPENGL, false>(std::size_t capacity);
 template void Polygons::synchronize_index_buffer<Device::CPU, Device::CUDA>();
@@ -784,6 +785,9 @@ template void Polygons::synchronize_index_buffer<Device::CUDA, Device::CPU>();
 //template void Polygons::synchronize_index_buffer<Device::CUDA, Device::OPENGL>();
 //template void Polygons::synchronize_index_buffer<Device::OPENGL, Device::CPU>();
 //template void Polygons::synchronize_index_buffer<Device::OPENGL, Device::CUDA>();
+template void Polygons::unload_index_buffer<Device::CPU>();
+template void Polygons::unload_index_buffer<Device::CUDA>();
+template void Polygons::unload_index_buffer<Device::OPENGL>();
 template void Polygons::resizeAttribBuffer<Device::CPU>(std::size_t v, std::size_t f);
 template void Polygons::resizeAttribBuffer<Device::CUDA>(std::size_t v, std::size_t f);
 template void Polygons::resizeAttribBuffer<Device::OPENGL>(std::size_t v, std::size_t f);

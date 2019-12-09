@@ -59,7 +59,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)deps\;$(SolutionDir)deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)external\rapidjson-1.1.0\$(Configuration)\include;$(SolutionDir)deps\miniz;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)src\core\export;$(SolutionDir)deps\;$(SolutionDir)deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)external\rapidjson-1.1.0\$(Configuration)\include;$(SolutionDir)deps\miniz;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_WINDLL;LOADER_EXPORTS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -76,7 +76,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)deps\;$(SolutionDir)deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)external\rapidjson-1.1.0\$(Configuration)\include;$(SolutionDir)deps\miniz;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)src;$(SolutionDir)src\core\export;$(SolutionDir)deps\;$(SolutionDir)deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)external\rapidjson-1.1.0\$(Configuration)\include;$(SolutionDir)deps\miniz;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_WINDLL;LOADER_EXPORTS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -123,8 +123,8 @@
     <ClInclude Include="..\..\deps\epsilon\include\ei\vector.hpp" />
     <ClInclude Include="..\..\deps\miniz\miniz\miniz.h" />
     <ClInclude Include="..\..\src\mffloader\export\scene_exporter.hpp" />
-    <ClInclude Include="..\..\src\mffloader\interface\api.h" />
-    <ClInclude Include="..\..\src\mffloader\interface\interface.h" />
+    <ClInclude Include="..\..\src\mffloader\interface\mff_api.h" />
+    <ClInclude Include="..\..\src\mffloader\interface\mff_interface.h" />
     <ClInclude Include="..\..\src\mffloader\parsing\binary.hpp" />
     <ClInclude Include="..\..\src\mffloader\parsing\json_helper.hpp" />
     <ClInclude Include="..\..\src\mffloader\parsing\json_loader.hpp" />

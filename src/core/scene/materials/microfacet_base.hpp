@@ -1,17 +1,18 @@
 ﻿#pragma once
 
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "util/types.hpp"
 #include "core/math/sampling.hpp"
 #include "core/math/functions.hpp"
 #include "medium.hpp"
 #include <cuda_runtime.h>
 #include <ei/vector.hpp>
+#include <math.h>
 
 namespace mufflon { namespace scene { namespace materials {
 
 
-CUDA_FUNCTION Direction compute_half_vector(const Medium& inMedium, const Medium& exMedium, const Direction& incidentTS, const Direction& excidentTS) {
+inline CUDA_FUNCTION Direction compute_half_vector(const Medium& inMedium, const Medium& exMedium, const Direction& incidentTS, const Direction& excidentTS) {
 	// There are two different preconditions: reflection and refraction.
 	// For reflection the good old normalize(in + out) is sufficient.
 	// For refraction we need normalize(in * n_i + out * n_e) with the
@@ -35,11 +36,11 @@ struct Boundary { // Interface would be a good name too, but 'interface' as vari
 public:
 	const Medium& incidentMedium;
 	const Medium& otherMedium;
-	CUDA_FUNCTION Boundary(const Medium& incidentMedium, const Medium& otherMedium) :
+	inline CUDA_FUNCTION Boundary(const Medium& incidentMedium, const Medium& otherMedium) :
 		incidentMedium(incidentMedium), otherMedium(otherMedium)
 	{}
 	// Get the half vector. If necessary it will be computed.
-	CUDA_FUNCTION Direction get_halfTS(const Direction& incidentTS, const Direction& excidentTS) noexcept {
+	inline CUDA_FUNCTION Direction get_halfTS(const Direction& incidentTS, const Direction& excidentTS) noexcept {
 		if(halfIsComputed) return halfTS; // Cache hit.
 		const Medium& excidentMedium = incidentTS.z * excidentTS.z > 0.0f ? incidentMedium : otherMedium;
 		halfTS = compute_half_vector(incidentMedium, excidentMedium, incidentTS, excidentTS);
@@ -47,7 +48,7 @@ public:
 		return halfTS;
 	}
 	// Set the half vector from another source (e.g. from sampling)
-	CUDA_FUNCTION void set_halfTS(const Direction& newHalfTS) {
+	inline CUDA_FUNCTION void set_halfTS(const Direction& newHalfTS) {
 		halfTS = newHalfTS;
 		halfIsComputed = true;
 	}
@@ -70,7 +71,7 @@ enum class ShadowingModel : i16 {
 };
 
 // Geometry term (Selfshadow) for V-cavity model.
-CUDA_FUNCTION __forceinline__ float geoshadowing_vcavity(float wDotH, float wDotN, float hDotN, const ei::Vec2 & roughness) {
+CUDA_FUNCTION __forceinline__ float geoshadowing_vcavity(float wDotH, float wDotN, float hDotN, const ei::Vec2 & /*roughness*/) {
 	// For refraction the half vector can be the other way around than the surface. I.e. the
 	// microfacet would be seen from back-side, which is impossible.
 	if(wDotH * wDotN <= 0.0) return 0.0;
@@ -171,7 +172,7 @@ sample_visible_normal_vcavity(const Direction& incidentTS, const Direction& cavi
 }
 
 // Get the sampled slopes for the smith model with beckmann distribution
-CUDA_FUNCTION ei::Vec2 sample_visible_slopes_beckmann(float sinTheta, float cosTheta, float tanTheta, const ei::Vec2& roughness, const math::RndSet2& rnd, u64& rnd2) {
+inline CUDA_FUNCTION ei::Vec2 sample_visible_slopes_beckmann(float sinTheta, float cosTheta, float tanTheta, const ei::Vec2& /*roughness*/, const math::RndSet2& rnd, u64& rnd2) {
 	// Special case (normal incidence)
 	if(tanTheta < 0.0001) {
 		const float r = sqrt(-log(rnd.u0));
@@ -223,7 +224,7 @@ CUDA_FUNCTION ei::Vec2 sample_visible_slopes_beckmann(float sinTheta, float cosT
 }
 
 // Get the sampled slopes for the smith model with ggx distribution
-CUDA_FUNCTION ei::Vec2 sample_visible_slopes_ggx(float tanTheta, const math::RndSet2& rnd, u64& rnd2) {
+inline CUDA_FUNCTION ei::Vec2 sample_visible_slopes_ggx(float tanTheta, const math::RndSet2& rnd, u64& rnd2) {
 	mAssert(tanTheta >= 0.0f);
 	// Special case (normal incidence)
 	if(tanTheta < 0.0001) {
@@ -258,7 +259,7 @@ CUDA_FUNCTION ei::Vec2 sample_visible_slopes_ggx(float tanTheta, const math::Rnd
 }
 
 // Get a normal of the cavity proportional to their visibility.
-CUDA_FUNCTION Direction sample_visible_normal_smith(const NDF ndf,const Direction& incidentTS, const ei::Vec2& roughness, const math::RndSet2& rnd, u64& rnd2) {
+inline CUDA_FUNCTION Direction sample_visible_normal_smith(const NDF ndf,const Direction& incidentTS, const ei::Vec2& roughness, const math::RndSet2& rnd, u64& rnd2) {
 	// Stretch incidentTS
 	Direction inStretched = incidentTS * ei::Vec3{ roughness , 1.0f };
 	inStretched = normalize(inStretched);
@@ -271,7 +272,7 @@ CUDA_FUNCTION Direction sample_visible_normal_smith(const NDF ndf,const Directio
 	const float sinPhi = sinTheta > 1e-5f ? inStretched.y / sinTheta : 0.0f;
 
 	// sample
-	ei::Vec2 slopes;
+	ei::Vec2 slopes{ 0.f };
 	switch (ndf) {
 		case NDF::BECKMANN: {
 			slopes = sample_visible_slopes_beckmann(sinTheta, inStretched.z, tanTheta, roughness, rnd, rnd2);
@@ -292,7 +293,7 @@ CUDA_FUNCTION Direction sample_visible_normal_smith(const NDF ndf,const Directio
 }
 
 // Evaluate any of the supported ndfs
-CUDA_FUNCTION float eval_ndf(NDF ndf, ei::Vec2 roughness, const Direction& halfTS) {
+inline CUDA_FUNCTION float eval_ndf(NDF ndf, ei::Vec2 roughness, const Direction& halfTS) {
 	switch(ndf) {
 		case NDF::GGX: {
 			// Anisotropic GGX: http://graphicrants.blogspot.de/2013/08/specular-brdf-reference.html,
@@ -319,7 +320,7 @@ CUDA_FUNCTION float eval_ndf(NDF ndf, ei::Vec2 roughness, const Direction& halfT
 	return 0.0f;
 }
 
-CUDA_FUNCTION math::DirectionSample sample_ndf(NDF ndf, ei::Vec2 roughness, const math::RndSet2& rnd) {
+inline CUDA_FUNCTION math::DirectionSample sample_ndf(NDF ndf, ei::Vec2 roughness, const math::RndSet2& rnd) {
 	switch(ndf) {
 		case NDF::GGX: {
 			float phi = 2.0f * ei::PI * rnd.u0;

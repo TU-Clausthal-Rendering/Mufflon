@@ -1,4 +1,4 @@
-﻿#include "interface.h"
+﻿#include "core_interface.h"
 #include "plugin/texture_plugin.hpp"
 #include "util/log.hpp"
 #include "util/byte_io.hpp"
@@ -20,9 +20,8 @@
 #include "core/scene/lights/lights.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/textures/interface.hpp"
-#include "mffloader/interface/interface.h"
+#include "mffloader/interface/mff_interface.h"
 #include <glad/glad.h>
-#include <OpenImageDenoise/oidn.hpp>
 #include <cuda_runtime.h>
 #include <fstream>
 #include <type_traits>
@@ -30,7 +29,10 @@
 #include <fstream>
 #include <vector>
 #include <set>
-#include "glad/glad.h"
+
+#ifdef MUFFLON_ENABLE_OPEN_DENOISE
+#include <OpenImageDenoise/oidn.hpp>
+#endif // MUFFLON_ENABLE_OPEN_DENOISE
 
 #ifdef _WIN32
 #include <windows.h>
@@ -88,10 +90,6 @@ using SphereVHdl = Spheres::SphereHandle;
 // Return values for invalid handles/attributes
 namespace {
 
-// Specifies the minimum compute capability requirements
-constexpr int minMajorCC = 5;
-constexpr int minMinorCC = 2;
-
 // static variables for interacting with the renderer
 renderer::IRenderer* s_currentRenderer;
 // Current iteration counter
@@ -122,22 +120,6 @@ util::IndexedStringMap<std::vector<std::unique_ptr<renderer::IRenderer>>> s_rend
 constexpr VertexAttributeHdl INVALID_POLY_VATTR_HANDLE{ ATTRTYPE_COUNT, nullptr };
 constexpr FaceAttributeHdl INVALID_POLY_FATTR_HANDLE{ ATTRTYPE_COUNT, nullptr };
 constexpr SphereAttributeHdl INVALID_SPHERE_ATTR_HANDLE{ ATTRTYPE_COUNT, nullptr };
-
-// Convert attribute type to string for convenience
-inline StringView get_attr_type_name(const GeomAttributeType& type) {
-	switch(type) {
-		case GeomAttributeType::ATTRTYPE_SHORT: return "short";
-		case GeomAttributeType::ATTRTYPE_USHORT: return "ushort";
-		case GeomAttributeType::ATTRTYPE_INT: return "int";
-		case GeomAttributeType::ATTRTYPE_UINT: return "uint";
-		case GeomAttributeType::ATTRTYPE_FLOAT: return "float";
-		case GeomAttributeType::ATTRTYPE_FLOAT2: return "float2";
-		case GeomAttributeType::ATTRTYPE_FLOAT3: return "float3";
-		case GeomAttributeType::ATTRTYPE_FLOAT4: return "float4";
-		case GeomAttributeType::ATTRTYPE_SPHERE: return "sphere";
-		default: return "unknown";
-	}
-}
 
 // Initializes all renderers
 template < bool initOpenGL, std::size_t I = 0u >
@@ -240,7 +222,7 @@ Boolean core_set_log_level(LogLevel level) {
 Boolean core_set_lod_loader(Boolean(*func)(ObjectHdl, uint32_t)) {
 	TRY
 	CHECK_NULLPTR(func, "LoD loader function", false);
-	s_world.set_lod_loader_function(reinterpret_cast<bool(*)(ObjectHandle, u32)>(func));
+	s_world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(ObjectHandle, u32)>(func));
 	return true;
 	CATCH_ALL(false)
 }
@@ -280,7 +262,7 @@ Boolean core_copy_screen_texture_rgba32(Vec4* ptr, const float factor) {
 		const float* texData = s_screenTexture.get();
 #pragma PARALLEL_FOR
 		for(int i = 0; i < numPixels; ++i) {
-			Vec4 pixel { 0.0f };
+			Vec4 pixel { 0.f, 0.f, 0.f, 0.f };
 			float* dst = reinterpret_cast<float*>(&pixel);
 			int idx = i * s_screenTextureNumChannels;
 			for(int c = 0; c < s_screenTextureNumChannels; ++c)
@@ -442,21 +424,21 @@ VertexHdl polygon_add_vertex_bulk(LodHdl lvlDtl, size_t count, const BulkLoader*
 	std::unique_ptr<util::ArrayStreamBuffer> pointBuffer;
 	std::unique_ptr<util::ArrayStreamBuffer> normalBuffer;
 	std::unique_ptr<util::ArrayStreamBuffer> uvBuffer;
-	if(points->type == BulkLoader::BULK_FILE) {
+	if(points->type == BulkType::BULK_FILE) {
 		pointReader = std::make_unique<util::FileReader>(points->descriptor.file);
 	} else {
 		pointBuffer = std::make_unique<util::ArrayStreamBuffer>(points->descriptor.bytes, count * sizeof(Vec3));
 		pointStream = std::make_unique<std::istream>(pointBuffer.get());
 		pointReader = std::make_unique<util::StreamReader>(*pointStream);
 	}
-	if(normals != nullptr && normals->type == BulkLoader::BULK_FILE) {
+	if(normals != nullptr && normals->type == BulkType::BULK_FILE) {
 		normalReader = std::make_unique<util::FileReader>(normals->descriptor.file);
 	} else if(normals != nullptr) {
 		normalBuffer = std::make_unique<util::ArrayStreamBuffer>(normals->descriptor.bytes, count * sizeof(Vec3));
 		normalStream = std::make_unique<std::istream>(normalBuffer.get());
 		normalReader = std::make_unique<util::StreamReader>(*normalStream);
 	}
-	if(uvs->type == BulkLoader::BULK_FILE) {
+	if(uvs->type == BulkType::BULK_FILE) {
 		uvReader = std::make_unique<util::FileReader>(uvs->descriptor.file);
 	} else {
 		uvBuffer = std::make_unique<util::ArrayStreamBuffer>(uvs->descriptor.bytes, count * sizeof(Vec2));
@@ -629,7 +611,7 @@ size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const VertexAttributeHdl
 	std::unique_ptr<util::IByteReader> attrReader;
 	std::unique_ptr<util::ArrayStreamBuffer> attrBuffer;
 	std::unique_ptr<std::istream> attrStream;
-	if(stream->type == BulkLoader::BULK_FILE) {
+	if(stream->type == BulkType::BULK_FILE) {
 		attrReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
 		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * elemSize);
@@ -669,7 +651,7 @@ size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const FaceAttributeHdl att
 	std::unique_ptr<util::IByteReader> attrReader;
 	std::unique_ptr<util::ArrayStreamBuffer> attrBuffer;
 	std::unique_ptr<std::istream> attrStream;
-	if(stream->type == BulkLoader::BULK_FILE) {
+	if(stream->type == BulkType::BULK_FILE) {
 		attrReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
 		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * elemSize);
@@ -707,7 +689,7 @@ size_t polygon_set_material_idx_bulk(LodHdl lvlDtl, FaceHdl startFace, size_t co
 	std::unique_ptr<util::IByteReader> matReader;
 	std::unique_ptr<util::ArrayStreamBuffer> matBuffer;
 	std::unique_ptr<std::istream> matStream;
-	if(stream->type == BulkLoader::BULK_FILE) {
+	if(stream->type == BulkType::BULK_FILE) {
 		matReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
 		matBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * sizeof(MaterialIndex));
@@ -821,7 +803,7 @@ SphereHdl spheres_add_sphere_bulk(LodHdl lvlDtl, size_t count, const BulkLoader*
 	std::unique_ptr<util::IByteReader> sphereReader;
 	std::unique_ptr<util::ArrayStreamBuffer> sphereBuffer;
 	std::unique_ptr<std::istream> sphereStream;
-	if(stream->type == BulkLoader::BULK_FILE) {
+	if(stream->type == BulkType::BULK_FILE) {
 		sphereReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
 		sphereBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * sizeof(ei::Sphere));
@@ -912,7 +894,7 @@ size_t spheres_set_attribute_bulk(LodHdl lvlDtl, const SphereAttributeHdl attr,
 	std::unique_ptr<util::IByteReader> attrReader;
 	std::unique_ptr<util::ArrayStreamBuffer> attrBuffer;
 	std::unique_ptr<std::istream> attrStream;
-	if(stream->type == BulkLoader::BULK_FILE) {
+	if(stream->type == BulkType::BULK_FILE) {
 		attrReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
 		attrBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * elemSize);
@@ -948,7 +930,7 @@ size_t spheres_set_material_idx_bulk(LodHdl lvlDtl, SphereHdl startSphere, size_
 	std::unique_ptr<util::IByteReader> matReader;
 	std::unique_ptr<util::ArrayStreamBuffer> matBuffer;
 	std::unique_ptr<std::istream> matStream;
-	if(stream->type == BulkLoader::BULK_FILE) {
+	if(stream->type == BulkType::BULK_FILE) {
 		matReader = std::make_unique<util::FileReader>(stream->descriptor.file);
 	} else {
 		matBuffer = std::make_unique<util::ArrayStreamBuffer>(stream->descriptor.bytes, count * sizeof(MaterialIndex));
@@ -1011,7 +993,7 @@ Boolean object_get_id(ObjectHdl obj, uint32_t* id) {
 }
 
 Boolean instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat,
-										   const bool isWorldToInst) {
+										   const Boolean isWorldToInst) {
 	TRY
 	CHECK_NULLPTR(inst, "instance handle", false);
 	CHECK_NULLPTR(mat, "transformation matrix", false);
@@ -1320,9 +1302,9 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 }
 
 // Callback function for OpenGL debug context
-void APIENTRY opengl_callback(GLenum source, GLenum type, GLuint id,
-							  GLenum severity, GLsizei length,
-							  const GLchar* message, const void* userParam) {
+void APIENTRY opengl_callback(GLenum /*source*/, GLenum /*type*/, GLuint id,
+							  GLenum severity, GLsizei /*length*/,
+							  const GLchar* message, const void* /*userParam*/) {
 	switch(severity) {
 		case GL_DEBUG_SEVERITY_HIGH: logError(message); break;
 		case GL_DEBUG_SEVERITY_MEDIUM:
@@ -1751,7 +1733,6 @@ TextureHdl world_add_texture(const char* path, TextureSampling sampling, MipmapT
 													   texData.sRgb, false, std::unique_ptr<u8[]>(texData.data));
 	if(callback != nullptr) {
 		auto cpuTex = texture->template acquire<Device::CPU>();
-		const auto PIXELSIZE = textures::PIXEL_SIZE(static_cast<textures::Format>(texData.format));
 		for(uint32_t layer = 0u; layer < texData.layers; ++layer) {
 			for(uint32_t y = 0u; y < texData.height; ++y) {
 				for(uint32_t x = 0u; x < texData.width; ++x) {
@@ -2586,7 +2567,7 @@ LightHdl scenario_get_light_handle(ScenarioHdl scenario, IndexType index, LightT
 			return LightHdl{ LightType::LIGHT_DIRECTIONAL, scen.get_dir_lights()[index] };
 			break;
 		case LightType::LIGHT_ENVMAP:
-			if(index >= 1u) {
+			if(index >= 1) {
 				logError("[", FUNCTION_NAME, "] Background index out of bounds (", index, " >= 1)");
 				return invalid;
 			}
@@ -3453,7 +3434,7 @@ Boolean render_iterate(ProcessTime* time) {
 		time->microseconds = CpuProfileState::get_process_time().count() - time->microseconds;
 	}
 	s_currentRenderer->post_iteration(*s_imageOutput);
-	Profiler::instance().create_snapshot_all();
+	Profiler::core().create_snapshot_all();
 	return true;
 	CATCH_ALL(false)
 }
@@ -3503,7 +3484,7 @@ Boolean render_save_screenshot(const char* filename, const char* targetName, Boo
 	const int numChannels = s_imageOutput->get_num_channels(targetName);
 	ei::IVec2 res{ s_imageOutput->get_width(), s_imageOutput->get_height() };
 
-	TextureData texData;
+	TextureData texData{};
 	texData.data = reinterpret_cast<uint8_t*>(data.get());
 	texData.components = numChannels;
 	texData.format = numChannels == 1 ? FORMAT_R32F : FORMAT_RGB32F;
@@ -3527,6 +3508,7 @@ Boolean render_save_screenshot(const char* filename, const char* targetName, Boo
 }
 
 Boolean render_save_denoised_radiance(const char* filename) {
+#ifdef MUFFLON_ENABLE_OPEN_DENOISE
 	TRY
 	auto lock = std::scoped_lock(s_iterationMutex);
 	if(s_currentRenderer == nullptr) {
@@ -3593,7 +3575,7 @@ Boolean render_save_denoised_radiance(const char* filename) {
 					   "; the screenshot possibly may not be created");
 
 	const int numChannels = s_imageOutput->get_num_channels("Radiance");
-	TextureData texData;
+	TextureData texData{};
 	texData.data = reinterpret_cast<uint8_t*>(output.get());
 	texData.components = numChannels;
 	texData.format = numChannels == 1 ? FORMAT_R32F : FORMAT_RGB32F;
@@ -3615,6 +3597,10 @@ Boolean render_save_denoised_radiance(const char* filename) {
 
 	return true;
 	CATCH_ALL(false)
+#else // MUFFLON_ENABLE_OPEN_DENOISE
+	(void)filename;
+	return false;
+#endif // MUFFLON_ENABLE_OPEN_DENOISE
 }
 
 uint32_t render_get_render_target_count() {
@@ -3848,13 +3834,13 @@ Boolean renderer_get_parameter_enum_name(const char* param, int value, const cha
 
 void profiling_enable() {
 	TRY
-	Profiler::instance().set_enabled(true);
+	Profiler::core().set_enabled(true);
 	CATCH_ALL(;)
 }
 
 void profiling_disable() {
 	TRY
-	Profiler::instance().set_enabled(false);
+	Profiler::core().set_enabled(false);
 	CATCH_ALL(;)
 }
 
@@ -3862,16 +3848,16 @@ Boolean profiling_set_level(ProfilingLevel level) {
 	TRY
 	switch(level) {
 		case ProfilingLevel::PROFILING_OFF:
-			Profiler::instance().set_enabled(false);
+			Profiler::core().set_enabled(false);
 			return true;
 		case ProfilingLevel::PROFILING_LOW:
-			Profiler::instance().set_profile_level(ProfileLevel::LOW);
+			Profiler::core().set_profile_level(ProfileLevel::LOW);
 			return true;
 		case ProfilingLevel::PROFILING_HIGH:
-			Profiler::instance().set_profile_level(ProfileLevel::HIGH);
+			Profiler::core().set_profile_level(ProfileLevel::HIGH);
 			return true;
 		case ProfilingLevel::PROFILING_ALL:
-			Profiler::instance().set_profile_level(ProfileLevel::ALL);
+			Profiler::core().set_profile_level(ProfileLevel::ALL);
 			return true;
 		default:
 			logError("[", FUNCTION_NAME, "] invalid profiling level");
@@ -3883,7 +3869,7 @@ Boolean profiling_set_level(ProfilingLevel level) {
 Boolean profiling_save_current_state(const char* path) {
 	TRY
 	CHECK_NULLPTR(path, "file path", false);
-	Profiler::instance().save_current_state(path);
+	Profiler::core().save_current_state(path);
 	return true;
 	CATCH_ALL(false)
 }
@@ -3891,7 +3877,7 @@ Boolean profiling_save_current_state(const char* path) {
 Boolean profiling_save_snapshots(const char* path) {
 	TRY
 	CHECK_NULLPTR(path, "file path", false);
-	Profiler::instance().save_snapshots(path);
+	Profiler::core().save_snapshots(path);
 	return true;
 	CATCH_ALL(false)
 }
@@ -3899,7 +3885,7 @@ Boolean profiling_save_snapshots(const char* path) {
 Boolean profiling_save_total_and_snapshots(const char* path) {
 	TRY
 	CHECK_NULLPTR(path, "file path", false);
-	Profiler::instance().save_total_and_snapshots(path);
+	Profiler::core().save_total_and_snapshots(path);
 	return true;
 	CATCH_ALL(false)
 }
@@ -3907,7 +3893,7 @@ Boolean profiling_save_total_and_snapshots(const char* path) {
 const char* profiling_get_current_state() {
 	TRY
 	static thread_local std::string str;
-	str = Profiler::instance().save_current_state();
+	str = Profiler::core().save_current_state();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
@@ -3915,7 +3901,7 @@ const char* profiling_get_current_state() {
 const char* profiling_get_snapshots() {
 	TRY
 	static thread_local std::string str;
-	str = Profiler::instance().save_snapshots();
+	str = Profiler::core().save_snapshots();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
@@ -3923,7 +3909,7 @@ const char* profiling_get_snapshots() {
 const char* profiling_get_total() {
 	TRY
 	static thread_local std::string str;
-	str = Profiler::instance().save_total();
+	str = Profiler::core().save_total();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
@@ -3931,14 +3917,14 @@ const char* profiling_get_total() {
 const char* profiling_get_total_and_snapshots() {
 	TRY
 	static thread_local std::string str;
-	str = Profiler::instance().save_total_and_snapshots();
+	str = Profiler::core().save_total_and_snapshots();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 
 void profiling_reset() {
 	TRY
-	Profiler::instance().reset_all();
+	Profiler::core().reset_all();
 	CATCH_ALL(;)
 }
 
@@ -3989,7 +3975,6 @@ Boolean mufflon_set_logger(void(*logCallback)(const char*, int)) {
 		for(auto& plugin : s_plugins) {
 			logInfo("[", FUNCTION_NAME, "] Loaded texture plugin '",
 					plugin.get_path().string(), "'");
-			plugin.set_logger(logCallback);
 		}
 		int count = 0;
 		cuda::check_error(cudaGetDeviceCount(&count));
@@ -4021,7 +4006,7 @@ Boolean mufflon_initialize() {
 		s_logFile = std::ofstream("log.txt", std::ios_base::trunc);
 		// Load plugins from the DLLs directory
 		s_plugins.clear();
-		fs::path dllPath;
+		fs::path dllPath{};
 		// First obtain the module handle (platform specific), then use that to
 		// get the module's path
 #ifdef _WIN32
@@ -4052,14 +4037,17 @@ Boolean mufflon_initialize() {
 			// avoid loading excessively many DLLs
 			for(const auto& dir : fs::directory_iterator(dllPath.parent_path() / "plugins")) {
 				fs::path path = dir.path();
+#ifdef _WIN32
 				if(!fs::is_directory(path) && path.extension() == ".dll") {
+#else // _WIN32
+				if(!fs::is_directory(path) && path.extension() == ".so") {
+#endif // _WIN32
 					TextureLoaderPlugin plugin{ path };
 					// If we succeeded in loading (and thus have the necessary functions),
 					// add it as a usable plugin
 					if(plugin.is_loaded()) {
 						logInfo("[", FUNCTION_NAME, "] Loaded texture plugin '",
 								plugin.get_path().string(), "'");
-						plugin.set_logger(s_logCallback);
 						s_plugins.push_back(std::move(plugin));
 					}
 				}
@@ -4068,8 +4056,34 @@ Boolean mufflon_initialize() {
 
 		// Set the CUDA device to initialize the context
 		int count = 0;
-		cuda::check_error(cudaGetDeviceCount(&count));
-		if(count > 0) {
+		const auto res = cudaGetDeviceCount(&count);
+		if(res == cudaSuccess && count > 0) {
+			// Parse list of CCs to determine eligible GPUs
+#ifdef MUFFLON_CUDA_ARCHES
+			const std::string archString{ MUFFLON_CUDA_ARCHES };
+#else // MUFFLON_CUDA_ARCHES
+			const std::string archString{};
+#endif // MUFFLON_CUDA_ARCHES
+			std::istringstream ss{ archString };
+			using StringIterator = std::istream_iterator<std::string>;
+			const std::vector<std::string> arches{ StringIterator{ss}, StringIterator{} };
+			int minMajorCC = std::numeric_limits<int>::max();
+			int minMinorCC = std::numeric_limits<int>::max();
+			for(const auto& arch : arches) {
+				if(const auto pos = arch.find('.'); pos != arch.npos) {
+					char* end = nullptr;
+					const auto major = std::strtol(arch.c_str(), &end, 10);
+					if(major < minMajorCC) {
+						minMajorCC = major;
+						minMinorCC = std::strtol(arch.c_str() + pos + 1u, &end, 10);
+					}
+				}
+			}
+			if(minMajorCC == std::numeric_limits<int>::max()) {
+				minMajorCC = 0;
+				minMinorCC = 0;
+			}
+
 			// We select the device with the highest compute capability
 			int devIndex = -1;
 			int major = -1;
@@ -4090,6 +4104,7 @@ Boolean mufflon_initialize() {
 			if(devIndex < 0) {
 				logWarning("[", FUNCTION_NAME, "] Found CUDA device(s), but none support unified addressing or have the required compute capability; "
 						 "continuing without CUDA");
+				mufflon::g_hasCudaEnabled = false;
 			} else {
 				cuda::check_error(cudaSetDevice(devIndex));
 				cuda::check_error(cudaGetDeviceProperties(&deviceProp, devIndex));
@@ -4100,6 +4115,7 @@ Boolean mufflon_initialize() {
 			}
 		} else {
 			logInfo("[", FUNCTION_NAME, "] No CUDA device found; continuing without CUDA");
+			mufflon::g_hasCudaEnabled = false;
 		}
 
 		// Initialize renderers
@@ -4186,7 +4202,7 @@ void mufflon_destroy() {
 	s_plugins.clear();
 	s_screenTexture.reset();
 	WorldContainer::clear_instance();
-	cuda::check_error(cudaDeviceReset());
+	cudaDeviceReset();
 	CATCH_ALL(;)
 }
 

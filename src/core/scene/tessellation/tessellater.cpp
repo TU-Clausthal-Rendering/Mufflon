@@ -22,7 +22,7 @@ OpenMesh::FaceHandle create_dummy_face(geometry::PolygonMeshType& mesh) {
 } // namespace
 
 void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
-	auto profilerTimer = Profiler::instance().start<CpuProfileState>("Tessellater::tessellate", ProfileLevel::HIGH);
+	auto profilerTimer = Profiler::core().start<CpuProfileState>("Tessellater::tessellate", ProfileLevel::HIGH);
 
 	// Setup
 	m_mesh = &mesh;
@@ -375,7 +375,7 @@ void Tessellater::set_edge_vertex(const float x, const OpenMesh::EdgeHandle edge
 
 void Tessellater::set_quad_inner_vertex(const float x, const float y,
 										const OpenMesh::VertexHandle vertex,
-										const OpenMesh::FaceHandle face,
+										const OpenMesh::FaceHandle /*face*/,
 										const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices) {
 	mAssert(x >= 0.f && x <= 1.f && y >= 0.f && y <= 1.f);
 	const ei::Vec3 p0 = util::pun<ei::Vec3>(m_mesh->point(vertices[0u].first));
@@ -417,7 +417,7 @@ void Tessellater::set_quad_inner_vertex(const float x, const float y,
 
 void Tessellater::set_triangle_inner_vertex(const float x, const float y,
 											const OpenMesh::VertexHandle vertex,
-											const OpenMesh::FaceHandle face,
+											const OpenMesh::FaceHandle /*face*/,
 											const std::vector<std::pair<OpenMesh::VertexHandle, AddedVertices>>& vertices) {
 	mAssert(x >= 0.f && y >= 0.f && x + y <= 1.f);
 	const ei::Vec3 p0 = util::pun<ei::Vec3>(m_mesh->point(vertices[0u].first));
@@ -543,14 +543,11 @@ void Tessellater::spawn_inner_triangle_vertices(const u32 innerLevel,
 	for(u32 y = 0u; y < innerLevel; ++y) {
 		const float edgeBaryZ = (y + 1u) / static_cast<float>(innerLevel + 1u);
 		const float edgeBaryX = 1.f - edgeBaryZ;
-		const float bZ = (y + 1u) / static_cast<float>(innerLevel + 2u);
 		for(u32 x = 0u; x < innerLevel - y; ++x) {
 			const OpenMesh::VertexHandle newVertex = m_mesh->add_vertex(OpenMesh::Vec3f{});
 			if(!newVertex.is_valid())
 				throw std::runtime_error("Triangle: failed to add inner vertex");
 			m_innerVertices.push_back(newVertex);
-			const float bX = ((innerLevel - y) - x) / static_cast<float>(innerLevel + 2u);
-
 			const float baryX = edgeBaryX - edgeBaryX * (x + 1u) / static_cast<float>(innerLevel - y + 1u);
 			const float baryY = 1.f - edgeBaryZ - baryX;
 			this->set_triangle_inner_vertex(baryX, baryY, newVertex, face, vertices);

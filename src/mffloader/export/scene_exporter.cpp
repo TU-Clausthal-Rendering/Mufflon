@@ -2,8 +2,6 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/prettywriter.h"
 
-#include "core/export/interface.h"
-
 #include <fstream> 
 #include "util/degrad.hpp"
 #include "util/log.hpp"
@@ -22,7 +20,7 @@ bool operator!=(const Vec3& a, const Vec3& b) {
 
 // Reads a file completely and returns the string containing all bytes
 std::string read_file(fs::path path) {
-	auto scope = mufflon::Profiler::instance().start<mufflon::CpuProfileState>("JSON read_file", mufflon::ProfileLevel::HIGH);
+	auto scope = mufflon::Profiler::loader().start<mufflon::CpuProfileState>("JSON read_file", mufflon::ProfileLevel::HIGH);
 	mufflon::logPedantic("[read_file] Loading JSON file '", path.string(), "' into RAM");
 	const std::uintmax_t fileSize = fs::file_size(path);
 	std::string fileString;
@@ -30,7 +28,7 @@ std::string read_file(fs::path path) {
 
 	std::ifstream file(path, std::ios::binary);
 	file.read(&fileString[0u], fileSize);
-	if(file.gcount() != fileSize)
+	if(file.gcount() != static_cast<std::streamsize>(fileSize))
 		mufflon::logWarning("[read_file] File '", path.string(), "'not read completely");
 	// Finalize the string
 	fileString[file.gcount()] = '\0';
@@ -44,11 +42,11 @@ public:
 	{}
 	bool Double(double d) { Prefix(rapidjson::kNumberType); return EndValue(WriteDouble(d)); }
 	bool WriteDouble(double d) {
-		if(rapidjson::internal::Double(d).IsNanOrInf()) {
+		if(rapidjson::internal::Double(d).isnanOrInf()) {
 			// Note: This code path can only be reached if (RAPIDJSON_WRITE_DEFAULT_FLAGS & kWriteNanAndInfFlag).
 			if(!(rapidjson::kWriteDefaultFlags & rapidjson::kWriteNanAndInfFlag))
 				return false;
-			if(rapidjson::internal::Double(d).IsNan()) {
+			if(rapidjson::internal::Double(d).isnan()) {
 				PutReserve(*os_, 3);
 				PutUnsafe(*os_, 'N'); PutUnsafe(*os_, 'a'); PutUnsafe(*os_, 'N');
 				return true;

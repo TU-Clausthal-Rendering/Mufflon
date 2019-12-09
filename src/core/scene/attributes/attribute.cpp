@@ -658,7 +658,7 @@ std::size_t AttributePool::store(SphereAttributeHandle hdl, util::IByteWriter& a
 	AttribInfo& attribute = m_attributes[hdl.index];
 	const std::size_t elemSize = attribute.elemSize;
 	const char* mem = m_pools.template get<PoolHandle<Device::CPU>>().handle + attribute.poolOffset + elemSize * start;
-	return attrStream.write(mem, elemSize * count) / attribute.elemSize;
+	return attrStream.write(mem, elemSize * actualCount) / attribute.elemSize;
 }
 
 std::size_t AttributePool::insert_attribute_at_first_empty(AttribInfo&& info) {
@@ -681,8 +681,6 @@ template void AttributePool::unload<Device::CUDA>();
 template void AttributePool::unload<Device::OPENGL>();
 template class OpenMeshAttributePool<true>;
 template class OpenMeshAttributePool<false>;
-template void OpenMeshAttributePool<true>::copy(const OpenMeshAttributePool<true>& pool);
-template void OpenMeshAttributePool<false>::copy(const OpenMeshAttributePool<false>& pool);
 template void OpenMeshAttributePool<true>::synchronize<Device::CPU>();
 template void OpenMeshAttributePool<true>::synchronize<Device::CUDA>();
 template void OpenMeshAttributePool<true>::synchronize<Device::OPENGL>();

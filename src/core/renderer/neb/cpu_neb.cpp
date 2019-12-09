@@ -48,7 +48,7 @@ struct NebVertexExt {
 	};
 	float density { -1.0f };
 
-	CUDA_FUNCTION void init(const PathVertex<NebVertexExt>& thisVertex,
+	inline CUDA_FUNCTION void init(const PathVertex<NebVertexExt>& /*thisVertex*/,
 							const AreaPdf inAreaPdf,
 							const AngularPdf inDirPdf,
 							const float pChoice) {
@@ -56,21 +56,21 @@ struct NebVertexExt {
 		this->throughput = Spectrum{1.0f};
 	}
 
-	CUDA_FUNCTION void update(const PathVertex<NebVertexExt>& prevVertex,
+	inline CUDA_FUNCTION void update(const PathVertex<NebVertexExt>& prevVertex,
 							  const PathVertex<NebVertexExt>& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
 							  const Spectrum& throughput,
-							  const float continuationPropability,
-							  const Spectrum& transmission) {
+							  const float /*continuationPropability*/,
+							  const Spectrum& /*transmission*/) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
 		this->throughput = throughput;
 	}
 
-	void update(const PathVertex<NebVertexExt>& thisVertex,
-				const scene::Direction& excident,
+	void update(const PathVertex<NebVertexExt>& /*thisVertex*/,
+				const scene::Direction& /*excident*/,
 				const VertexSample& sample) {
 		pdfBack = sample.pdf.back;
 	}
@@ -101,7 +101,7 @@ public:
 
 namespace {
 
-int get_photon_split_count(const NebPathVertex& vertex, float maxFlux, float targetFlux) {
+int get_photon_split_count(const NebPathVertex& /*vertex*/, float maxFlux, float targetFlux) {
 	return 1; // Disabled
 	float smoothness = 1.0f;//ei::min(1e30f, vertex.get_pdf_max() * ei::PI);
 	if(smoothness < 1e-3f) // Max-pdf cannot be that small (except the surface does not reflect at all)
@@ -250,7 +250,7 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 void CpuNextEventBacktracking::sample_photon_path(float photonMergeArea, math::Rng& rng,
 	const NebPathVertex& vertex, const NeeDesc& nee,
 	AreaPdf* incidentF, AreaPdf* incidentB, int numPhotons) {
-	const float mergeRadiusSq = photonMergeArea / ei::PI;
+	//const float mergeRadiusSq = photonMergeArea / ei::PI;
 	// Precomupte the irradiance -> flux factor and
 	// pplit photons on rough surfaces if their density is much smaller than necessary
 	auto pFactors = get_photon_conversion_factors(vertex, nee, m_targetFlux);
@@ -298,7 +298,7 @@ void CpuNextEventBacktracking::sample_photon_path(float photonMergeArea, math::R
 void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 seed, float photonMergeArea,
 	AreaPdf* incidentF, AreaPdf* incidentB) {
 	math::RndSet2 rndStart { m_rngs[idx].next() };
-	float mergeRadiusSq = photonMergeArea / ei::PI;
+	//float mergeRadiusSq = photonMergeArea / ei::PI;
 	//u64 lightTreeRnd = m_rngs[idx].next();
 	scene::lights::Emitter p = scene::lights::emit(m_sceneDesc, idx, numPhotons, seed, rndStart);
 	NebPathVertex vertex[2];
@@ -494,7 +494,7 @@ static int pairing(int a, int b) {
 }
 
 void CpuNextEventBacktracking::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU NEB iteration", ProfileLevel::HIGH);
+	auto scope = Profiler::core().start<CpuProfileState>("CPU NEB iteration", ProfileLevel::HIGH);
 
 	m_sceneDesc.lightTree.posGuide = m_params.neeUsePositionGuide;
 
@@ -601,8 +601,8 @@ void CpuNextEventBacktracking::iterate() {
 }
 
 void CpuNextEventBacktracking::post_reset() {
-	ResetEvent resetFlags { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
-							ResetEvent::ALL : get_reset_event() };
+	ResetEvent resetFlags { { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
+							ResetEvent::ALL : get_reset_event() } };
 	init_rngs(m_outputBuffer.get_num_pixels());
 	//int countHeuristic = m_outputBuffer.get_num_pixels() * (m_params.maxPathLength - 1) * 2; // Save count
 	int countHeuristic = m_outputBuffer.get_num_pixels() * ei::ceil(logf(float(m_params.maxPathLength)) * 4.0f);

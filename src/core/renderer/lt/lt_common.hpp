@@ -16,7 +16,7 @@ using LtPathVertex = PathVertex<VertexExtension>;
 /*
  * Create one sample path (random walk of a photon) and connect each vertex to the camera
  */
-CUDA_FUNCTION void lt_sample(typename LtTargets::template RenderBufferType<CURRENT_DEV> outputBuffer,
+inline CUDA_FUNCTION void lt_sample(typename LtTargets::template RenderBufferType<CURRENT_DEV> outputBuffer,
 							 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 							 const LtParameters& params,
 							 const int idx,

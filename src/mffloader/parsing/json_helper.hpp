@@ -47,7 +47,7 @@ class ParserException : public std::exception {
 public:
 	ParserException(const ParserState& state);
 
-	virtual const char* what() const override {
+	virtual const char* what() const noexcept override {
 		return m_msg.c_str();
 	}
 

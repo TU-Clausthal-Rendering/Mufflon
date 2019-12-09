@@ -1,7 +1,7 @@
 #pragma once
 
 #include "lights.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/allocator.hpp"
 #include "core/memory/residency.hpp"
 #include "core/memory/synchronize.hpp"
@@ -124,7 +124,7 @@ struct LightTree {
 	bool posGuide;
 
 	// Get the total flux of all lights
-	CUDA_FUNCTION float get_flux() const {
+	inline CUDA_FUNCTION float get_flux() const {
 		return dirLights.root.flux + posLights.root.flux + ei::sum(background.flux);
 	}
 };

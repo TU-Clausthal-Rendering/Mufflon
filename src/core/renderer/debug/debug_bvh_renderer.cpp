@@ -111,7 +111,6 @@ void mufflon::renderer::DebugBvhRenderer::post_reset()
 			auto lodIdx = sceneDesc.lodIndices[i];
 			if(!sceneDesc.is_instance_present(lodIdx))
 				continue;
-			const auto& lod = sceneDesc.lods[lodIdx];
 			bbox.push_back(sceneDesc.cpuDescriptor->aabbs[lodIdx]);
 		}
 
@@ -126,7 +125,6 @@ void mufflon::renderer::DebugBvhRenderer::init()
 	// shader must be reloaded for changed color coding
 	//if (m_isInit) return;
 	//m_isInit = true;
-	const auto& sceneDesc = this->get_scene_descriptor();
 	auto colorCoding = this->m_params.get_param_bool(PDebugColorInstance::name);
 
 	m_triangleProgram = gl::ProgramBuilder()

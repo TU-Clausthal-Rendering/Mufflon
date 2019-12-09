@@ -4,9 +4,9 @@
 #include "int_types.hpp"
 #include "ei/vector.hpp"
 #include <cuda_runtime.h>
-#include <limits>
 #include <cstdint>
 #include <cstddef>
+#include <limits>
 
 namespace mufflon {
 

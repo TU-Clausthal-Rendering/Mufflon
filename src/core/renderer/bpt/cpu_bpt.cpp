@@ -6,6 +6,7 @@
 #include "core/memory/dyntype_memory.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
 #include <array>
+#include <cmath>
 
 
 namespace mufflon::renderer {
@@ -23,28 +24,28 @@ struct BptVertexExt {
 	float prevRelativeProbabilitySum{ 0.0f };
 	Spectrum throughput{ 1.0f };	// Throughput of the path up to this point
 
-	CUDA_FUNCTION void init(const BptPathVertex& thisVertex,
+	inline CUDA_FUNCTION void init(const BptPathVertex& /*thisVertex*/,
 							const AreaPdf inAreaPdf,
 							const AngularPdf inDirPdf,
 							const float pChoice) {
 		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
 	}
 
-	CUDA_FUNCTION void update(const BptPathVertex& prevVertex,
+	inline CUDA_FUNCTION void update(const BptPathVertex& prevVertex,
 							  const BptPathVertex& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
 							  const Spectrum& throughput,
-							  const float continuationPropability,
-							  const Spectrum& transmission) {
+							  const float /*continuationPropability*/,
+							  const Spectrum& /*transmission*/) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
 		this->throughput = throughput;
 	}
 
-	CUDA_FUNCTION void update(const BptPathVertex& thisVertex,
-							  const scene::Direction& excident,
+	inline CUDA_FUNCTION void update(const BptPathVertex& thisVertex,
+							  const scene::Direction& /*excident*/,
 							  const VertexSample& sample) {
 		// Sum up all previous relative probability (cached recursion).
 		// Also see PBRT p.1015.
@@ -99,7 +100,7 @@ float get_mis_weight(const BptPathVertex& vertex0, math::PdfPair pdf0,
 	// given by the get_mis_part() method. => The following line is the balance
 	// heuristic: how likely is this event compared to all other possibilities?
 	float weight = 1.0f / (1.0f + rpSum0 + rpSum1);
-	mAssert(!isnan(weight));
+	mAssert(!std::isnan(weight));
 	return weight;
 }
 
@@ -113,7 +114,7 @@ float get_mis_weight(const BptPathVertex& vertex,
 	float prevRelativeProbabilitySum = get_mis_part(vertex, vertexPdfBack, AngularPdf{float(startPdf)},
 		Interaction::VIRTUAL, {scene::Direction{0.0f}, 0.0f});
 	float weight = 1.0f / (1.0f + prevRelativeProbabilitySum);
-	mAssert(!isnan(weight));
+	mAssert(!std::isnan(weight));
 	return weight;
 }
 
@@ -132,7 +133,7 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 	Spectrum bxdfProd = val0.value * val1.value;
 	float cosProd = val0.cosOut * val1.cosOut;//TODO: abs?
 	mAssert(cosProd >= 0.0f);
-	mAssert(!isnan(bxdfProd.x));
+	mAssert(!std::isnan(bxdfProd.x));
 	// Early out if there would not be a contribution (estimating the materials is usually
 	// cheaper than the any-hit test).
 	if(any(greater(bxdfProd, 0.0f)) && cosProd > 0.0f) {
@@ -156,7 +157,7 @@ CpuBidirPathTracer::CpuBidirPathTracer() {
 }
 
 void CpuBidirPathTracer::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU BPT iteration", ProfileLevel::HIGH);
+	auto scope = Profiler::core().start<CpuProfileState>("CPU BPT iteration", ProfileLevel::HIGH);
 
 	// Allocate a path memory (up to pathlength many vertices per thread)
 	std::vector<std::vector<BptPathVertex>> pathMem(get_thread_num());
@@ -209,7 +210,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 			Pixel outCoord = coord;
 			auto conVal = connect(vertex[currentV], path[l], m_sceneDesc, outCoord);
 			if(outCoord.x != -1) {
-				mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.x) && !isnan(path[l].ext().throughput.x));
+				mAssert(!std::isnan(conVal.cosines) && !std::isnan(conVal.bxdfs.x) && !std::isnan(throughput.x) && !std::isnan(path[l].ext().throughput.x));
 				Spectrum fullThroughput = throughput * path[l].ext().throughput;
 				m_outputBuffer.contribute<RadianceTarget>(outCoord, fullThroughput * conVal.cosines * conVal.bxdfs);
 				m_outputBuffer.contribute<LightnessTarget>(outCoord, avg(fullThroughput) * conVal.cosines);
@@ -232,7 +233,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 				float mis = get_mis_weight(vertex[currentV], emission.pdf, emission.emitPdf);
 				emission.value *= mis;
 			}
-			mAssert(!isnan(emission.value.x));
+			mAssert(!std::isnan(emission.value.x));
 
 			m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 			m_outputBuffer.contribute<LightnessTarget>(coord, avg(throughput) * ei::avg(emission.value));

@@ -48,11 +48,11 @@ public:
 	using AttrHandle = std::conditional_t<IS_FACE, FaceAttributeHandle, VertexAttributeHandle>;
 
 private:
-	template < Device dev >
+	template < Device dev, class Dummy = void >
 	struct AcquireHelper {};
 
-	template <> 
-	struct AcquireHelper< Device::CPU > {
+	template < class Dummy > 
+	struct AcquireHelper< Device::CPU, Dummy > {
 		template <class T>
 		static ArrayDevHandle_t<Device::CPU, T> acquire(OpenMeshAttributePool<IsFace>& parent, const AttrHandle& handle) {
 			return as<ArrayDevHandle_t<Device::CPU, T>, ArrayDevHandle_t<Device::CPU, char>>(
@@ -60,8 +60,8 @@ private:
 		}
 	};
 
-	template <>
-	struct AcquireHelper< Device::CUDA > {
+	template < class Dummy >
+	struct AcquireHelper< Device::CUDA, Dummy > {
 		template <class T>
 		static ArrayDevHandle_t<Device::CUDA, T> acquire(OpenMeshAttributePool<IsFace>& parent, const AttrHandle& handle) {
 			return as<ArrayDevHandle_t<Device::CUDA, T>, ArrayDevHandle_t<Device::CUDA, char>>(
@@ -69,8 +69,8 @@ private:
 		}
 	};
 
-	template <>
-	struct AcquireHelper< Device::OPENGL > {
+	template < class Dummy >
+	struct AcquireHelper< Device::OPENGL, Dummy > {
 		template <class T>
 		static ArrayDevHandle_t<Device::OPENGL, T> acquire(OpenMeshAttributePool<IsFace>& parent, const AttrHandle& handle) {
 			return as<ArrayDevHandle_t<Device::OPENGL, T>, ArrayDevHandle_t<Device::OPENGL, char>>(

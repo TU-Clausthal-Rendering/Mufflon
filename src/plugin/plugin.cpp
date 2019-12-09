@@ -22,7 +22,7 @@ Plugin::Plugin(fs::path path) :
 #ifdef _WIN32
 		m_handle = ::LoadLibrary(m_pluginPath.c_str());
 #else // _WIN32
-		m_handle = dlopen();
+		m_handle = dlopen(m_pluginPath.c_str(), RTLD_NOW | RTLD_LOCAL);
 #endif // _WIN32
 		if(!is_loaded())
 			logError("[Plugin::Plugin] Failed to load plugin '",
@@ -51,7 +51,7 @@ void Plugin::close() {
 #ifdef _WIN32
 		if(!::FreeLibrary(static_cast<HandleType>(m_handle))) {
 #else // _WIN32
-		if(::dlcose(static_cast<HandleType>(m_handle)) != 0) {
+		if(::dlclose(static_cast<HandleType>(m_handle)) != 0) {
 #endif // _WIN32
 			logError("[Plugin::close] Failed to free plugin '",
 					 m_pluginPath.string(), "': ", get_last_error_message());

@@ -63,7 +63,7 @@ namespace mufflon::renderer {
 		int m_minLevel = 0;
 		int m_maxLevel = 100;
 
-		// init tracking
-		bool m_isInit = false;
+		// Init tracking
+		//bool m_isInit = false;
 	};
 }

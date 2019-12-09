@@ -95,7 +95,7 @@ public:
 		ws[0] = 1.0f - ws[1];
 		float countSum = 0.0f, areaSum = 0.0f;
 		// Iterate over all eight cells
-		for(int i = 0u; i < 8u; ++i) {
+		for(int i = 0u; i < 8; ++i) {
 			int ix = i & 1, iy = (i>>1) & 1, iz = i>>2;
 			ei::IVec3 cellPos { gridPosI.x + ix,
 								gridPosI.y + iy,

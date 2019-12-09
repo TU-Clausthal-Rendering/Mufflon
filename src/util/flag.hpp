@@ -1,7 +1,7 @@
 #pragma once
 
 #include "util/assert.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include <climits>
 #include <type_traits>
 
@@ -27,29 +27,29 @@ struct Flags {
 	T mask = 0;
 
 	// Set a flag, may set or remove multiple flags at once
-	CUDA_FUNCTION void set(T flag) noexcept { mask = mask | flag; }
+	inline CUDA_FUNCTION void set(T flag) noexcept { mask = mask | flag; }
 	// Remove a flag, may set or remove multiple flags at once
-	CUDA_FUNCTION void clear(T flag) noexcept { mask = mask & ~flag; }
+	inline CUDA_FUNCTION void clear(T flag) noexcept { mask = mask & ~flag; }
 	// Remove all flags (initial state)
-	CUDA_FUNCTION void clear_all() noexcept { mask = 0; }
+	inline CUDA_FUNCTION void clear_all() noexcept { mask = 0; }
 	// Remove or set a flag based on the current state, may set or remove multiple flags at once
-	CUDA_FUNCTION void toggle(T flag) noexcept { mask = mask ^ flag; }
+	inline CUDA_FUNCTION void toggle(T flag) noexcept { mask = mask ^ flag; }
 	// Check if a specific flag is set
-	CUDA_FUNCTION bool is_set(T flag) const noexcept {
+	inline CUDA_FUNCTION bool is_set(T flag) const noexcept {
 		mAssertMsg(is_power_of_two(flag),
 				   "Only a single flag (bit) should be checked.");
 		return (mask & flag) != 0;
 	}
 	// Check if one of a number of flags is set
-	CUDA_FUNCTION bool is_any_set(T mask) const noexcept {
+	inline CUDA_FUNCTION bool is_any_set(T mask) const noexcept {
 		return (this->mask & mask) != 0;
 	}
 	// Check if NO flag is set
-	CUDA_FUNCTION bool is_empty() const noexcept { return mask == 0; }
+	inline CUDA_FUNCTION bool is_empty() const noexcept { return mask == 0; }
 	// Check if exactly one flag is set
-	CUDA_FUNCTION bool is_unique() const noexcept { return is_power_of_two(mask); }
+	inline CUDA_FUNCTION bool is_unique() const noexcept { return is_power_of_two(mask); }
 
-	constexpr CUDA_FUNCTION operator T () const noexcept { return mask; }
+	constexpr inline CUDA_FUNCTION operator T () const noexcept { return mask; }
 };
 
 }} // namespace mufflon::util

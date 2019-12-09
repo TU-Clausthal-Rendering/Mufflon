@@ -4,7 +4,7 @@
 #include "util/types.hpp"
 #include "util/tagged_tuple.hpp"
 #include "util/string_view.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "core/opengl/gl_texture.hpp"
 #include <array>
@@ -92,13 +92,13 @@ using ConstTextureDevHandle_t = typename TextureDevHandle<dev>::ConstHandleType;
 
 // Returns the size of a texture based on its handle
 // The other overload is located in cputexture.hpp
-inline __host__ __device__ __forceinline__ Pixel get_texture_size(const textures::ConstTextureDevHandle_t<Device::CUDA>& texture) noexcept {
+CUDA_FUNCTION __forceinline__ Pixel get_texture_size(const textures::ConstTextureDevHandle_t<Device::CUDA>& texture) noexcept {
 	return { texture.width, texture.height };
 }
 
 // Returns the number of layers of a texture based on its handle
 // The other specialization is located in cputexture.hpp
-inline __host__ __device__ __forceinline__ u16 get_texture_layers(const textures::ConstTextureDevHandle_t<Device::CUDA>& texture) noexcept {
+CUDA_FUNCTION __forceinline__ u16 get_texture_layers(const textures::ConstTextureDevHandle_t<Device::CUDA>& texture) noexcept {
 	return texture.depth;
 }
 

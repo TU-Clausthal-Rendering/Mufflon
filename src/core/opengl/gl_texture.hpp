@@ -30,6 +30,7 @@ namespace gl {
         case scene::textures::Format::R32F: return {TextureInternal::R32F, TextureSetFormat::R, TextureSetType::F32 };
         case scene::textures::Format::RG32F: return {TextureInternal::RG32F, TextureSetFormat::RG, TextureSetType::F32 };
         case scene::textures::Format::RGBA32F: return {TextureInternal::RGBA32F, TextureSetFormat::RGBA, TextureSetType::F32 };
+        default: mAssert(false); break;
         }
 		mAssert(false);
         return TextureFormat{};

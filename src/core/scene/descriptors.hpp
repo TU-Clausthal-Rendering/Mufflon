@@ -74,10 +74,10 @@ struct LodDescriptor {
 struct CameraDescriptor {
 	u8 cameraParameters[cameras::MAX_CAMERA_PARAM_SIZE];
 
-	CUDA_FUNCTION const cameras::CameraParams& get() const {
+	inline CUDA_FUNCTION const cameras::CameraParams& get() const {
 		return *as<cameras::CameraParams>(cameraParameters);
 	}
-	CUDA_FUNCTION cameras::CameraParams& get() {
+	inline CUDA_FUNCTION cameras::CameraParams& get() {
 		return *as<cameras::CameraParams>(cameraParameters);
 	}
 };
@@ -135,7 +135,7 @@ struct SceneDescriptor : public InstanceData<dev> {
 	float diagSize;	// len(aabb.max - aabb.min)
 	ei::Box aabb;	// Scene-wide bounding box
 	// The receiver of this struct is responsible for deallocating these two arrays!
-	ConstArrayDevHandle_t<NotGl<dev>, LodDescriptor<dev>> lods;
+	ConstArrayDevHandle_t<NotGl<dev>(), LodDescriptor<dev>> lods;
 
 	AccelDescriptor accelStruct;
 	ConstArrayDevHandle_t<dev, ei::Box> aabbs; // For each object.
@@ -150,7 +150,7 @@ struct SceneDescriptor : public InstanceData<dev> {
 		return lodIndex != std::numeric_limits<u32>::max();
 	}
 
-	CUDA_FUNCTION MaterialIndex get_material_index(PrimitiveHandle primitive) const {
+	inline CUDA_FUNCTION MaterialIndex get_material_index(PrimitiveHandle primitive) const {
 		const LodDescriptor<dev>& object = lods[this->lodIndices[primitive.instanceId]];
 		const u32 faceCount = object.polygon.numTriangles + object.polygon.numQuads;
 		if(static_cast<u32>(primitive.primId) < faceCount)
@@ -159,25 +159,25 @@ struct SceneDescriptor : public InstanceData<dev> {
 			return object.spheres.matIndices[primitive.primId];
 	}
 
-	CUDA_FUNCTION const materials::MaterialDescriptorBase& get_material(MaterialIndex matIdx) const {
+	inline CUDA_FUNCTION const materials::MaterialDescriptorBase& get_material(MaterialIndex matIdx) const {
 		return *as<materials::MaterialDescriptorBase>(as<char>(materials) + materials[matIdx]);
 	}
-	CUDA_FUNCTION const materials::MaterialDescriptorBase& get_material(PrimitiveHandle primitive) const {
+	inline CUDA_FUNCTION const materials::MaterialDescriptorBase& get_material(PrimitiveHandle primitive) const {
 		return get_material(get_material_index(primitive));
 	}
 
 
-	CUDA_FUNCTION textures::ConstTextureDevHandle_t<dev> get_alpha_texture(MaterialIndex matIdx) const {
+	inline CUDA_FUNCTION textures::ConstTextureDevHandle_t<dev> get_alpha_texture(MaterialIndex matIdx) const {
 		return alphaTextures[matIdx];
 	}
-	CUDA_FUNCTION textures::ConstTextureDevHandle_t<dev> get_alpha_texture(PrimitiveHandle primitive) const {
+	inline CUDA_FUNCTION textures::ConstTextureDevHandle_t<dev> get_alpha_texture(PrimitiveHandle primitive) const {
 		return get_alpha_texture(get_material_index(primitive));
 	}
 
-	CUDA_FUNCTION bool has_alpha(MaterialIndex matIdx) const {
+	inline CUDA_FUNCTION bool has_alpha(MaterialIndex matIdx) const {
 		return alphaTextures[matIdx] != textures::ConstTextureDevHandle_t<dev>{};
 	}
-	CUDA_FUNCTION bool has_alpha(PrimitiveHandle primitive) const {
+	inline CUDA_FUNCTION bool has_alpha(PrimitiveHandle primitive) const {
 		return has_alpha(get_material_index(primitive));
 	}
 };

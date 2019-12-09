@@ -1,6 +1,7 @@
 #pragma once
 
 #include "residency.hpp"
+#include "synchronize.hpp"
 #include "util/assert.hpp"
 #include "core/cuda/error.hpp"
 #include "core/opengl/gl_buffer.hpp"
@@ -121,7 +122,7 @@ public:
 	}
 
 	template < class T >
-	static T* free(T* ptr, std::size_t n) {
+	static T* free(T* ptr, std::size_t /*n*/) {
 		if(ptr != nullptr) {
 			static_assert(std::is_trivially_destructible<T>::value, "Cannot deallocate complex types on CUDA side like this!");
 			cuda::check_error(cudaFree(ptr));
@@ -176,7 +177,7 @@ public:
 	}
 
 	template < class T >
-	static gl::BufferHandle<T> free(gl::BufferHandle<T> handle, std::size_t n) {
+	static gl::BufferHandle<T> free(gl::BufferHandle<T> handle, std::size_t /*n*/) {
 		if(handle.id != 0)
 			gl::deleteBuffer(handle.id);
 		return gl::BufferHandle<T>{0, 0};

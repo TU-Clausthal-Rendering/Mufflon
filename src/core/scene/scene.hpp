@@ -117,6 +117,7 @@ public:
 
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {
+		(void)camera;
 		mAssert(camera != nullptr);
 		m_cameraDescChanged.for_each([](auto& elem) { elem.changed = true; });
 		// TODO: this function is obsolete, once the scene querries the 'changed' flag from the scenario itself.
@@ -214,7 +215,7 @@ private:
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, LodDescriptor<Device::CPU>[]>,
 		unique_device_ptr<Device::CUDA, LodDescriptor<Device::CUDA>[]>,
-		unique_device_ptr<NotGl<Device::OPENGL>, LodDescriptor<Device::OPENGL>[]>> m_lodDevDesc;
+		unique_device_ptr<NotGl<Device::OPENGL>(), LodDescriptor<Device::OPENGL>[]>> m_lodDevDesc;
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
 		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>,

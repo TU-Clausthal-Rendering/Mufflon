@@ -1,4 +1,4 @@
-#include "interface.h"
+#include "mff_interface.h"
 #include "util/filesystem.hpp"
 #include "util/log.hpp"
 #include "profiler/cpu_profiler.hpp"
@@ -35,16 +35,6 @@ std::string s_lastError;
 std::atomic<json::JsonLoader*> s_jsonLoader = nullptr;
 fs::path s_binPath;
 
-void(*s_logCallback)(const char*, int);
-
-// Function delegating the logger output to the applications handle, if applicable
-void delegateLog(LogSeverity severity, const std::string& message) {
-	TRY
-	if(s_logCallback != nullptr)
-		s_logCallback(message.c_str(), static_cast<int>(severity));
-	CATCH_ALL(;)
-}
-
 } // namespace
 
 const char* loader_get_dll_error() {
@@ -63,42 +53,6 @@ const char* loader_get_dll_error() {
 	buffer[s_lastError.size()] = '\0';
 	return buffer;
 	CATCH_ALL(nullptr)
-}
-
-bool loader_set_log_level(LogLevel level) {
-	switch(level) {
-		case LogLevel::LOG_PEDANTIC:
-			mufflon::s_logLevel = LogSeverity::PEDANTIC;
-			return true;
-		case LogLevel::LOG_INFO:
-			mufflon::s_logLevel = LogSeverity::INFO;
-			return true;
-		case LogLevel::LOG_WARNING:
-			mufflon::s_logLevel = LogSeverity::WARNING;
-			return true;
-		case LogLevel::LOG_ERROR:
-			mufflon::s_logLevel = LogSeverity::ERROR;
-			return true;
-		case LogLevel::LOG_FATAL_ERROR:
-			mufflon::s_logLevel = LogSeverity::FATAL_ERROR;
-			return true;
-		default:
-			logError("[", FUNCTION_NAME, "] Invalid log level");
-			return false;
-	}
-}
-
-Boolean loader_set_logger(void(*logCallback)(const char*, int)) {
-	TRY
-	static bool initialized = false;
-	s_logCallback = logCallback;
-	if(!initialized) {
-		registerMessageHandler(delegateLog);
-		disableStdHandler();
-		initialized = true;
-	}
-	return true;
-	CATCH_ALL(false)
 }
 
 LoaderStatus loader_load_json(const char* path) {
@@ -200,13 +154,13 @@ const char* loader_get_loading_status() {
 
 void loader_profiling_enable() {
 	TRY
-	Profiler::instance().set_enabled(true);
+	Profiler::loader().set_enabled(true);
 	CATCH_ALL(;)
 }
 
 void loader_profiling_disable() {
 	TRY
-	Profiler::instance().set_enabled(false);
+	Profiler::loader().set_enabled(false);
 	CATCH_ALL(;)
 }
 
@@ -214,16 +168,16 @@ Boolean loader_profiling_set_level(ProfilingLevel level) {
 	TRY
 	switch(level) {
 		case ProfilingLevel::PROFILING_OFF:
-			Profiler::instance().set_enabled(false);
+			Profiler::loader().set_enabled(false);
 			return true;
 		case ProfilingLevel::PROFILING_LOW:
-			Profiler::instance().set_profile_level(ProfileLevel::LOW);
+			Profiler::loader().set_profile_level(ProfileLevel::LOW);
 			return true;
 		case ProfilingLevel::PROFILING_HIGH:
-			Profiler::instance().set_profile_level(ProfileLevel::HIGH);
+			Profiler::loader().set_profile_level(ProfileLevel::HIGH);
 			return true;
 		case ProfilingLevel::PROFILING_ALL:
-			Profiler::instance().set_profile_level(ProfileLevel::ALL);
+			Profiler::loader().set_profile_level(ProfileLevel::ALL);
 			return true;
 		default:
 			logError("[", FUNCTION_NAME, "] invalid profiling level");
@@ -238,7 +192,7 @@ Boolean loader_profiling_save_current_state(const char* path) {
 		logError("[", FUNCTION_NAME, "] Invalid file path (nullptr)");
 		return false;
 	}
-	Profiler::instance().save_current_state(path);
+	Profiler::loader().save_current_state(path);
 	return true;
 	CATCH_ALL(false)
 }
@@ -249,7 +203,7 @@ Boolean loader_profiling_save_snapshots(const char* path) {
 		logError("[", FUNCTION_NAME, "] Invalid file path (nullptr)");
 		return false;
 	}
-	Profiler::instance().save_snapshots(path);
+	Profiler::loader().save_snapshots(path);
 	return true;
 	CATCH_ALL(false)
 }
@@ -260,7 +214,7 @@ Boolean loader_profiling_save_total_and_snapshots(const char* path) {
 		logError("[", FUNCTION_NAME, "] Invalid file path (nullptr)");
 		return false;
 	}
-	Profiler::instance().save_total_and_snapshots(path);
+	Profiler::loader().save_total_and_snapshots(path);
 	return true;
 	CATCH_ALL(false)
 }
@@ -268,7 +222,7 @@ Boolean loader_profiling_save_total_and_snapshots(const char* path) {
 const char* loader_profiling_get_current_state() {
 	TRY
 		static thread_local std::string str;
-	str = Profiler::instance().save_current_state();
+	str = Profiler::loader().save_current_state();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
@@ -276,7 +230,7 @@ const char* loader_profiling_get_current_state() {
 const char* loader_profiling_get_snapshots() {
 	TRY
 	static thread_local std::string str;
-	str = Profiler::instance().save_snapshots();
+	str = Profiler::loader().save_snapshots();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
@@ -284,7 +238,7 @@ const char* loader_profiling_get_snapshots() {
 const char* loader_profiling_get_total() {
 	TRY
 	static thread_local std::string str;
-	str = Profiler::instance().save_total();
+	str = Profiler::loader().save_total();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
@@ -292,13 +246,13 @@ const char* loader_profiling_get_total() {
 const char* loader_profiling_get_total_and_snapshots() {
 	TRY
 	static thread_local std::string str;
-	str = Profiler::instance().save_total_and_snapshots();
+	str = Profiler::loader().save_total_and_snapshots();
 	return str.c_str();
 	CATCH_ALL(nullptr)
 }
 
 void loader_profiling_reset() {
 	TRY
-	Profiler::instance().reset_all();
+	Profiler::loader().reset_all();
 	CATCH_ALL(;)
 }

@@ -70,6 +70,7 @@ void GlRenderer::reset(int width, int height) {
 		glNamedFramebufferTexture(m_framebuffer, m_depthAttachmentType, m_depthTarget, 0);
 
 	const auto fbStatus = glCheckNamedFramebufferStatus(m_framebuffer, GL_DRAW_FRAMEBUFFER);
+	(void)fbStatus;
 	mAssert(fbStatus == GL_FRAMEBUFFER_COMPLETE);
 	glNamedFramebufferDrawBuffers(m_framebuffer, GLsizei(attachments.size()), attachments.data());
 }
@@ -114,7 +115,7 @@ void GlRenderer::draw_triangles(const gl::Pipeline& pipe, Attribute attribs) {
 
 	bindStaticAttribs(pipe, attribs);
 
-	for(size_t i = 0; i < sceneDesc.numInstances; ++i) {
+	for(size_t i = 0; i < static_cast<size_t>(sceneDesc.numInstances); ++i) {
 		const auto idx = sceneDesc.lodIndices[i];
 		if(!sceneDesc.is_instance_present(idx))
 			continue;
@@ -158,7 +159,7 @@ void GlRenderer::draw_spheres(const gl::Pipeline& pipe, Attribute attribs) {
 
 	bindStaticAttribs(pipe, attribs);
 
-	for(size_t i = 0; i < sceneDesc.numInstances; ++i) {
+	for(size_t i = 0; i < static_cast<size_t>(sceneDesc.numInstances); ++i) {
 		const auto idx = sceneDesc.lodIndices[i];
 		if(!sceneDesc.is_instance_present(idx))
 			continue;
@@ -191,7 +192,7 @@ void GlRenderer::draw_quads(const gl::Pipeline& pipe, Attribute attribs) {
 
 	bindStaticAttribs(pipe, attribs);
 
-	for(size_t i = 0; i < sceneDesc.numInstances; ++i) {
+	for(size_t i = 0; i < static_cast<size_t>(sceneDesc.numInstances); ++i) {
 		const auto idx = sceneDesc.lodIndices[i];
 		if(!sceneDesc.is_instance_present(idx))
 			continue;

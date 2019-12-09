@@ -1,4 +1,5 @@
 #include "lights.hpp"
+#include "util/punning.hpp"
 #include "core/math/rng.hpp"
 #include "core/math/sampling.hpp"
 #include "core/scene/textures/interface.hpp"
@@ -24,7 +25,7 @@ Spectrum get_flux(const AreaLightTriangle<Device::CPU>& light, const int* materi
 	auto* mat = as<materials::MaterialDescriptorBase>(as<char>(materials) + materials[light.material]);
 	float area = len(cross(light.posV[1u], light.posV[2u])) / 2.0f;
 	// Sample the radiance over the entire triangle region.
-	math::GoldenRatio2D gen(*reinterpret_cast<u32*>(&area));	// Use the area as seed
+	math::GoldenRatio2D gen(util::pun<u32>(area));	// Use the area as seed
 	Spectrum radianceSum{ 0.0f };
 	for(int i = 0; i < 128; ++i) {// TODO: adaptive sample count?
 		const ei::Vec2 u = math::sample_uniform(gen.next());
@@ -42,7 +43,7 @@ Spectrum get_flux(const AreaLightTriangle<Device::CPU>& light, const int* materi
 Spectrum get_flux(const AreaLightQuad<Device::CPU>& light, const int* materials) {
 	auto* mat = as<materials::MaterialDescriptorBase>(as<char>(materials) + materials[light.material]);
 	// Sample the radiance over the entire triangle region.
-	math::GoldenRatio2D gen((u32)reinterpret_cast<u64>(&light));	// Use different seeds per light
+	math::GoldenRatio2D gen((u32)util::pun<u64>(&light));	// Use different seeds per light
 	Spectrum intensitySum { 0.0f };
 	for(int i = 0; i < 128; ++i) {// TODO: adaptive sample count?
 		const ei::Vec2 u = math::sample_uniform(gen.next());
@@ -63,7 +64,7 @@ Spectrum get_flux(const AreaLightSphere<Device::CPU>& light, const int* material
 	auto* mat = as<materials::MaterialDescriptorBase>(as<char>(materials) + materials[light.material]);
 	float area = ei::surface(ei::Sphere{ light.position, light.radius });
 	// Sample the radiance over the entire triangle region.
-	math::GoldenRatio2D gen(*reinterpret_cast<u32*>(&area));	// Use the area as seed
+	math::GoldenRatio2D gen(util::pun<u32>(area));	// Use the area as seed
 	Spectrum radianceSum{ 0.0f };
 	for(int i = 0; i < 128; ++i) {// TODO: adaptive sample count?
 		const ei::Vec2 u = math::sample_uniform(gen.next());

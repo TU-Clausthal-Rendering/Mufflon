@@ -6,10 +6,10 @@
 namespace mufflon::scene::lights {
 
 Background::Background(const BackgroundType type) :
-	m_type(type),
-	m_params{},
-	m_flux{ 0.f },
-	m_scale{ 1.f }
+	m_params{ MonochromParams{} },
+	m_type{ type },
+	m_scale{ 1.f },
+	m_flux{ 0.f }
 {
 	switch(type) {
 		case BackgroundType::COLORED:
@@ -58,6 +58,7 @@ const BackgroundDesc<dev> Background::acquire_const(const ei::Box& bounds) {
 			const auto& params = std::get<SkyParams>(m_params);
 			desc.skyParams = compute_sky_model_params(params);
 			desc.flux = m_flux;
+			break;
 		}
 		default: mAssert(false); break;
 	}

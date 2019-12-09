@@ -4,7 +4,7 @@
 #include "util/string_view.hpp"
 #include "json_helper.hpp"
 #include "binary.hpp"
-#include "core/export/interface.h"
+#include "core_interface.h"
 #include "util/fixed_hashmap.hpp"
 #include <ei/3dtypes.hpp>
 #include <rapidjson/document.h>
@@ -19,7 +19,7 @@ namespace mff_loader::json {
 class JsonException : public std::exception {
 public:
 	JsonException(const std::string& str, rapidjson::ParseResult res);
-	virtual const char* what() const override {
+	virtual const char* what() const noexcept override {
 		return m_error.c_str();
 	}
 

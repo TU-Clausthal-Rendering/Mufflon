@@ -13,7 +13,7 @@ using PtPathVertex = PathVertex<VertexExtension>;
 
 namespace {
 
-CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const ei::Vec3* vertices, const ei::IVec3& indices,
+inline CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const ei::Vec3* vertices, const ei::IVec3& indices,
 											   const ei::Mat3x4& instanceToWorld, const ei::Vec3& hitpoint) {
 	// Compute the projected points on the triangle lines
 	const auto A = transform(vertices[indices.x], instanceToWorld);
@@ -41,7 +41,7 @@ CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const ei::Vec3* vertices, const e
 		return onBC;
 }
 
-CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const ei::Vec3* vertices, const ei::IVec4& indices,
+inline CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const ei::Vec3* vertices, const ei::IVec4& indices,
 											   const ei::Mat3x4& instanceToWorld, const ei::Vec3& hitpoint) {
 	// Compute the projected points on the quad lines
 	const auto A = transform(vertices[indices.x], instanceToWorld);
@@ -76,13 +76,13 @@ CUDA_FUNCTION ei::Vec3 computeClosestLinePoint(const ei::Vec3* vertices, const e
 		return onCD;
 }
 
-CUDA_FUNCTION float computeDistToRim(const ei::Sphere* spheres, const u32 index,
+inline CUDA_FUNCTION float computeDistToRim(const ei::Sphere* spheres, const u32 index,
 									 const ei::Mat3x4& instanceToWorld, const ei::Vec3& hitpoint,
-									 const ei::Vec3& incident, const ei::Vec3& origin) {
+									 const ei::Vec3& incident) {
 	const auto& sphere = spheres[index];
 	const auto center = transform(sphere.center, instanceToWorld);
 	// We use the angle between incident and center-hitpoint as the indicator of
-	// proximity to tangential ray (90° == tangent, 0° == max. non-tangentness
+	// proximity to tangential ray (90ï¿½ == tangent, 0ï¿½ == max. non-tangentness
 	const auto hitToCenter = ei::normalize(center - hitpoint);
 	const float angleIntersectCenter = ei::dot(hitToCenter, incident);
 	return sphere.radius * angleIntersectCenter;
@@ -90,7 +90,7 @@ CUDA_FUNCTION float computeDistToRim(const ei::Sphere* spheres, const u32 index,
 
 } // namespace 
 
-CUDA_FUNCTION void sample_wireframe(WireframeTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
+inline CUDA_FUNCTION void sample_wireframe(WireframeTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 									scene::SceneDescriptor<CURRENT_DEV>& scene,
 									const WireframeParameters& params, math::Rng& rng, const Pixel& coord) {
 	constexpr ei::Vec3 borderColor{ 1.f };
@@ -166,8 +166,7 @@ CUDA_FUNCTION void sample_wireframe(WireframeTargets::RenderBufferType<CURRENT_D
 				// here is a workaround to get roughly the same line width as triangles
 				// and quads
 				projDistToRim = 0.05f * computeDistToRim(lod.spheres.spheres, hitId.primId,
-														 instanceToWorld, hit, ray.direction,
-														 sample.origin);
+														 instanceToWorld, hit, ray.direction);
 			}
 			const float distThreshold = params.lineWidth * pixelSize;
 			// Only draw it if it's below the threshold (expressed in pixels)
