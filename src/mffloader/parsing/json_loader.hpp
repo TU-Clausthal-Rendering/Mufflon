@@ -27,10 +27,54 @@ private:
 	std::string m_error;
 };
 
+struct FileVersion {
+	unsigned major = 0u;
+	unsigned minor = 0u;
+
+	constexpr FileVersion() = default;
+
+	constexpr FileVersion(unsigned major, unsigned minor) noexcept :
+		major{ major },
+		minor{ minor }
+	{}
+
+	explicit FileVersion(std::string_view str) {
+		std::sscanf(str.data(), "%u.%u", &major, &minor);
+	}
+
+	constexpr bool operator<(const FileVersion& rhs) const noexcept {
+		return (major < rhs.major) || ((major == rhs.major) && (minor < rhs.minor));
+	}
+
+	constexpr bool operator==(const FileVersion& rhs) const noexcept {
+		return (major == rhs.major) && (minor == rhs.minor);
+	}
+
+	constexpr bool operator<=(const FileVersion& rhs) const noexcept {
+		return this->operator<(rhs) || this->operator==(rhs);
+	}
+
+	constexpr bool operator>(const FileVersion& rhs) const noexcept {
+		return !this->operator<=(rhs);
+	}
+
+	constexpr bool operator>=(const FileVersion& rhs) const noexcept {
+		return !this->operator<(rhs);
+	}
+
+	constexpr bool operator!=(const FileVersion& rhs) const noexcept {
+		return !this->operator==(rhs);
+	}
+};
 
 class JsonLoader {
 public:
-	static constexpr const char FILE_VERSION[] = "1.5";
+
+	static constexpr ei::Mat2x2 TEST{ 0.f, 0.f, 0.f, 0.f };
+	static constexpr FileVersion CURRENT_FILE_VERSION{ 1u, 5u };
+	static constexpr FileVersion INVERTEX_TRANSMAT_FILE_VERSION{ 1u, 4u };
+	static constexpr FileVersion ABSOLUTE_CAM_NEAR_FAR_FILE_VERSION{ 1u, 5u };
+
 	static constexpr float DEFAULT_NEAR_PLANE_FACTOR = 1.e-4f;
 	static constexpr float DEFAULT_FAR_PLANE_FACTOR = 2.f;
 	static constexpr float DEFAULT_NEAR_PLANE = 0.01f;
@@ -78,7 +122,7 @@ private:
 	rapidjson::Value::ConstMemberIterator m_lights;
 	rapidjson::Value::ConstMemberIterator m_materials;
 	rapidjson::Value::ConstMemberIterator m_scenarios;
-	mufflon::StringView m_version;
+	FileVersion m_version;
 	mufflon::StringView m_defaultScenario;
 	std::map<std::string, MaterialHdl, std::less<>> m_materialMap;
 	mufflon::util::FixedHashMap<mufflon::StringView, LightHdl> m_lightMap;
@@ -94,3 +138,11 @@ private:
 };
 
 } // namespace mff_loader::json
+
+namespace std {
+
+inline std::string to_string(const mff_loader::json::FileVersion& version) {
+	return std::to_string(version.major) + "." + std::to_string(version.minor);
+}
+
+} // namespace std

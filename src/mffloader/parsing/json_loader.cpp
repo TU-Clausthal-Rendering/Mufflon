@@ -1016,14 +1016,12 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 	if(versionIter == document.MemberEnd()) {
 		logWarning("[JsonLoader::load_file] Scene file: no version specified (current one assumed)");
 	} else {
-		m_version = read<const char*>(m_state, versionIter);
-		if(m_version.compare(FILE_VERSION) != 0 && m_version.compare("1.0") != 0
-		   && m_version.compare("1.1") != 0 && m_version.compare("1.2")
-		   && m_version.compare("1.3") != 0 && m_version.compare("1.4") != 0)
+		m_version = FileVersion{ read<const char*>(m_state, versionIter) };
+		if(m_version > CURRENT_FILE_VERSION)
 			logWarning("[JsonLoader::load_file] Scene file: version mismatch (",
-					   m_version, "(file) vs ", FILE_VERSION, "(current))");
-		hasWorldToInstTrans = (m_version.compare("1.4") == 0);
-		m_absoluteCamNearFar = (m_version.compare("1.5") == 0);
+					   m_version, "(file) vs ", CURRENT_FILE_VERSION, "(current))");
+		hasWorldToInstTrans = m_version >= INVERTEX_TRANSMAT_FILE_VERSION;
+		m_absoluteCamNearFar = m_version >= ABSOLUTE_CAM_NEAR_FAR_FILE_VERSION;
 		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");
 	}
 	// Binary file path
