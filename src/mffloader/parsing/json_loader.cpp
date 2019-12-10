@@ -1107,7 +1107,7 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 	const bool deinstance = read_opt<bool>(m_state, document, "deinstance", false);
 	// Load the binary file before we load the rest of the JSON
 	if(!m_binLoader.load_file(binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods,
-							  deinstance, hasWorldToInstTrans, m_absoluteCamNearFar))
+							  deinstance, hasWorldToInstTrans, !m_absoluteCamNearFar))
 		return false;
 
 	try {

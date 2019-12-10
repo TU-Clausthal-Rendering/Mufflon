@@ -818,12 +818,14 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 											compute_instance_to_world_transformation(&m_instances[i]))
 	};
 #pragma PARALLEL_FOR
-	for(i32 i = static_cast<i32>(animatedInstOffset); i < static_cast<i32>(animatedInstCount); ++i)
+	for(i32 i = 0u; i < static_cast<i32>(animatedInstCount); ++i) {
+		const auto idx = static_cast<i32>(animatedInstOffset) + i;
 		threadAabbs[get_current_thread_idx()] = ei::Box{
 			threadAabbs[get_current_thread_idx()],
-			m_instances[i].get_bounding_box(m_scenario->get_effective_lod(&m_instances[i]),
-											compute_instance_to_world_transformation(&m_instances[i]))
-	};
+			m_instances[idx].get_bounding_box(m_scenario->get_effective_lod(&m_instances[idx]),
+											compute_instance_to_world_transformation(&m_instances[idx]))
+		};
+	}
 	// Merge the bounding boxes
 	for(const auto& box : threadAabbs)
 		aabb = ei::Box{ aabb, box };
