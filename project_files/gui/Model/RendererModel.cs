@@ -200,21 +200,42 @@ namespace gui.Model
 
         public uint Iteration => Core.render_get_current_iteration();
 
-        public Core.ProcessTime CurrentIterationTime { get; private set; }
+        private Core.ProcessTime m_currentIterationTime = new Core.ProcessTime();
+        public Core.ProcessTime CurrentIterationTime
+        {
+            get => m_currentIterationTime;
+            private set
+            {
+                if (value.cycles == m_currentIterationTime.cycles
+                    && value.microseconds == m_currentIterationTime.microseconds) return;
+                m_currentIterationTime = value;
+                OnPropertyChanged(nameof(CurrentIterationTime));
+            }
+        }
         public Core.ProcessTime AverageIterationTime => new Core.ProcessTime()
         {
             cycles = TotalIterationTime.cycles / (Iteration == 0 ? 1 : Iteration),
             microseconds = TotalIterationTime.microseconds / (Iteration == 0 ? 1 : Iteration)
         };
-        public Core.ProcessTime TotalIterationTime { get; private set; }
+        private Core.ProcessTime m_totalIterationTime = new Core.ProcessTime();
+        public Core.ProcessTime TotalIterationTime
+        {
+            get => m_totalIterationTime;
+            private set
+            {
+                if (value.cycles == m_totalIterationTime.cycles
+                    && value.microseconds == m_totalIterationTime.microseconds) return;
+                m_totalIterationTime = value;
+                OnPropertyChanged(nameof(TotalIterationTime));
+            }
+        }
 
         public void Reset()
         {
             if (!Core.render_reset())
                 throw new Exception(Core.core_get_dll_error());
             CurrentIterationTime = new Core.ProcessTime();
-            OnPropertyChanged(nameof(CurrentIterationTime));
-            UpdateIterationData();
+            TotalIterationTime = new Core.ProcessTime();
         }
 
         // Takes screenshots of all active render targets
