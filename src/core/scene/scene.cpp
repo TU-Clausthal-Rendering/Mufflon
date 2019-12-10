@@ -155,9 +155,6 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 		std::unique_ptr<LodDescriptor<dev>[]> lodDescs;
 		std::unique_ptr<ei::Box[]> lodAabbs;
 
-		m_boundingBox.max = ei::Vec3{ -std::numeric_limits<float>::max() };
-		m_boundingBox.min = ei::Vec3{ std::numeric_limits<float>::max() };
-
 		// Create the object and instance descriptors
 		// This keeps track of instances for a given LoD
 
@@ -244,8 +241,6 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 
 				const auto instanceIndex = inst->get_index();
 				lodIndices[instanceIndex] = threadLodIndex + index;
-				const auto aabb = inst->get_bounding_box(instanceLod, m_worldToInstanceTransformation[inst->get_index()]);
-				m_boundingBox = ei::Box(m_boundingBox, aabb);
 			}
 		}
 

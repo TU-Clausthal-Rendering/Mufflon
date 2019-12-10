@@ -51,7 +51,7 @@ Polygons::Polygons(const Polygons& poly) :
 	m_normalsHdl(m_vertexAttributes.register_normal_attribute()),
 	m_uvsHdl(m_vertexAttributes.register_uv_attribute()),
 	m_curvatureHdl{},
-	m_matIndicesHdl{ this->template add_face_attribute<u16>("materials") },
+	m_matIndicesHdl{ poly.m_matIndicesHdl },
 	m_boundingBox(poly.m_boundingBox),
 	m_triangles(poly.m_triangles),
 	m_quads(poly.m_quads)
