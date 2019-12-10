@@ -209,7 +209,7 @@ private:
 		m_idxToParam[Idx] = P::get_desc();
 		const int offset = int(reinterpret_cast<char*>(static_cast<P*>(this)) - reinterpret_cast<char*>(this));
 		const auto enumMaps = get_enum_map_ptrs<P>();
-		auto iter = m_paramMap.emplace(m_idxToParam[Idx].name, ParamRef{offset, m_idxToParam[Idx].type,
+		(void)m_paramMap.emplace(m_idxToParam[Idx].name, ParamRef{offset, m_idxToParam[Idx].type,
 									   enumMaps });
 		init<Idx+1, Tail...>();
 	}

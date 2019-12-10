@@ -38,7 +38,7 @@ std::streamsize ArrayStreamBuffer::showmanyc() {
 
 
 std::streampos ArrayStreamBuffer::seekoff(std::streamoff off, std::ios_base::seekdir way,
-										  std::ios_base::openmode which) {
+										  std::ios_base::openmode /*which*/) {
 	if(way == std::ios_base::beg) {
 		m_current = m_begin + off;
 	} else if(way == std::ios_base::cur) {
@@ -55,7 +55,7 @@ std::streampos ArrayStreamBuffer::seekoff(std::streamoff off, std::ios_base::see
 }
 
 std::streampos ArrayStreamBuffer::seekpos(std::streampos sp,
-										  std::ios_base::openmode which) {
+										  std::ios_base::openmode /*which*/) {
 	m_current = m_begin + sp;
 
 	if(m_current < m_begin || m_current > m_end)

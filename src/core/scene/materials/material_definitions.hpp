@@ -223,7 +223,7 @@ struct MatWalter {
 	} nonTexParams;
 	float refractionIndex;
 
-	Medium compute_medium(const Medium& outerMedium) const {
+	Medium compute_medium(const Medium& /*outerMedium*/) const {
 		return Medium{ei::Vec2{refractionIndex, 0.0f}, nonTexParams.absorption};
 	}
 };
@@ -266,7 +266,7 @@ struct MatMicrofacet {
 	} nonTexParams;
 	float refractionIndex;
 
-	Medium compute_medium(const Medium& outerMedium) const {
+	Medium compute_medium(const Medium& /*outerMedium*/) const {
 		return Medium{ei::Vec2{refractionIndex, 0.0f}, nonTexParams.absorption};
 	}
 };
@@ -413,7 +413,7 @@ struct MatBlendFresnel {
 		//nonTexParams.pReflect = 0.89176122288449f * f0 + 0.10823877711551f;
 	}
 
-	Medium compute_medium(const Medium& outerMedium) const;
+	Medium compute_medium(const Medium& /*outerMedium*/) const;
 
 	using NonTexParams = MatNTPBlendFresnel<LayerA, LayerB>;
 	NonTexParams nonTexParams;

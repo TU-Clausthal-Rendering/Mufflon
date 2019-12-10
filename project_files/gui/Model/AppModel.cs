@@ -48,8 +48,6 @@ namespace gui.Model
             Window.RenderDisplay.BorderHost.Child = GlHost;
             if (!Core.mufflon_set_logger(m_logCallbackPointer))
                 throw new Exception(Core.core_get_dll_error());
-            if (!Loader.loader_set_logger(m_logCallbackPointer))
-                throw new Exception(Core.core_get_dll_error());
             GlHost.StartRenderLoop();
             Loaded(this, null);
         }

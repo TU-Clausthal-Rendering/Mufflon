@@ -25,7 +25,7 @@ CpuSsSilPT::CpuSsSilPT() {
 }
 
 void CpuSsSilPT::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU PT iteration", ProfileLevel::HIGH);
+	auto scope = Profiler::core().start<CpuProfileState>("CPU PT iteration", ProfileLevel::HIGH);
 
 	m_sceneDesc.lightTree.posGuide = m_params.neeUsePositionGuide;
 	const auto NUM_PIXELS = m_outputBuffer.get_num_pixels();

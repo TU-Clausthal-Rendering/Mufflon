@@ -1,6 +1,7 @@
 #pragma once
 
 #include "descriptors.hpp"
+#include "scenario.hpp"
 #include "accel_structs/lbvh.hpp"
 #include "geometry/polygon.hpp"
 #include "geometry/sphere.hpp"
@@ -20,8 +21,6 @@ template < Device dev >
 struct LodDescriptor;
 class Object;
 
-class Scenario;
-
 namespace tessellation {
 class TessLevelOracle;
 } // namespace tessellation
@@ -31,7 +30,12 @@ public:
 	// Available geometry types - extend if necessary
 	using GeometryTuple = util::TaggedTuple<geometry::Polygons, geometry::Spheres>;
 
-	Lod(const Object* parent) : m_parent{parent} {}
+	Lod(const Object* parent) :
+		m_geometry{},
+		m_accelStruct{},
+		m_parent{ parent },
+		m_flags{ 0 }
+	{}
 	// Warning: implicit sync!
 	Lod(Lod&) = default;
 	Lod(Lod&& obj) = delete;
@@ -50,6 +54,19 @@ public:
 		return m_geometry.template get<Geom>();
 	}
 
+	// Updates the LoD's flags according to the given scenarios
+	// Takes an unordered_set so the scratch memmory can be shared between LoDs
+	void update_flags(const Scenario& scenario, std::unordered_set<MaterialIndex>& uniqueMatCache);
+
+	// Is there any emissive polygon/sphere in this object
+	bool is_emissive(const Scenario& scenario) const noexcept {
+		return m_flags & (1llu << static_cast<u64>(2u * scenario.get_index()));
+	}
+	// Is there any displaced polygon in this object
+	bool is_displaced(const Scenario& scenario) const noexcept {
+		return m_flags & (1llu << static_cast<u64>(2u * scenario.get_index() + 1u));
+	}
+
 	/* This set of functions interacts with LoDs created internally (e.g. importance-based geometry reduction).
 	 * A renderer may choose to create a reduced version (overwriting the previously existing one).
 	 * Reduced versions may also be shared between LoDs (e.g. creating a reduced version from a high-res LoD
@@ -66,22 +83,17 @@ public:
 	}
 	// Sets the reduced version to the reduced version of another LoD
 	void reference_reduced_version(const Lod& donor) noexcept { m_reducedVersion = donor.m_reducedVersion; }
-	
-
-	// Is there any emissive polygon in this object
-	// Requires the scenario for the material mapping.
-	bool is_emissive(const class Scenario& scenario) const noexcept;
 
 	// Get the descriptor of the object (including all geometry, but without attributes)
 	// Synchronizes implicitly
 	template < Device dev >
-	LodDescriptor<dev> get_descriptor();
+	LodDescriptor<dev> get_descriptor(const bool allowSerialBvhBuild);
 	// Updates the given descriptor's attribute fields
 	template < Device dev >
 	void update_attribute_descriptor(LodDescriptor<dev>& descriptor,
-									 const std::vector<const char*>& vertexAttribs,
-									 const std::vector<const char*>& faceAttribs,
-									 const std::vector<const char*>& sphereAttribs);
+									 const std::vector<AttributeIdentifier>& vertexAttribs,
+									 const std::vector<AttributeIdentifier>& faceAttribs,
+									 const std::vector<AttributeIdentifier>& sphereAttribs);
 
 	// Clears the BVH of this object.
 	void clear_accel_structure();
@@ -119,15 +131,6 @@ public:
 		m_parent = parent;
 	}
 
-	// Returns whether any geometry has a displacement map associated with the given material assignment
-	bool has_displacement_mapping(const Scenario& scenario) const noexcept {
-		bool hasDisplacementMapping = false;
-		m_geometry.for_each([&hasDisplacementMapping, &scenario](auto& elem) {
-			hasDisplacementMapping |= elem.has_displacement_mapping(scenario);
-		});
-		return hasDisplacementMapping;
-	}
-
 	// Checks if displacement mapping was applied to all of the LoD's geometry
 	bool was_displacement_mapping_applied() const noexcept {
 		bool wasDisplacementApplied = true;
@@ -149,6 +152,7 @@ private:
 	// Acceleration structure of the geometry
 	accel_struct::LBVHBuilder m_accelStruct;
 	const Object* m_parent;
+	u64 m_flags;	// Stores flags (2 bits per-scenario)
 	std::shared_ptr<Lod> m_reducedVersion;
 };
 

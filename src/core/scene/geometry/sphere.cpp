@@ -9,8 +9,8 @@ namespace mufflon::scene::geometry {
 
 Spheres::Spheres() :
 	m_attributes(),
-	m_spheresHdl(m_attributes.add_attribute<ei::Sphere>("spheres")),
-	m_matIndicesHdl(m_attributes.add_attribute<MaterialIndex>("materialIdx")) {
+	m_spheresHdl(this->template add_attribute<ei::Sphere>("spheres")),
+	m_matIndicesHdl(this->template add_attribute<MaterialIndex>("materials")) {
 	// Invalidate bounding box
 	m_boundingBox.min = {
 		std::numeric_limits<float>::max(),
@@ -28,8 +28,7 @@ Spheres::Spheres(const Spheres& sphere) :
 	m_attributes(sphere.m_attributes),
 	m_spheresHdl(sphere.m_spheresHdl),
 	m_matIndicesHdl(sphere.m_matIndicesHdl),
-	m_boundingBox(sphere.m_boundingBox),
-	m_uniqueMaterials(sphere.m_uniqueMaterials)
+	m_boundingBox(sphere.m_boundingBox)
 {
 	sphere.m_attribBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
@@ -48,8 +47,7 @@ Spheres::Spheres(Spheres&& sphere) :
 	m_attributes(std::move(sphere.m_attributes)),
 	m_spheresHdl(std::move(sphere.m_spheresHdl)),
 	m_matIndicesHdl(std::move(sphere.m_matIndicesHdl)),
-	m_boundingBox(std::move(sphere.m_boundingBox)),
-	m_uniqueMaterials(std::move(sphere.m_uniqueMaterials))
+	m_boundingBox(std::move(sphere.m_boundingBox))
 {
 	sphere.m_attribBuffer.for_each([&](auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
@@ -84,7 +82,6 @@ Spheres::SphereHandle Spheres::add(const Point& point, float radius, MaterialInd
 	SphereHandle hdl = this->add(point, radius);
 	m_attributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl] = idx;
 	m_attributes.mark_changed(Device::CPU);
-	m_uniqueMaterials.emplace(idx);
 	return hdl;
 }
 
@@ -111,12 +108,6 @@ Spheres::BulkReturn Spheres::add_bulk(std::size_t count, util::IByteReader& radP
 	return { hdl, readRadPos };
 }
 
-std::size_t Spheres::add_bulk(StringView name, const SphereHandle& startSphere,
-							  std::size_t count, util::IByteReader& attrStream) {
-	return this->add_bulk(m_attributes.get_attribute_handle(name), startSphere,
-						  count, attrStream);
-}
-
 std::size_t Spheres::add_bulk(SphereAttributeHandle hdl, const SphereHandle& startSphere,
 							  std::size_t count, util::IByteReader& attrStream) {
 	if(startSphere >= m_attributes.get_attribute_elem_count())
@@ -124,16 +115,10 @@ std::size_t Spheres::add_bulk(SphereAttributeHandle hdl, const SphereHandle& sta
 	if(startSphere + count > m_attributes.get_attribute_elem_count())
 		m_attributes.reserve(startSphere + count);
 	std::size_t numRead = m_attributes.restore(hdl, attrStream, startSphere, count);
-	// Update material table in case this load was about materials
-	if(hdl == m_matIndicesHdl) {
-		MaterialIndex* materials = m_attributes.acquire<Device::CPU, MaterialIndex>(hdl);
-		for(std::size_t i = startSphere; i < startSphere+numRead; ++i)
-			m_uniqueMaterials.emplace(materials[i]);
-	}
 	return numRead;
 }
 
-void Spheres::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
+void Spheres::transform(const ei::Mat3x4& transMat) {
 	if (this->get_sphere_count() == 0) return;
 	// Invalidate bounding box
 	m_boundingBox.min = {
@@ -148,9 +133,12 @@ void Spheres::transform(const ei::Mat3x4& transMat, const ei::Vec3& scale) {
 	};
 	// Transform mesh
 	ei::Sphere* spheres = m_attributes.acquire<Device::CPU, ei::Sphere>(m_spheresHdl);
+	const float scale = ei::len(ei::Vec3(transMat, 0u, 0u));
 	for (size_t i = 0; i < this->get_sphere_count(); i++) {
-		mAssert(scale.x == scale.y && scale.y == scale.z);
-		spheres[i].radius *= scale.x;
+		mAssertMsg(scale == ei::len(ei::Vec3(transMat, 0u, 1u))
+				   && scale == ei::len(ei::Vec3(transMat, 0u, 1u)),
+				   "The scales in the transformation matrix must be all equal!");
+		spheres[i].radius *= scale;
 		spheres[i].center = ei::transform(spheres[i].center, transMat);
 		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(spheres[i].center + ei::Vec3(spheres[i].radius)), m_boundingBox.max);
 		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(spheres[i].center - ei::Vec3(spheres[i].radius)), m_boundingBox.min);
@@ -173,8 +161,9 @@ SpheresDescriptor<dev> Spheres::get_descriptor() {
 // Updates the descriptor with the given set of attributes
 template < Device dev >
 void Spheres::update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
-										  const std::vector<const char*>& attribs) {
+										  const std::vector<AttributeIdentifier>& attribs) {
 	this->synchronize<dev>();
+
 	// Collect the attributes; for that, we iterate the given Attributes and
 	// gather them on CPU side (or rather, their device pointers); then
 	// we copy it to the actual device
@@ -185,15 +174,16 @@ void Spheres::update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
 			if(attribBuffer.size == 0)
 				attribBuffer.buffer = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(attribs.size());
 			else
-				attribBuffer.buffer = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, attribBuffer.size,
-																	   attribs.size());
+				attribBuffer.buffer = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer,
+																									attribBuffer.size,
+																									attribs.size());
 			attribBuffer.size = attribs.size();
 		}
 
 		std::vector<ArrayDevHandle_t<dev, void>> cpuAttribs(attribs.size());
-		for(const char* name : attribs)
-			cpuAttribs.push_back(m_attributes.acquire<dev, void>(name));
-		copy<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, cpuAttribs.data(), sizeof(const char*) * attribs.size());
+		for(const auto& ident : attribs)
+			cpuAttribs.push_back(this->template acquire<dev, void>(ident));
+		copy<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, cpuAttribs.data(), sizeof(cpuAttribs.front()) * attribs.size());
 	} else if(attribBuffer.size != 0) {
 		attribBuffer.buffer = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(attribBuffer.buffer, attribBuffer.size);
 	}
@@ -208,10 +198,8 @@ void Spheres::displace(tessellation::TessLevelOracle& oracle, const Scenario& sc
 	// There is no displacement we can perform for a perfect sphere (yet)
 }
 
-void Spheres::tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
-						 const bool usePhong) {
-	(void)oracle;
-	(void)scenario;
+void Spheres::tessellate(tessellation::TessLevelOracle& /*oracle*/, const Scenario* /*scenario*/,
+						 const bool /*usePhong*/) {
 	// There is no tessellation we can/have to perform for a perfect sphere (yet)
 }
 
@@ -219,9 +207,9 @@ template SpheresDescriptor<Device::CPU> Spheres::get_descriptor<Device::CPU>();
 template SpheresDescriptor<Device::CUDA> Spheres::get_descriptor<Device::CUDA>();
 template SpheresDescriptor<Device::OPENGL> Spheres::get_descriptor<Device::OPENGL>();
 template void Spheres::update_attribute_descriptor<Device::CPU>(SpheresDescriptor<Device::CPU>& descriptor,
-																 const std::vector<const char*>&);
+																const std::vector<AttributeIdentifier>&);
 template void Spheres::update_attribute_descriptor<Device::CUDA>(SpheresDescriptor<Device::CUDA>& descriptor,
-																 const std::vector<const char*>&);
+																 const std::vector<AttributeIdentifier>&);
 template void Spheres::update_attribute_descriptor<Device::OPENGL>(SpheresDescriptor<Device::OPENGL>& descriptor,
-																 const std::vector<const char*>&);
+																 const std::vector<AttributeIdentifier>&);
 } // namespace mufflon::scene::geometry

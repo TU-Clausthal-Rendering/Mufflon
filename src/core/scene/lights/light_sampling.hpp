@@ -2,7 +2,7 @@
 
 #include "lights.hpp"
 #include "texture_sampling.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "ei/vector.hpp"
 #include "ei/conversions.hpp"
 #include "core/math/sampling.hpp"
@@ -28,10 +28,10 @@ struct Emitter {
 	// Deliver some additional information dependent on the type.
 	// These are required to generate general purpose vertices.
 	union SourceParam {
-		CUDA_FUNCTION SourceParam() {}
-		CUDA_FUNCTION SourceParam(const scene::Direction& d, half cT, half cFS) : spot{d, cT, cFS} {}
-		CUDA_FUNCTION SourceParam(const scene::Direction& n, float a) : area{n, a} {}
-		CUDA_FUNCTION SourceParam(float pA) : dir{pA} {}
+		inline CUDA_FUNCTION SourceParam() {}
+		inline CUDA_FUNCTION SourceParam(const scene::Direction& d, half cT, half cFS) : spot{d, cT, cFS} {}
+		inline CUDA_FUNCTION SourceParam(const scene::Direction& n, float a) : area{n, a} {}
+		inline CUDA_FUNCTION SourceParam(float pA) : dir{pA} {}
 		struct {
 			scene::Direction direction;
 			half cosThetaMax;
@@ -78,9 +78,9 @@ constexpr float DISTANCESQ_EPSILON = 1e-10f;
 // Sample a light source
 // *** POINT LIGHT ***
 CUDA_FUNCTION __forceinline__ Emitter sample_light_pos(const PointLight& light,
-													   const math::RndSet2& rnd) {
+													   const math::RndSet2& /*rnd*/) {
 	return Emitter{ light.position, float(AreaPdf::infinite()),
-				    light.intensity, 0.0f, LightType::POINT_LIGHT, light.mediumIndex };
+				    light.intensity, 0.0f, LightType::POINT_LIGHT, light.mediumIndex, {} };
 }
 CUDA_FUNCTION __forceinline__ PhotonDir sample_light_dir_point(const Spectrum& intensity,
 															   const math::RndSet2& rnd) {
@@ -90,7 +90,7 @@ CUDA_FUNCTION __forceinline__ PhotonDir sample_light_dir_point(const Spectrum& i
 
 // *** SPOT LIGHT ***
 CUDA_FUNCTION __forceinline__ Emitter sample_light_pos(const SpotLight& light,
-													   const math::RndSet2& rnd
+													   const math::RndSet2& /*rnd*/
 ) {
 	return Emitter{ light.position, float(AreaPdf::infinite()),
 					light.intensity, 0.0f, LightType::SPOT_LIGHT, light.mediumIndex,
@@ -222,7 +222,7 @@ CUDA_FUNCTION __forceinline__ Emitter sample_light_pos(const DirectionalLight& l
 // *** ENVMAP ***
 // Samples a direction and evaluates the envmap's radiance in that direction
 struct LightDirSampleResult{ math::DirectionSample dir; Spectrum radiance; };
-CUDA_FUNCTION LightDirSampleResult
+inline CUDA_FUNCTION LightDirSampleResult
 sample_light_dir(const BackgroundDesc<CURRENT_DEV>& light,
 				 const float u0, const float u1) {
 	if(light.type == BackgroundType::COLORED) {
@@ -308,7 +308,7 @@ CUDA_FUNCTION __forceinline__ Emitter sample_light_pos(const BackgroundDesc<CURR
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SceneDescriptor<CURRENT_DEV>& scene,
 																const PointLight& light,
 																const ei::Vec3& pos,
-																const math::RndSet2& rnd) {
+																const math::RndSet2& /*rnd*/) {
 	ei::Vec3 direction = light.position - pos;
 	const float distSq = lensq(direction) + DISTANCESQ_EPSILON;
 	const float dist = sqrtf(distSq);
@@ -326,7 +326,7 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SceneDescr
 CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const SceneDescriptor<CURRENT_DEV>& scene,
 																const SpotLight& light,
 																const ei::Vec3& pos,
-																const math::RndSet2& rnd) {
+																const math::RndSet2& /*rnd*/) {
 	ei::Vec3 direction = light.position - pos;
 	const float distSq = lensq(direction) + DISTANCESQ_EPSILON;
 	const float dist = sqrtf(distSq);
@@ -464,14 +464,14 @@ CUDA_FUNCTION __forceinline__ NextEventEstimation connect_light(const Background
 // Evaluate a directional hit of the background.
 // This function would be more logical in lights.hpp. But it requires textures
 // and would increase header dependencies.
-CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<CURRENT_DEV>& background,
+inline CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<CURRENT_DEV>& background,
 												  const ei::Vec3& direction) {
 	switch(background.type) {
 		case BackgroundType::COLORED: return { background.monochromParams.color * background.scale,
-			1.0f, AngularPdf{0.0f}, AngularPdf{1.0f / (4.0f * ei::PI)} };
+			1.0f, { AngularPdf{0.0f}, AngularPdf{1.0f / (4.0f * ei::PI)} } };
 		case BackgroundType::SKY_HOSEK: {
 			return { get_hosek_sky_rgb_radiance(background.skyParams, direction) * background.scale,
-				1.f, AngularPdf{0.f}, AngularPdf{1.0f / (4.0f * ei::PI)} };
+				1.f, { AngularPdf{0.f}, AngularPdf{1.0f / (4.0f * ei::PI)} } };
 		}
 		case BackgroundType::ENVMAP: {
 			UvCoordinate uv;
@@ -500,7 +500,7 @@ CUDA_FUNCTION math::EvalValue evaluate_background(const BackgroundDesc<CURRENT_D
 				pdfScale *= sinPixel / (2.0f * ei::PI * ei::PI * sinJac);
 			}
 			radiance *= background.scale;
-			return { radiance, 1.0f, AngularPdf{0.0f}, AngularPdf{pdfScale / cdf} };
+			return { radiance, 1.0f, { AngularPdf{0.0f}, AngularPdf{pdfScale / cdf} } };
 		}
 		default: mAssert(false); return {};
 	}

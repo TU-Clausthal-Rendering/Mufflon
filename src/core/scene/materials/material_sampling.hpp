@@ -2,7 +2,7 @@
 
 #include "material_definitions.hpp"
 #include "medium.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/scene/types.hpp"
 #include "util/log.hpp"
 #include "util/assert.hpp"
@@ -16,6 +16,7 @@
 #include "microfacet_refractive.hpp"
 #include "microfacet_full.hpp"
 #include <cuda_runtime.h>
+#include <math.h>
 
 namespace mufflon { namespace scene { namespace materials {
 
@@ -29,7 +30,7 @@ namespace mufflon { namespace scene { namespace materials {
  *		get_parameter_pack_size(device) memory.
  * Returns the size of the fetched data.
  */
-CUDA_FUNCTION int fetch(const MaterialDescriptorBase& desc, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) {
+inline CUDA_FUNCTION int fetch(const MaterialDescriptorBase& desc, const UvCoordinate& uvCoordinate, ParameterPack* outBuffer) {
 	auto MAT_TEX_COUNT = details::enumerate_tex_counts( std::make_integer_sequence<int, int(Materials::NUM)>{} );
 	// 1. Fetch date in a unified style to reduce divergence
 	const textures::ConstTextureDevHandle_t<CURRENT_DEV>* tex = as<textures::ConstTextureDevHandle_t<CURRENT_DEV>>(&desc + 1);
@@ -55,7 +56,7 @@ CUDA_FUNCTION int fetch(const MaterialDescriptorBase& desc, const UvCoordinate& 
 constexpr float SHADING_NORMAL_EPS = 1e-3f;
 
 // TODO: put the solve method into epsilon
-CUDA_FUNCTION ei::Vec2 solve(const ei::Mat2x2 & _A, const ei::Vec2 & _b) {
+inline CUDA_FUNCTION ei::Vec2 solve(const ei::Mat2x2 & _A, const ei::Vec2 & _b) {
 	float detM = _A.m00 * _A.m11 - _A.m10 * _A.m01;
 	float detX = _b.x   * _A.m11 - _b.y   * _A.m01;
 	float detY = _A.m00 * _b.y   - _A.m10 * _b.x;
@@ -73,7 +74,7 @@ CUDA_FUNCTION ei::Vec2 solve(const ei::Mat2x2 & _A, const ei::Vec2 & _b) {
  *		A halfvector based method should supply the sampled half vector
  *		via set to improve performance.
  */
-CUDA_FUNCTION math::PathSample
+inline CUDA_FUNCTION math::PathSample
 sample(const TangentSpace& tangentSpace,
 		const ParameterPack& params,
 		const Direction& incident,
@@ -133,7 +134,8 @@ sample(const TangentSpace& tangentSpace,
 						/ (SHADING_NORMAL_EPS + ei::abs(iDotG * eDotN));
 	}
 
-	mAssert(!isnan(res.throughput.x) && !isnan(res.excident.x) && !isnan(float(res.pdf.forw)) && !isnan(float(res.pdf.back)));
+	mAssert(!isnan(res.throughput.x) && !isnan(res.excident.x)
+			&& !isnan(float(res.pdf.forw)) && !isnan(float(res.pdf.back)));
 
 	return res;
 }
@@ -151,7 +153,7 @@ sample(const TangentSpace& tangentSpace,
  *		Use 0 for connection events! Otherwise this is the dot(geoN, lightDir) at the
  *		point where the photon hit.
  */
-CUDA_FUNCTION math::EvalValue
+inline CUDA_FUNCTION math::EvalValue
 evaluate(const TangentSpace& tangentSpace,
 		 const ParameterPack& params,
 		 const Direction& incident,
@@ -208,7 +210,8 @@ evaluate(const TangentSpace& tangentSpace,
 
 	// Early out if result is discarded anyway
 	if(res.value == 0.0f) return math::EvalValue{};
-	mAssert(!isnan(res.value.x) && !isnan(float(res.pdf.forw)) && !isnan(float(res.pdf.back)));
+	mAssert(!isnan(res.value.x) && !isnan(float(res.pdf.forw))
+			&& !isnan(float(res.pdf.back)));
 
 	// Shading normal caused density correction.
 	if(lightNormal != nullptr) {
@@ -228,8 +231,8 @@ evaluate(const TangentSpace& tangentSpace,
 	return math::EvalValue{
 		res.value, ei::abs(eDotN),
 		// Swap back output values if we swapped the directions before
-		adjoint ? res.pdf.back : res.pdf.forw,
-		adjoint ? res.pdf.forw : res.pdf.back
+		{ adjoint ? res.pdf.back : res.pdf.forw,
+		  adjoint ? res.pdf.forw : res.pdf.back }
 	};
 }
 
@@ -238,7 +241,7 @@ evaluate(const TangentSpace& tangentSpace,
  * a white furnace environment. Not necessarily the correct value - approximations
  * suffice.
  */
-CUDA_FUNCTION Spectrum
+inline CUDA_FUNCTION Spectrum
 albedo(const ParameterPack& params) {
 	material_switch(params.type,
 		return albedo(*as<typename MatType::SampleType>(params.subParams));
@@ -249,7 +252,7 @@ albedo(const ParameterPack& params) {
 /*
  * Get the self emission into some direction.
  */
-CUDA_FUNCTION math::SampleValue
+inline CUDA_FUNCTION math::SampleValue
 emission(const ParameterPack& params, const scene::Direction& geoN, const scene::Direction& excident) {
 	material_switch(params.type,
 		return emission(*as<typename MatType::SampleType>(params.subParams), geoN, excident);
@@ -261,7 +264,7 @@ emission(const ParameterPack& params, const scene::Direction& geoN, const scene:
 /* 
  * Get the maximum value of the pdf (approximated for some models).
  */
-CUDA_FUNCTION float
+inline CUDA_FUNCTION float
 pdf_max(const ParameterPack& params) {
 	material_switch(params.type,
 		return pdf_max(*as<typename MatType::SampleType>(params.subParams));

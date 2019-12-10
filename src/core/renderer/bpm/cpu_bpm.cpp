@@ -7,6 +7,7 @@
 #include "core/renderer/random_walk.hpp"
 #include "core/scene/materials/medium.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
+#include <cmath>
 
 namespace mufflon::renderer {
 
@@ -25,20 +26,20 @@ struct BpmVertexExt {
 	float prevConversionFactor { 0.0f };
 
 
-	CUDA_FUNCTION void init(const BpmPathVertex& thisVertex,
+	inline CUDA_FUNCTION void init(const BpmPathVertex& /*thisVertex*/,
 							const AreaPdf inAreaPdf,
 							const AngularPdf inDirPdf,
 							const float pChoice) {
 		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
 	}
 
-	CUDA_FUNCTION void update(const BpmPathVertex& prevVertex,
+	inline CUDA_FUNCTION void update(const BpmPathVertex& prevVertex,
 							  const BpmPathVertex& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const Spectrum& throughput,
-							  const float continuationPropability,
-							  const Spectrum& transmission) {
+							  const Spectrum& /*throughput*/,
+							  const float /*continuationPropability*/,
+							  const Spectrum& /*transmission*/) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
@@ -53,8 +54,8 @@ struct BpmVertexExt {
 		}
 	}
 
-	CUDA_FUNCTION void update(const BpmPathVertex& thisVertex,
-							  const scene::Direction& excident,
+	inline CUDA_FUNCTION void update(const BpmPathVertex& thisVertex,
+							  const scene::Direction& /*excident*/,
 							  const VertexSample& sample) {
 		// Sum up all previous relative probability (cached recursion).
 		// Also see PBRT p.1015.
@@ -96,7 +97,7 @@ float get_mis_weight(const BpmPathVertex& thisVertex, const AngularPdf pdfBack,
 	return 1.0f / (1.0f + mergeProbSum);
 }
 
-CUDA_FUNCTION float select_bandwidth(const float* distSq, int n) {
+inline CUDA_FUNCTION float select_bandwidth(const float* distSq, int n) {
 	// Take element k+1 for the independent area estimate (using the radius of the k-th element is biased).
 	return distSq[n];	// Unbiased according to Garcia 2012, but biased in my experiments
 
@@ -105,7 +106,7 @@ CUDA_FUNCTION float select_bandwidth(const float* distSq, int n) {
 }
 
 // A photon mapping kernel with dSq = current sample distance and rSq = bandwidth.
-CUDA_FUNCTION float kernel(float dSq, float rSq) {
+inline CUDA_FUNCTION float kernel(float dSq, float rSq) {
 	//return 1.0f;	// Uniform
 	//return 2.0f * (1.0f - dSq / rSq);		// Epanechnikov
 	return 3.0f * ei::sq(1.0f - dSq / rSq);	// Silverman
@@ -118,7 +119,7 @@ CpuBidirPhotonMapper::CpuBidirPhotonMapper() {
 }
 
 void CpuBidirPhotonMapper::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU BPM iteration", ProfileLevel::LOW);
+	auto scope = Profiler::core().start<CpuProfileState>("CPU BPM iteration", ProfileLevel::LOW);
 
 	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
 	if(m_params.progressive)
@@ -217,17 +218,17 @@ void CpuBidirPhotonMapper::trace_photon(int idx, int numPhotons, u64 seed, float
 		// Store a photon to the photon map
 		if(m_params.knn == 0)
 			m_photonMap.insert(vertex[currentV].get_position(), {
-				vertex[currentV].ext().incidentPdf,
-				vertex[currentV].get_incident_direction(), pathLen,
-				throughput / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
-				vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor,
+				{ vertex[currentV].ext().incidentPdf,
+				  vertex[currentV].get_incident_direction(), pathLen,
+				  throughput / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
+				  vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor },
 				vertex[currentV].get_position() });
 		else
 			prevKdTreeIdx = m_photonMapKd.insert(vertex[currentV].get_position(), {
-				vertex[currentV].ext().incidentPdf,
-				vertex[currentV].get_incident_direction(), pathLen,
-				throughput / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
-				vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor,
+				{ vertex[currentV].ext().incidentPdf,
+				  vertex[currentV].get_incident_direction(), pathLen,
+				  throughput / numPhotons, vertex[otherV].ext().prevRelativeProbabilitySum,
+				  vertex[currentV].get_geometric_normal(), vertex[currentV].ext().prevConversionFactor },
 				1.0f, prevKdTreeIdx });
 	} while(pathLen < m_params.maxPathLength-1); // -1 because there is at least one segment on the view path
 }
@@ -260,10 +261,9 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 			if(emission.value != 0.0f && viewPathLen > 1) {
 				float misWeight = get_mis_weight(vertex[currentV], emission.pdf, emission.emitPdf, numPhotons, prevMergeArea);
 				emission.value *= misWeight;
-				if(isnan(emission.value.x)) __debugbreak();
-				m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 			}
-			mAssert(!isnan(emission.value.x));
+			mAssert(!std::isnan(emission.value.x));
+			m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 		}
 		if(vertex[currentV].is_end_point()) break;
 
@@ -279,7 +279,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 				if(pathLen >= m_params.minPathLength && pathLen <= m_params.maxPathLength
 					&& lensq(photonIt->position - currentPos) < mergeRadiusSq) {
 					radiance += merge(vertex[currentV], *photonIt);
-					if(isnan(radiance.x)) __debugbreak();
+					mAssert(!std::isnan(radiance.x));
 				}
 				++photonIt;
 			}
@@ -301,8 +301,7 @@ void CpuBidirPhotonMapper::sample(const Pixel coord, int idx, int numPhotons, fl
 					radiance += merge(vertex[currentV], photon) * kernel(distSq[i], bandwidth);
 			}
 			radiance /= currentMergeArea;
-			if(isnan(radiance.x))
-				__debugbreak();
+			mAssert(!std::isnan(radiance.x));
 		}
 
 		m_outputBuffer.contribute<RadianceTarget>(coord, throughput * radiance);

@@ -22,7 +22,7 @@ GpuLightTracer::GpuLightTracer() :
 {}
 
 void GpuLightTracer::iterate() {
-	//auto scope = Profiler::instance().start<GpuProfileState>("GPU LT iteration", ProfileLevel::LOW);
+	//auto scope = Profiler::core().start<GpuProfileState>("GPU LT iteration", ProfileLevel::LOW);
 
 	cuda::check_error(gpult_detail::call_kernel(std::move(m_outputBuffer),
 												m_sceneDesc.get(), m_rngs.get(), m_params));

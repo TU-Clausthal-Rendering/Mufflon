@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "core/math/sampling.hpp"
+#include <math.h>
 
 namespace mufflon { namespace renderer {
 
@@ -112,8 +113,8 @@ public:
 	}
 
 	Footprint2DCov add_segment(float pdf, bool orthographic, float mean_curvature,
-							   float prevInCos, float prevOutCos, float eta, float distance,
-							   float inCos) const {
+							   float prevInCos, float /*prevOutCos*/, float /*eta*/, float distance,
+							   float /*inCos*/) const {
 		Footprint2DCov f = *this;
 		if(orthographic) {
 			f.m_xx = 1.0f / pdf;
@@ -124,8 +125,7 @@ public:
 			f.update_travel(distance);
 		}
 	//	f.update_projection(ei::abs(inCos));
-		if(std::isnan(f.m_aa) || std::isnan(f.m_ax) || std::isnan(f.m_xx))
-			__debugbreak();
+		mAssert(!(isnan(f.m_aa) || isnan(f.m_ax) || isnan(f.m_xx)));
 		return f;
 	}
 private:
@@ -150,9 +150,9 @@ public:
 		return m_a * m_a / m_P;
 	}
 
-	__host__ __device__ FootprintV0 add_segment(float pdf, bool orthographic, float mean_curvature,
-							float prevInCos, float prevOutCos, float eta, float distance,
-							float inCos, float pRoulette) const {
+	__host__ __device__ FootprintV0 add_segment(float pdf, bool orthographic, float /*mean_curvature*/,
+							float /*prevInCos*/, float /*prevOutCos*/, float /*eta*/, float distance,
+							float /*inCos*/, float pRoulette) const {
 		FootprintV0 f = *this;
 		if(orthographic) {
 			f.m_x = 1.0f / sqrt(pdf);
@@ -181,9 +181,9 @@ public:
 		return m_x / m_P;
 	}
 
-	__host__ __device__ FootprintV0Sq add_segment(float pdf, bool orthographic, float mean_curvature,
-							float prevInCos, float prevOutCos, float eta, float distance,
-							float inCos, float pRoulette) const {
+	__host__ __device__ FootprintV0Sq add_segment(float pdf, bool orthographic, float /*mean_curvature*/,
+							float /*prevInCos*/, float /*prevOutCos*/, float /*eta*/, float distance,
+							float /*inCos*/, float pRoulette) const {
 		FootprintV0Sq f = *this;
 		if(orthographic) {
 			f.m_x = 1.0f / pdf;
@@ -212,8 +212,8 @@ public:
 	}
 
 	FootprintV1 add_segment(float pdf, bool orthographic, float mean_curvature,
-							float prevInCos, float prevOutCos, float eta, float distance,
-							float inCos) const {
+							float /*prevInCos*/, float /*prevOutCos*/, float /*eta*/, float distance,
+							float /*inCos*/) const {
 		FootprintV1 f = *this;
 		if(orthographic) {
 			f.m_x = 1.0f / sqrt(pdf);
@@ -252,25 +252,28 @@ public:
 		//	const float xNoProj = sqrt(f.m_xx * ei::abs(prevInCos));
 		//	const float Hs = mean_curvature * xNoProj * (1 + 1.0f / ei::abs(prevInCos)) * ei::sign(prevInCos);
 		//	const float Hs = mean_curvature * xNoProj * ei::sign(prevInCos);
-			const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
-		//	const float Hs = mean_curvature * atan(sqrt(f.m_xx)) * ei::sign(prevInCos);
+			//const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
+			const float Hs = mean_curvature * atan(sqrt(f.m_xx)) * ei::sign(prevInCos);
 			if(prevInCos * prevOutCos < 0.0f && ei::abs(eta) > 1e-5f) {
 				// Refraction
-			//	float da = Hs * sqrt(2 * ei::PI);
-			//	f.m_a = (f.m_a + Hs) * eta - Hs;
-			//	f.m_a = (f.m_a + Hs * ei::abs(prevInCos / prevOutCos)) * eta - Hs;
-			//	f.m_a = f.m_a + Hs * ei::abs(prevInCos / prevOutCos) * eta - Hs;
-			//	f.m_a = (f.m_a + Hs * ei::abs(prevInCos)) * eta - Hs * ei::abs(prevOutCos);
-			//	f.m_a = eta * f.m_a + (eta * prevInCos + prevOutCos) * Hs;
+				//float da = Hs * sqrt(2 * ei::PI);
+				//f.m_a = (f.m_a + Hs) * eta - Hs;
+				f.m_a = (f.m_a + Hs * ei::abs(prevInCos / prevOutCos)) * eta - Hs;
+				//f.m_a = f.m_a + Hs * ei::abs(prevInCos / prevOutCos) * eta - Hs;
+				//f.m_a = (f.m_a + Hs * ei::abs(prevInCos)) * eta - Hs * ei::abs(prevOutCos);
+				//f.m_a = eta * f.m_a + (eta * prevInCos + prevOutCos) * Hs;
+				//f.m_a = f.m_a * eta + a2sar(Hs * ei::abs(prevInCos / prevOutCos) * eta - Hs);
+				//f.m_a = f.m_a * eta - (1.0f - eta) * Hs * sqrt(2*ei::PI);
 			} else {
 				// Reflection
 				//f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx) * ei::sign(prevOutCos);
 				//f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx / ei::abs(prevInCos)) * ei::sign(prevOutCos);
 				//f.m_a = f.m_a + 2 * mean_curvature * sqrt(f.m_xx) * (prevOutCos);
-			//	f.m_a = f.m_a + 2 * Hs;
+				f.m_a = f.m_a + 2 * Hs;
 				//f.m_a += 2.0f * Hs * prevInCos;
+				//f.m_a = f.m_a + a2sar(2 * Hs);
 			}
-			f.m_a += ei::abs(Hs);
+			//f.m_a += ei::abs(Hs);
 			// Leave tangent space
 			f.m_xx *= ei::abs(prevOutCos);
 			// BRDF
@@ -283,6 +286,8 @@ public:
 			}
 			// Enter tangent space
 			f.m_xx /= ei::abs(inCos) + 1e-6f;
+		//	if(f.m_xx > 1e20f || isnan(f.m_xx))
+		//		__debugbreak();
 		}
 		f.m_P *= pRoulette;
 		return f;
@@ -291,6 +296,12 @@ private:
 	float m_xx = 0.0f;
 	float m_a = 0.0f;
 	float m_P = 1.0f;
+
+	// Angle -> sqrt(Solid Angle)
+	float a2sar(float a) const {
+		float s = ei::sgn(a);
+		return s * sqrt(2*ei::PI*(1.0f - cos(ei::abs(a))));
+	}
 };
 
 class FootprintV2Sq {
@@ -315,7 +326,7 @@ public:
 			f.m_xx = 1.0f / (pdf * ei::abs(inCos));
 			//f.m_x = 1.0f / sqrt(pdf);
 		} else {
-			const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
+			//const float Hs = mean_curvature * sqrt(f.m_xx) * ei::sign(prevInCos);
 			if(prevInCos * prevOutCos < 0.0f) {
 				// Refraction
 			//	f.m_aa = f.m_aa * eta * eta + (Hs * eta - Hs) * ei::abs(Hs * eta - Hs);
@@ -375,6 +386,6 @@ private:
 
 
 //using Footprint2D = Footprint2DCov;
-using Footprint2D = FootprintV0;
+using Footprint2D = FootprintV2;
 
 }} // namespace mufflon::renderer

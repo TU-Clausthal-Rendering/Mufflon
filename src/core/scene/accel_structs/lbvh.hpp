@@ -18,7 +18,7 @@ struct BvhNode {
 };
 template < Device dev >
 struct LBVH {
-	ConstArrayDevHandle_t<NotGl<dev>, BvhNode> bvh;
+	ConstArrayDevHandle_t<NotGl<dev>(), BvhNode> bvh;
 	ConstArrayDevHandle_t<dev, i32> primIds;
 	i32 numInternalNodes;
 };
@@ -62,10 +62,10 @@ public:
 	}
 
 	template < Device dev >
-	void build(LodDescriptor<dev>& obj, const ei::Box& currentBB);
+	void build(LodDescriptor<dev>& obj, const ei::Box& currentBB, const bool parallelize);
 
 	template < Device dev >
-	void build(const SceneDescriptor<dev>& scene);
+	void build(const SceneDescriptor<dev>& scene, const u32 actualInstCount = 0u);
 
 	template < Device dev >
 	AccelDescriptor acquire_const() {
@@ -79,7 +79,7 @@ public:
 		AccelDescriptor desc;
 		desc.type = AccelType::LBVH;
 		LBVH<dev>& lbvhDesc = *as<LBVH<dev>>(desc.accelParameters);
-		lbvhDesc.bvh = as<ConstArrayDevHandle_t<NotGl<dev>, BvhNode>, ConstArrayDevHandle_t<dev, char>>( m_bvhNodes.acquire_const<dev>() );
+		lbvhDesc.bvh = as<ConstArrayDevHandle_t<NotGl<dev>(), BvhNode>, ConstArrayDevHandle_t<dev, char>>( m_bvhNodes.acquire_const<dev>() );
 		lbvhDesc.primIds = as<ConstArrayDevHandle_t<dev, i32>, ConstArrayDevHandle_t<dev, char>>( m_primIds.acquire_const<dev>() );
 		lbvhDesc.numInternalNodes = int(m_bvhNodes.size() / (4 * sizeof(ei::Vec4)));
 		return desc;
@@ -114,7 +114,9 @@ private:
 	template < typename DescType >
 	void build_lbvh(const DescType& desc,
 					const ei::Box& sceneBB,
-					const i32 numPrimitives);
+					const i32 numPrimitives,
+					const bool parallelize,
+					const u32 actualPrimCount);
 };
 
 }} // namespace scene::accel_struct

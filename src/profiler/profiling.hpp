@@ -88,7 +88,8 @@ public:
 		return std::nullopt;
 	}
 
-	static Profiler& instance();
+	static Profiler& core();
+	static Profiler& loader();
 
 	void reset_all();
 	void reset(StringView name);

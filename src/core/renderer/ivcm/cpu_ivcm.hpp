@@ -20,10 +20,8 @@ namespace mufflon::renderer {
 
 template < typename ExtensionT >
 class PathVertex;
-namespace {
-	using IvcmPathVertex = PathVertex<struct IvcmVertexExt>;
-	class VertexWrapper;
-}
+using IvcmPathVertex = PathVertex<struct IvcmVertexExt>;
+class VertexWrapper;
 
 class CpuIvcm final : public RendererBase<Device::CPU, IvcmTargets> {
 public:

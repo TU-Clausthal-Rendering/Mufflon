@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "shadow_photons_params.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/renderer/path_util.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include "core/data_structs/dm_octree.hpp"

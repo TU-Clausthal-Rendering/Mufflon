@@ -2,6 +2,7 @@ from ctypes import *
 from time import *
 from enum import IntEnum
 import ntpath
+import os
 
 class ProcessTime(Structure):
     _fields_ = [
@@ -11,8 +12,12 @@ class ProcessTime(Structure):
 
 class DllHolder:
     def __init__(self):
-        self.core = cdll.LoadLibrary("core.dll")
-        self.mffLoader = cdll.LoadLibrary("mffloader.dll")
+        if os.name == 'nt':
+            self.core = cdll.LoadLibrary("core.dll")
+            self.mffLoader = cdll.LoadLibrary("mffloader.dll")
+        else:
+            self.core = cdll.LoadLibrary("./libcore.so")
+            self.mffLoader = cdll.LoadLibrary("./libmffloader.so")
 
 class Device(IntEnum):
     CPU = 1,
@@ -58,15 +63,13 @@ class DllInterface:
         self.dllHolder.core.world_get_camera.restype = c_void_p
         self.dllHolder.core.scenario_set_camera.argtypes = [c_void_p, c_void_p]
         self.dllHolder.core.world_get_current_scenario.restype = c_void_p
+        self.dllHolder.mffLoader.restype = LoaderStatus
         
     def __del__(self):
         self.dllHolder.core.mufflon_destroy()
         
     def core_set_log_level(self, logLevel):
         return self.dllHolder.core.core_set_log_level(c_int32(logLevel)) != 0
-        
-    def loader_set_log_level(self, logLevel):
-        return self.dllHolder.mffLoader.loader_set_log_level(c_int32(logLevel)) != 0
 
     def disable_profiling(self):
         self.dllHolder.core.profiling_disable()
@@ -212,7 +215,7 @@ class RenderActions:
         self.sceneName = fileName.split(".")[0]
         returnValue = self.dllInterface.loader_load_json(sceneJson)
         if returnValue != LoaderStatus.SUCCESS:
-            raise Exception("Failed to load scene '" + sceneJson + "' (error code: " + returnValue.name + ")")
+            raise Exception("Failed to load scene '" + sceneJson + "' (error code: " + LoaderStatus(returnValue).name + ")")
         self.enable_render_target(defaultRenderTarget, False)
 
     def enable_renderer(self, rendererName, devices):
@@ -274,10 +277,6 @@ class RenderActions:
     def set_renderer_log_level(self, logLevel):
         if not self.dllInterface.core_set_log_level(logLevel):
             raise Exception("Failed to set log level to '" + logLevel.name + "'")
-            
-    def set_loader_log_level(self, logLevel):
-        if not self.dllInterface.loader_set_log_level(logLevel):
-            raise Exception("Failed to set log level to '" + logLevel.name + "'")
 
     def enable_render_target(self, targetName, variance):
         if not self.dllInterface.render_enable_render_target(targetName, variance):
@@ -297,7 +296,7 @@ class RenderActions:
         filename = filename.replace("#preCycles", str(preTime.cycles / 1000000) + "MCycles", 1)
         filename = filename.replace("#postCycles", str(postTime.cycles / 1000000) + "MCycles", 1)
         
-        self.dllInterface.render_save_denoised_radiance(fName)
+        self.dllInterface.render_save_denoised_radiance(filename)
 
     def take_screenshot(self, iterationNr, iterateTime=ProcessTime(0,0), preTime=ProcessTime(0,0), postTime=ProcessTime(0,0)):
         filename = self.screenshotPattern

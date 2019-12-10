@@ -10,12 +10,15 @@
 #include "core/scene/lights/light_tree_sampling.hpp"
 
 #include <cn/rnd.hpp>
+#include <cmath>
 
 namespace mufflon::renderer {
 
 namespace {
 
 float prev_rel_sum(const VcmPathVertex& vertex, AngularPdf pdfBack, int numPhotons, float area);
+
+}
 
 // Extension which stores a partial result of the MIS-weight computation for speed-up.
 struct VcmVertexExt {
@@ -30,7 +33,7 @@ struct VcmVertexExt {
 	// Store 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
 	float prevConversionFactor { 0.0f };
 
-	CUDA_FUNCTION void init(const VcmPathVertex& thisVertex,
+	inline CUDA_FUNCTION void init(const VcmPathVertex& /*thisVertex*/,
 							const AreaPdf inAreaPdf,
 							const AngularPdf inDirPdf,
 							const float pChoice) {
@@ -38,14 +41,14 @@ struct VcmVertexExt {
 		this->throughput = Spectrum{1.0f};
 	}
 
-	CUDA_FUNCTION void update(const VcmPathVertex& prevVertex,
+	inline CUDA_FUNCTION void update(const VcmPathVertex& prevVertex,
 							  const VcmPathVertex& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
 							  const Spectrum& throughput,
-							  const float continuationPropability,
-							  const Spectrum& transmission,
-							  int numPhotons, float area) {
+							  const float/* continuationPropability*/,
+							  const Spectrum& /*transmission*/,
+							  int /*numPhotons*/, float /*area*/) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
 		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
@@ -59,8 +62,8 @@ struct VcmVertexExt {
 		}
 	}
 
-	CUDA_FUNCTION void update(const VcmPathVertex& thisVertex,
-							  const scene::Direction& excident,
+	inline CUDA_FUNCTION void update(const VcmPathVertex& thisVertex,
+							  const scene::Direction& /*excident*/,
 							  const VertexSample& sample,
 							  int numPhotons, float area) {
 		// Sum up all previous relative probability (cached recursion).
@@ -68,6 +71,8 @@ struct VcmVertexExt {
 		prevRelativeProbabilitySum = prev_rel_sum(thisVertex, sample.pdf.back, numPhotons, area);
 	}
 };
+
+namespace {
 
 // Compute the previous relative event sum in relation to a connection
 // between the previous and the current vertex.
@@ -143,7 +148,7 @@ ConnectionValue connect(const VcmPathVertex& path0, const VcmPathVertex& path1,
 	Spectrum bxdfProd = val0.value * val1.value;
 	float cosProd = val0.cosOut * val1.cosOut;//TODO: abs?
 	mAssert(cosProd >= 0.0f);
-	mAssert(!isnan(bxdfProd.x));
+	mAssert(!std::isnan(bxdfProd.x));
 	// Early out if there would not be a contribution (estimating the materials is usually
 	// cheaper than the any-hit test).
 	if(any(greater(bxdfProd, 0.0f)) && cosProd > 0.0f) {
@@ -166,7 +171,7 @@ CpuVcm::CpuVcm() {}
 CpuVcm::~CpuVcm() {}
 
 void CpuVcm::iterate() {
-	auto scope = Profiler::instance().start<CpuProfileState>("CPU VCM iteration", ProfileLevel::LOW);
+	auto scope = Profiler::core().start<CpuProfileState>("CPU VCM iteration", ProfileLevel::LOW);
 
 	float currentMergeRadius = m_params.mergeRadius * m_sceneDesc.diagSize;
 	if(m_params.progressive)
@@ -190,8 +195,8 @@ void CpuVcm::iterate() {
 }
 
 void CpuVcm::post_reset() {
-	ResetEvent resetFlags { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
-								ResetEvent::ALL : get_reset_event() };
+	ResetEvent resetFlags { { get_reset_event().is_set(ResetEvent::RENDERER_ENABLE) ?
+								ResetEvent::ALL : get_reset_event() } };
 	init_rngs(m_outputBuffer.get_num_pixels());
 	if(resetFlags.resolution_changed()) {
 		m_photonMapManager.resize(m_outputBuffer.get_num_pixels() * m_params.maxPathLength);
@@ -248,7 +253,7 @@ void CpuVcm::sample(const Pixel coord, int idx, int numPhotons, float currentMer
 				Pixel outCoord = coord;
 				auto conVal = connect(vertex[currentV], *lightVertex, m_sceneDesc, outCoord, numPhotons, mergeArea);
 				if(outCoord != -1) {
-					mAssert(!isnan(conVal.cosines) && !isnan(conVal.bxdfs.x) && !isnan(throughput.x) && !isnan(vertex[currentV].ext().throughput.x));
+					mAssert(!std::isnan(conVal.cosines) && !std::isnan(conVal.bxdfs.x) && !std::isnan(throughput.x) && !std::isnan(vertex[currentV].ext().throughput.x));
 					m_outputBuffer.contribute<RadianceTarget>(outCoord, throughput * lightVertex->ext().throughput * conVal.cosines * conVal.bxdfs);
 					m_outputBuffer.contribute<LightnessTarget>(outCoord, avg(throughput) * conVal.cosines);
 				}
@@ -274,7 +279,7 @@ void CpuVcm::sample(const Pixel coord, int idx, int numPhotons, float currentMer
 				float misWeight = get_mis_weight(vertex[currentV], emission.pdf, emission.emitPdf, numPhotons, ei::PI * mergeRadiusSq);
 				emission.value *= misWeight;
 			}
-			mAssert(!isnan(emission.value.x));
+			mAssert(!std::isnan(emission.value.x));
 
 			m_outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
 			m_outputBuffer.contribute<LightnessTarget>(coord, avg(throughput) * ei::avg(emission.value));

@@ -2,7 +2,7 @@
 
 #include "ss_pt_params.hpp"
 #include "ss_pt_common.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
@@ -16,14 +16,14 @@ using namespace scene::lights;
 
 namespace {
 
-CUDA_FUNCTION float get_luminance(const ei::Vec3& vec) {
+inline CUDA_FUNCTION float get_luminance(const ei::Vec3& vec) {
 	constexpr ei::Vec3 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
 	return ei::dot(LUM_WEIGHT, vec);
 }
 
 } // namespace
 
-CUDA_FUNCTION void post_process_shadow(ss::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
+inline CUDA_FUNCTION void post_process_shadow(ss::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 									   const scene::SceneDescriptor<CURRENT_DEV>& scene,
 									   const SilhouetteParameters& params,
 									   const Pixel& coord, const int pixel, const int iteration,
@@ -69,7 +69,7 @@ CUDA_FUNCTION void post_process_shadow(ss::SilhouetteTargets::RenderBufferType<C
 	outputBuffer.template set<PenumbraTarget>(coord, penumbra / static_cast<float>(iteration + 1u));
 }
 
-CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
+inline CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 									 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 									 const SilhouetteParameters& params,
 									 const Pixel& coord, math::Rng& rng,

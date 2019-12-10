@@ -28,7 +28,7 @@ CpuTexture::CpuTexture(u16 width, u16 height, u16 numLayers, Format format, Samp
 	const bool computeMipmaps = (m_imageData == nullptr) || (m_size.w > 1 && !dataHasMipmaps);
 	if(m_imageData == nullptr) {
 		m_imageData = std::make_unique<u8[]>(currOffset * PIXEL_SIZE(format));
-	} else if(m_size.w > 1u && !dataHasMipmaps) {
+	} else if(m_size.w > 1 && !dataHasMipmaps) {
 		// If the old array only had space for the highest mipmap we gotta realloc
 		u8* ptr = static_cast<u8*>(std::realloc(m_imageData.release(), currOffset * PIXEL_SIZE(format)));
 		if(ptr == nullptr)
@@ -116,6 +116,7 @@ void CpuTexture::recompute_mipmaps(MipmapType type) {
 								for(i32 cx = lowerX; cx <= upperX; ++cx)
 									val = ei::max(val, read(Pixel{ cx, cy }, layer, level - 1));
 						}	break;
+						default: mAssert(false); break;
 					}
 					write(val, Pixel{ x << level, y << level }, layer, level);
 				}
@@ -399,11 +400,11 @@ Vec4 CpuTexture::sample_linear(const UvCoordinate& uv, int layer, float level) c
 	return sample;
 }
 
-Vec4 CpuTexture::sample111_nearest(const UvCoordinate& uv, int layer, float level) const {
+Vec4 CpuTexture::sample111_nearest(const UvCoordinate& /*uv*/, int /*layer*/, float /*level*/) const {
 	return (this->*m_fetch)(0);
 }
 
-Vec4 CpuTexture::sample111_linear(const UvCoordinate& uv, int layer, float level) const {
+Vec4 CpuTexture::sample111_linear(const UvCoordinate& /*uv*/, int /*layer*/, float /*level*/) const {
 	return (this->*m_fetch)(0);
 }
 

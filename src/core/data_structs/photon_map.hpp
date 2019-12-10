@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "core/memory/residency.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/allocator.hpp"
 #include "core/memory/generic_resource.hpp"
 #include "util/types.hpp"
@@ -28,11 +28,11 @@ protected:
 	// 3 Magic numbers to scrample intput positions for the hash computation
 	static constexpr ei::UVec3 MAGIC {0xb286aff7, 0x35e4a487, 0x75a9c18f};
 
-	CUDA_FUNCTION ei::UVec3 get_grid_cell(const ei::Vec3& position) {
+	inline CUDA_FUNCTION ei::UVec3 get_grid_cell(const ei::Vec3& position) {
 		return ei::UVec3(ei::ceil(position * m_cellDensity));
 	}
 
-	static CUDA_FUNCTION u32 get_cell_hash(const ei::UVec3& cell) {
+	static inline CUDA_FUNCTION u32 get_cell_hash(const ei::UVec3& cell) {
 		// Use the Cantor pairing function to compress ℕ³->ℕ
 		//u32 preHash = ((cell.x + cell.y) * (cell.x + cell.y + 1)) / 2 + cell.y;
 		//preHash = ((preHash + cell.z) * (preHash + cell.z + 1)) / 2 + cell.z;
@@ -237,7 +237,7 @@ public:
 
 	// Reallocates the map (previous data is lost)
 	void resize(int numExpectedEntries) {
-		if(m_dataCapacity != numExpectedEntries) {
+		if(m_dataCapacity != static_cast<u32>(numExpectedEntries)) {
 			m_dataCapacity = numExpectedEntries;
 			m_mapSize = compute_valid_size(u32(numExpectedEntries * 1.15f));
 			m_memory.resize(m_dataCapacity * sizeof(HashGridCommon::LinkedData<V>) + m_mapSize * sizeof(u32));

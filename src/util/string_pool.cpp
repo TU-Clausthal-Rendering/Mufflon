@@ -4,10 +4,9 @@ namespace mufflon::util {
 
 class StringPool::Node {
 public:
-	static constexpr std::size_t CHARS = NODE_PAGE_COUNT * PAGE_SIZE - (sizeof(std::size_t) + sizeof(Node*));
-
-	Node() noexcept :
+	Node(std::size_t charCount) noexcept :
 		m_pos{ 0u },
+		m_charCount{ charCount },
 		m_next{ nullptr }
 	{}
 	// No move or copy - once they are placed in memory, nodes MUST stay where they are!
@@ -16,37 +15,41 @@ public:
 	Node& operator=(const Node&) = delete;
 	Node& operator=(Node&&) = delete;
 	~Node() {
-		if(m_next)
-			delete m_next;
+		if(m_next) {
+			m_next->~Node();
+			free(m_next);
+		}
 	}
 
 	char* insert(const StringView string) {
-		if(m_pos + string.size() + 1u > CHARS)
+		if(m_pos + string.size() + 1u > m_charCount)
 			return nullptr;
-		char* ptr = m_data + m_pos;
+		char* data = reinterpret_cast<char*>(this) + sizeof(Node);
+		char* ptr = data + m_pos;
 		(void)std::memcpy(ptr, string.data(), string.size());
 		m_pos += string.size();
 		// Important: add null termination for legacy-C usage
-		*(m_data + m_pos) = '\0';
+		*(data + m_pos) = '\0';
 		++m_pos;
 		return ptr;
 	}
 
 	Node* extent() {
-		m_next = new Node();
+		void* memory = std::malloc(sizeof(Node) + m_charCount);
+		m_next = new (memory) Node{ m_charCount };
 		return m_next;
 	}
 
 private:
 	std::size_t m_pos;
+	std::size_t m_charCount;
 	Node* m_next;
-	char m_data[CHARS];
 };
 
-StringPool::StringPool()
+StringPool::StringPool(const std::size_t pageCount) :
+	m_tree(nullptr, &delete_head_node),
+	m_poolSize{ (pageCount > 0u ? pageCount : 1u) * PAGE_SIZE }
 {
-	static_assert(sizeof(StringPool::Node) % PAGE_SIZE == 0,
-				  "The node size must be a multiple of a page size for optimal alignment");
 	this->clear();
 }
 
@@ -55,7 +58,11 @@ StringPool& StringPool::operator=(StringPool&&) = default;
 StringPool::~StringPool() = default;
 
 StringView StringPool::insert(const StringView str) {
-	if(str.size() > Node::CHARS)
+	// Only allocate once we actually have data to store
+	if(!m_head)
+		this->allocate_head_node();
+
+	if(str.size() > m_poolSize - sizeof(Node))
 		throw std::runtime_error("String too large to fit into a single node!");
 	// TODO: this is slightly wasteful, since worst case we could do small -> large -> small,
 	// leading to individual nodes even for the small strings
@@ -68,8 +75,25 @@ StringView StringPool::insert(const StringView str) {
 }
 
 void StringPool::clear() {
-	m_tree = std::make_unique<Node>();
-	m_head = m_tree.get();
+	m_tree = {};
+	m_head = nullptr;
+}
+
+
+void StringPool::allocate_head_node() {
+	// Allocate the node
+	const std::size_t charCount = m_poolSize - sizeof(Node);
+	void* memory = std::malloc(m_poolSize);
+	Node* node = new (memory) Node{ charCount };
+	m_tree.reset(node);
+	m_head = node;
+}
+
+void StringPool::delete_head_node(Node* node) {
+	if(node) {
+		node->~Node();
+		free(node);
+	}
 }
 
 } // namespace mufflon::util

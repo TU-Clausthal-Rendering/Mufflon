@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/scene/attribute.hpp"
+#include "core/scene/attributes/attribute.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/tessellation/tessellater.hpp"
 #include <ei/3dtypes.hpp>
@@ -64,17 +64,24 @@ public:
 		m_attributes.reserve(count);
 	}
 
+	SphereAttributeHandle add_attribute(StringView name, AttributeType type) {
+		return m_attributes.add_attribute(AttributeIdentifier{ type, name });
+	}
 	template < class T >
-	SphereAttributeHandle add_attribute(std::string name) {
-		return m_attributes.add_attribute<T>(std::move(name));
+	SphereAttributeHandle add_attribute(StringView name) {
+		return m_attributes.add_attribute(AttributeIdentifier{ get_attribute_type<T>(), name });
 	}
 
-	bool has_attribute(StringView name) {
-		return m_attributes.has_attribute(name);
+	std::optional<SphereAttributeHandle> find_attribute(StringView name, const AttributeType& type) const {
+		const AttributeIdentifier ident{ type, name };
+		return m_attributes.find_attribute(ident);
 	}
 
+	template < class T >
 	void remove_attribute(StringView name) {
-		throw std::runtime_error("Operation not implemented yet");
+		const AttributeIdentifier identifier{ get_attribute_type<T>(), name };
+		if(const auto handle = m_attributes.find_attribute(identifier); handle.has_value())
+			m_attributes.remove(handle.value());
 	}
 
 	// Synchronizes the default attributes position, normal, uv, matindex 
@@ -82,14 +89,14 @@ public:
 	void synchronize() {
 		m_attributes.synchronize<dev>();
 	}
-	template < Device dev >
+	/*template < Device dev >
 	void synchronize(StringView name) {
 		m_attributes.synchronize<dev>(name);
 	}
 	template < Device dev >
 	void synchronize(SphereAttributeHandle hdl) {
 		m_attributes.synchronize<dev>(hdl);
-	}
+	}*/
 
 	template < Device dev >
 	void unload() {
@@ -97,20 +104,24 @@ public:
 	}
 
 	template < Device dev, class T >
-	ArrayDevHandle_t<dev, T> acquire(SphereAttributeHandle hdl) {
-		return m_attributes.acquire<dev, T>(hdl);
+	ArrayDevHandle_t<dev, T> acquire(const SphereAttributeHandle& hdl) {
+		return m_attributes.template acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	ConstArrayDevHandle_t<dev, T> acquire_const(SphereAttributeHandle hdl) {
-		return m_attributes.acquire_const<dev, T>(hdl);
+	ConstArrayDevHandle_t<dev, T> acquire_const(const SphereAttributeHandle& hdl) {
+		return m_attributes.template acquire_const<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	ArrayDevHandle_t<dev, T> acquire(StringView name) {
-		return m_attributes.acquire<dev, T>(name);
+	ArrayDevHandle_t<dev, T> acquire(const AttributeIdentifier& ident) {
+		if(const auto handle = m_attributes.find_attribute(ident); handle.has_value())
+			return this->template acquire<dev, T>(handle.value());
+		return {};
 	}
 	template < Device dev, class T >
-	ConstArrayDevHandle_t<dev, T> acquire_const(StringView name) {
-		return m_attributes.acquire_const<dev, T>(name);
+	ConstArrayDevHandle_t<dev, T> acquire_const(const AttributeIdentifier& ident) {
+		if(const auto handle = m_attributes.find_attribute(ident); handle.has_value())
+			return this->template acquire_const<dev, T>(handle.value());
+		return {};
 	}
 
 	void mark_changed(Device dev) {
@@ -133,8 +144,6 @@ public:
 	 * The number of read values will be capped by the number of spheres present
 	 * after the starting position.
 	 */
-	std::size_t add_bulk(StringView name, const SphereHandle& startSphere,
-						 std::size_t count, util::IByteReader& attrStream);
 	std::size_t add_bulk(SphereAttributeHandle hdl, const SphereHandle& startSphere,
 						 std::size_t count, util::IByteReader& attrStream);
 
@@ -145,7 +154,7 @@ public:
 		return m_matIndicesHdl;
 	}
 	// Transforms sphere data
-	void transform(const ei::Mat3x4& transMat, const ei::Vec3& scale);
+	void transform(const ei::Mat3x4& transMat);
 
 	// Gets the descriptor with only default attributes (position etc)
 	template < Device dev >
@@ -153,7 +162,7 @@ public:
 	// Updates the descriptor with the given set of attributes
 	template < Device dev >
 	void update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,
-									 const std::vector<const char*>& attribs);
+									 const std::vector<AttributeIdentifier>& attribs);
 
 	const ei::Box& get_bounding_box() const noexcept {
 		return m_boundingBox;
@@ -161,16 +170,6 @@ public:
 
 	std::size_t get_sphere_count() const noexcept {
 		return m_attributes.get_attribute_elem_count();
-	}
-
-	// Get a list of all materials which are referenced by any primitive
-	const std::unordered_set<MaterialIndex>& get_unique_materials() const {
-		return m_uniqueMaterials;
-	}
-
-	// Returns whether any polygon has a displacement map associated with the given material assignment
-	bool has_displacement_mapping(const Scenario& scenario) const noexcept {
-		return false;
 	}
 
 	bool was_displacement_mapping_applied() const noexcept {
@@ -203,10 +202,6 @@ private:
 	// Array for aquired attribute descriptors
 	AttribBuffers m_attribBuffer;
 	ei::Box m_boundingBox;
-	// Whenever a primitive is added the table of all referenced
-	// materials will be updated. Assumption: a material reference
-	// will not change afterwards.
-	std::unordered_set<MaterialIndex> m_uniqueMaterials;
 };
 
 }}} // namespace mufflon::scene::geometry

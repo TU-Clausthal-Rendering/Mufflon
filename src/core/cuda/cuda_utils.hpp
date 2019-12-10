@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "util/types.hpp"
 #include <atomic>
@@ -101,6 +101,8 @@ struct AtomicOps<Device::CUDA, T> {
 #ifdef __CUDA_ARCH__
 		return atomicExch(&atom, value);
 #else // __CUDA_ARCH__
+		(void)atom;
+		(void)value;
 		return T{};
 #endif // __CUDA_ARCH__
 	}
@@ -108,6 +110,9 @@ struct AtomicOps<Device::CUDA, T> {
 	__host__ __device__ static void add(typename AtomicValue<Device::CUDA, T>::Type& atom, const T value) {
 #ifdef __CUDA_ARCH__
 		(void)atomicAdd(&atom, value);
+#else // __CUDA_ARCH__
+		(void)atom;
+		(void)value;
 #endif // __CUDA_ARCH__
 	}
 
@@ -115,6 +120,7 @@ struct AtomicOps<Device::CUDA, T> {
 #ifdef __CUDA_ARCH__
 		return atom;
 #else // __CUDA_ARCH__
+		(void)atom;
 		return T{};
 #endif // __CUDA_ARCH__
 	}
@@ -154,7 +160,7 @@ template < Device dev, class T >
 using Atomic = typename atomic_details::AtomicValue<dev, T>::Type;
 
 // Sync all threads in a block.
-CUDA_FUNCTION void syncthreads() {
+inline CUDA_FUNCTION void syncthreads() {
 #ifdef __CUDA_ARCH__
 	__syncthreads();
 #endif // __CUDA_ARCH__
@@ -162,7 +168,7 @@ CUDA_FUNCTION void syncthreads() {
 }
 
 
-CUDA_FUNCTION void globalMemoryBarrier() {
+inline CUDA_FUNCTION void globalMemoryBarrier() {
 #ifdef __CUDA_ARCH__
 	__threadfence_system();
 #else // __CUDA_ARCH__
@@ -173,7 +179,7 @@ CUDA_FUNCTION void globalMemoryBarrier() {
 
 
 // Count the number of consecutive high-order zero bits
-CUDA_FUNCTION u64 clz(u64 v) {
+inline CUDA_FUNCTION u64 clz(u64 v) {
 #ifdef __CUDA_ARCH__
 	return __clzll(v);
 #else
@@ -183,12 +189,13 @@ CUDA_FUNCTION u64 clz(u64 v) {
 	_BitScanReverse64(&out, v);
 	return (v == 0) ? 64 : 63 - out;
 #else
+	// TODO: This will not result in the correct value, since float can represent MUCH less values than 64 bit ints!
 	return (v == 0) ? 64 : 63 - (u64)log2f((float)v);
 #endif // _MSC_VER
 #endif // __CUDA_ARCH__
 }
 
-CUDA_FUNCTION u32 clz(u32 v) {
+inline CUDA_FUNCTION u32 clz(u32 v) {
 #ifdef __CUDA_ARCH__
 	return __clz(v);
 #else
@@ -206,19 +213,19 @@ CUDA_FUNCTION u32 clz(u32 v) {
 // Atomic operations; gives no(!) guarantees about memory access ordering
 // Note: this function must not be called on the GPU for CPU atomics!
 template < Device dev, class T >
-CUDA_FUNCTION T atomic_exchange(Atomic<dev, T>& atom, const T value) {
+inline CUDA_FUNCTION T atomic_exchange(Atomic<dev, T>& atom, const T value) {
 	return atomic_details::AtomicOps<dev, T>::exchange(atom, value);
 }
 
 // Note: this function must not be called on the GPU for CPU atomics!
 template < Device dev, class T >
-CUDA_FUNCTION void atomic_add(Atomic<dev, T>& atom, const T value) {
+inline CUDA_FUNCTION void atomic_add(Atomic<dev, T>& atom, const T value) {
 	atomic_details::AtomicOps<dev, T>::add(atom, value);
 }
 
 // Note: this function must not be called on the GPU for CPU atomics!
 template < Device dev, class T >
-CUDA_FUNCTION T atomic_load(const Atomic<dev, T>& atom) {
+inline CUDA_FUNCTION T atomic_load(const Atomic<dev, T>& atom) {
 	return atomic_details::AtomicOps<dev, T>::load(atom);
 }
 

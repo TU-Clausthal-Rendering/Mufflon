@@ -133,7 +133,7 @@ u32 CameraDistanceOracle::get_edge_tessellation_level(const OpenMesh::EdgeHandle
 	float phongDisplacement = 0.f;
 	if(m_usePhongTessellation) {
 		// This is only a heuristic, not the exact solution!
-		// Heuristic: normals at 90° == max. displacement, scale with edge length
+		// Heuristic: normals at 90ï¿½ == max. displacement, scale with edge length
 		const float normalFactor = 1.f - ei::abs(ei::dot(n0, n1));
 		phongDisplacement = normalFactor * maxEdgeLen;
 	}
@@ -145,8 +145,8 @@ u32 CameraDistanceOracle::get_edge_tessellation_level(const OpenMesh::EdgeHandle
 	float surfaceDisplacement = 0.f;
 	// Account for displacement if applicable
 	if(m_matHdl.is_valid()) {
-		float minDisp;
-		float maxDisp;
+		float minDisp = 0.f;
+		float maxDisp = 0.f;
 
 		// Compute min/max UV coordinates to later determine mipmap level
 		const ei::Vec2 minUv{ std::min(uv0.u, uv1.u), std::min(uv0.v, uv1.v) };
@@ -230,7 +230,7 @@ u32 CameraDistanceOracle::get_triangle_inner_tessellation_level(const OpenMesh::
 		const ei::Vec3 n1 = util::pun<ei::Vec3>(m_mesh->normal(v1));
 		const ei::Vec3 n2 = util::pun<ei::Vec3>(m_mesh->normal(v2));
 		// This is only a heuristic, not the exact solution!
-		// Heuristic: normals at 90° == max. displacement, scale with edge length
+		// Heuristic: normals at 90ï¿½ == max. displacement, scale with edge length
 		const float normalFactor = 1.f - std::min(ei::abs(ei::dot(n0, n1)),
 												  std::min(ei::abs(ei::dot(n0, n2)),
 														   ei::abs(ei::dot(n1, n2))));
@@ -316,7 +316,7 @@ std::pair<u32, u32> CameraDistanceOracle::get_quad_inner_tessellation_level(cons
 		const ei::Vec3 n2 = util::pun<ei::Vec3>(m_mesh->normal(v2));
 		const ei::Vec3 n3 = util::pun<ei::Vec3>(m_mesh->normal(v3));
 		// This is only a heuristic, not the exact solution!
-		// Heuristic: normals at 90° == max. displacement, scale with edge length
+		// Heuristic: normals at 90ï¿½ == max. displacement, scale with edge length
 		const float normalFactor = 1.f - std::min(ei::abs(ei::dot(n0, n1)),
 												  std::min(ei::abs(ei::dot(n0, n2)),
 														   std::min(ei::abs(ei::dot(n3, n2)),

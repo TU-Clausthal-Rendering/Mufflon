@@ -1,7 +1,6 @@
 #pragma once
 
 #include "tessellater.hpp"
-#include "core/scene/attribute.hpp"
 #include <ei/vector.hpp>
 #include <tuple>
 

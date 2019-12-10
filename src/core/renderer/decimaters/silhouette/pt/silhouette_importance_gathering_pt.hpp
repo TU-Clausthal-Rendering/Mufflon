@@ -2,7 +2,7 @@
 
 #include "silhouette_pt_common.hpp"
 #include "silhouette_pt_params.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/renderer/pt/pt_common.hpp"
@@ -18,7 +18,7 @@ using namespace scene::lights;
 namespace {
 
 // Checks whether a ray intersects a coplanar line segment and returns the intersection point
-CUDA_FUNCTION auto intersects_coplanar(const ei::Segment& ray, const ei::Segment& segment) {
+inline CUDA_FUNCTION auto intersects_coplanar(const ei::Segment& ray, const ei::Segment& segment) {
 	constexpr float ERROR_DELTA = 0.00125f;
 	struct Result {
 		bool intersects;
@@ -39,7 +39,7 @@ CUDA_FUNCTION auto intersects_coplanar(const ei::Segment& ray, const ei::Segment
 	return Result{ false, ei::Vec3{} };
 }
 
-CUDA_FUNCTION ei::Triangle get_world_triangle(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION ei::Triangle get_world_triangle(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 											  const scene::PrimitiveHandle& hitId) {
 	const auto& polygon = scene.lods[scene.lodIndices[hitId.instanceId]].polygon;
 	return ei::Triangle{
@@ -49,7 +49,7 @@ CUDA_FUNCTION ei::Triangle get_world_triangle(const scene::SceneDescriptor<CURRE
 	};
 }
 
-CUDA_FUNCTION ei::Tetrahedron get_world_quad(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION ei::Tetrahedron get_world_quad(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 											 const scene::PrimitiveHandle& hitId) {
 	const auto& polygon = scene.lods[scene.lodIndices[hitId.instanceId]].polygon;
 	const auto offset = 3u * polygon.numTriangles;
@@ -62,7 +62,7 @@ CUDA_FUNCTION ei::Tetrahedron get_world_quad(const scene::SceneDescriptor<CURREN
 	};
 }
 
-CUDA_FUNCTION ei::Triangle get_world_light_triangle(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION ei::Triangle get_world_light_triangle(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 													const u32 offset) {
 	const auto* lightMemory = scene.lightTree.posLights.memory + offset;
 	const auto& light = *reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(lightMemory);
@@ -72,7 +72,7 @@ CUDA_FUNCTION ei::Triangle get_world_light_triangle(const scene::SceneDescriptor
 	};
 }
 
-CUDA_FUNCTION ei::Tetrahedron get_world_light_quad(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION ei::Tetrahedron get_world_light_quad(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 												   const u32 offset) {
 	const auto* lightMemory = scene.lightTree.posLights.memory + offset;
 	const auto& light = *reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(lightMemory);
@@ -83,7 +83,7 @@ CUDA_FUNCTION ei::Tetrahedron get_world_light_quad(const scene::SceneDescriptor<
 	};
 }
 
-CUDA_FUNCTION ei::Triangle get_world_light_triangle_sides(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION ei::Triangle get_world_light_triangle_sides(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 																	  const u32 offset) {
 	const auto* lightMemory = scene.lightTree.posLights.memory + offset;
 	const auto& light = *reinterpret_cast<const AreaLightTriangle<CURRENT_DEV>*>(lightMemory);
@@ -92,7 +92,7 @@ CUDA_FUNCTION ei::Triangle get_world_light_triangle_sides(const scene::SceneDesc
 						 light.posV[1] - light.posV[2] };
 }
 
-CUDA_FUNCTION ei::Tetrahedron get_world_light_quad_sides(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION ei::Tetrahedron get_world_light_quad_sides(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 																  const u32 offset) {
 	const auto* lightMemory = scene.lightTree.posLights.memory + offset;
 	const auto& light = *reinterpret_cast<const AreaLightQuad<CURRENT_DEV>*>(lightMemory);
@@ -101,18 +101,18 @@ CUDA_FUNCTION ei::Tetrahedron get_world_light_quad_sides(const scene::SceneDescr
 							light.posV[3] + light.posV[2] };
 }
 
-CUDA_FUNCTION ei::Vec3 project_onto_plane(const ei::Vec3& point, const ei::Plane& plane) {
+inline CUDA_FUNCTION ei::Vec3 project_onto_plane(const ei::Vec3& point, const ei::Plane& plane) {
 	const float distToPlane = ei::dot(plane.n, point) + plane.d;
 	return point - plane.n * distToPlane;
 }
-CUDA_FUNCTION ei::Triangle project_onto_plane(const ei::Triangle& tri, const ei::Plane& plane) {
+inline CUDA_FUNCTION ei::Triangle project_onto_plane(const ei::Triangle& tri, const ei::Plane& plane) {
 	return ei::Triangle{
 		project_onto_plane(tri.v0, plane),
 		project_onto_plane(tri.v1, plane),
 		project_onto_plane(tri.v2, plane)
 	};
 }
-CUDA_FUNCTION ei::Tetrahedron project_onto_plane(const ei::Tetrahedron& quad, const ei::Plane& plane) {
+inline CUDA_FUNCTION ei::Tetrahedron project_onto_plane(const ei::Tetrahedron& quad, const ei::Plane& plane) {
 	return ei::Tetrahedron{
 		project_onto_plane(quad.v0, plane),
 		project_onto_plane(quad.v1, plane),
@@ -124,7 +124,7 @@ CUDA_FUNCTION ei::Tetrahedron project_onto_plane(const ei::Tetrahedron& quad, co
 // It then projects the triangle points onto the plane, computes the intersection points
 // of the ray defined by the intersection point and plane normal, and returns the distance
 // between the intersection points.
-CUDA_FUNCTION float intersect_triangle_borders(const ei::Triangle& triangle, const ei::Plane& plane,
+inline CUDA_FUNCTION float intersect_triangle_borders(const ei::Triangle& triangle, const ei::Plane& plane,
 											   const ei::Segment& planarSegment) {
 	// First project the triangle points onto the plane
 	// TODO: "proper" would be a perspective projection, which is more important the larger
@@ -159,7 +159,7 @@ CUDA_FUNCTION float intersect_triangle_borders(const ei::Triangle& triangle, con
 // It then projects the quad points onto the plane, computes the intersection points
 // of the ray defined by the intersection point and plane normal, and returns the distance
 // between the intersection points.
-CUDA_FUNCTION float intersect_quad_borders(const ei::Tetrahedron& quad, const ei::Plane& plane,
+inline CUDA_FUNCTION float intersect_quad_borders(const ei::Tetrahedron& quad, const ei::Plane& plane,
 										   const ei::Segment& planarSegment) {
 	// First project the quad points onto the plane
 	// TODO: "proper" would be a perspective projection, which is more important the larger
@@ -200,15 +200,15 @@ CUDA_FUNCTION float intersect_quad_borders(const ei::Tetrahedron& quad, const ei
 }
 
 // Takes a triangle type, but the individual vertices contain lengths
-CUDA_FUNCTION constexpr float get_shortest_length(const ei::Triangle& tri) {
+inline CUDA_FUNCTION constexpr float get_shortest_length(const ei::Triangle& tri) {
 	return ei::min(ei::min(ei::len(tri.v0), ei::len(tri.v1)), ei::len(tri.v2));
 }
 // Takes a quad type, but the individual vertices contain lengths
-CUDA_FUNCTION constexpr float get_shortest_length(const ei::Tetrahedron& quad) {
+inline CUDA_FUNCTION constexpr float get_shortest_length(const ei::Tetrahedron& quad) {
 	return ei::min(ei::min(ei::min(ei::len(quad.v0), ei::len(quad.v1)), ei::len(quad.v2)), ei::len(quad.v3));
 }
 
-CUDA_FUNCTION float estimate_silhouette_light_size(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION float estimate_silhouette_light_size(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 												   const LightType lightType, const u32 lightOffset,
 												   const ei::Ray& shadowRay, const scene::PrimitiveHandle shadowHitId,
 												   const SilPathVertex& vertex, const ei::Plane& neePlane,
@@ -221,12 +221,11 @@ CUDA_FUNCTION float estimate_silhouette_light_size(const scene::SceneDescriptor<
 			const auto& polygon = scene.lods[scene.lodIndices[shadowHitId.instanceId]].polygon;
 			mAssert(vertex.ext().silhouetteVerticesFirst[0] >= 0 && static_cast<u32>(vertex.ext().silhouetteVerticesFirst[0]) < polygon.numVertices);
 			mAssert(vertex.ext().silhouetteVerticesFirst[1] >= 0 && static_cast<u32>(vertex.ext().silhouetteVerticesFirst[1]) < polygon.numVertices);
+			const auto instToWorld = scene.compute_instance_to_world_transformation(shadowHitId.instanceId);
 			const ei::Vec3 a = project_onto_plane(ei::transform(polygon.vertices[vertex.ext().silhouetteVerticesFirst[0]],
-																scene.instanceToWorld[shadowHitId.instanceId]),
-												  neePlane);
+																instToWorld), neePlane);
 			const ei::Vec3 b = project_onto_plane(ei::transform(polygon.vertices[vertex.ext().silhouetteVerticesFirst[1]],
-																scene.instanceToWorld[shadowHitId.instanceId]),
-												  neePlane);
+																instToWorld), neePlane);
 			// Compute the 90° rotated vector
 			const ei::Vec3 rotatedB = a + ei::cross(neePlane.n, b - a);
 
@@ -238,11 +237,12 @@ CUDA_FUNCTION float estimate_silhouette_light_size(const scene::SceneDescriptor<
 			const auto& polygon = scene.lods[scene.lodIndices[shadowHitId.instanceId]].polygon;
 			mAssert(vertex.ext().silhouetteVerticesFirst[0] >= 0 && static_cast<u32>(vertex.ext().silhouetteVerticesFirst[0]) < polygon.numVertices);
 			mAssert(vertex.ext().silhouetteVerticesFirst[1] >= 0 && static_cast<u32>(vertex.ext().silhouetteVerticesFirst[1]) < polygon.numVertices);
+			const auto instToWorld = scene.compute_instance_to_world_transformation(shadowHitId.instanceId);
 			const ei::Vec3 a = project_onto_plane(ei::transform(polygon.vertices[vertex.ext().silhouetteVerticesFirst[0]],
-																scene.instanceToWorld[shadowHitId.instanceId]),
+																instToWorld),
 												  neePlane);
 			const ei::Vec3 b = project_onto_plane(ei::transform(polygon.vertices[vertex.ext().silhouetteVerticesFirst[1]],
-																scene.instanceToWorld[shadowHitId.instanceId]),
+																instToWorld),
 												  neePlane);
 			// Compute the 90° rotated vector
 			// TODO: end-points of silhouette edge may lie outside of light primitive!
@@ -266,7 +266,7 @@ CUDA_FUNCTION float estimate_silhouette_light_size(const scene::SceneDescriptor<
 	return size * occluderShadowDistance / occluderLightDistance;
 }
 
-CUDA_FUNCTION float estimate_shadow_light_size(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION float estimate_shadow_light_size(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 											   const LightType lightType, const u32 lightOffset,
 											   const ei::Ray& shadowRay, const SilPathVertex& vertex,
 											   const ei::Plane& neePlane, const float occluderLightDistance,
@@ -300,12 +300,12 @@ CUDA_FUNCTION float estimate_shadow_light_size(const scene::SceneDescriptor<CURR
 	return size * occluderShadowDistance / occluderLightDistance;
 }
 
-CUDA_FUNCTION constexpr float get_luminance(const ei::Vec3& vec) {
+inline CUDA_FUNCTION constexpr float get_luminance(const ei::Vec3& vec) {
 	constexpr ei::Vec3 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
 	return ei::dot(LUM_WEIGHT, vec);
 }
 
-CUDA_FUNCTION void record_silhouette_vertex_contribution(Importances<CURRENT_DEV>* importances,
+inline CUDA_FUNCTION void record_silhouette_vertex_contribution(Importances<CURRENT_DEV>* importances,
 														 DeviceImportanceSums<CURRENT_DEV>& sums,
 														 const u32 vertexIndex, const float importance) {
 	// Reminder: local index will refer to the decimated mesh
@@ -313,11 +313,11 @@ CUDA_FUNCTION void record_silhouette_vertex_contribution(Importances<CURRENT_DEV
 	cuda::atomic_add<CURRENT_DEV>(sums.shadowSilhouetteImportance, importance);
 }
 
-CUDA_FUNCTION void record_shadow(DeviceImportanceSums<CURRENT_DEV>& sums, const float irradiance) {
+inline CUDA_FUNCTION void record_shadow(DeviceImportanceSums<CURRENT_DEV>& sums, const float irradiance) {
 	cuda::atomic_add<CURRENT_DEV>(sums.shadowImportance, irradiance);
 }
 
-CUDA_FUNCTION void record_direct_hit(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
+inline CUDA_FUNCTION void record_direct_hit(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
 									 const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
 									 const float cosAngle, const float sharpness) {
 	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
@@ -338,7 +338,7 @@ CUDA_FUNCTION void record_direct_hit(const scene::PolygonsDescriptor<CURRENT_DEV
 		cuda::atomic_add<CURRENT_DEV>(importances[min].viewImportance, sharpness * (1.f - ei::abs(cosAngle)));
 }
 
-CUDA_FUNCTION void record_direct_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
+inline CUDA_FUNCTION void record_direct_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
 											const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint, const float irradiance) {
 	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
 	const u32 primIdx = vertexCount == 3u ? primId : (primId - polygon.numTriangles);
@@ -360,7 +360,7 @@ CUDA_FUNCTION void record_direct_irradiance(const scene::PolygonsDescriptor<CURR
 	}
 }
 
-CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
+inline CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
 											  const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint, const float irradiance) {
 	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
 	const u32 primIdx = vertexCount == 3u ? primId : (primId - polygon.numTriangles);
@@ -380,7 +380,7 @@ CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CU
 		cuda::atomic_add<CURRENT_DEV>(importances[min].irradiance, irradiance);
 }
 
-CUDA_FUNCTION float weight_shadow(const float importance, const SilhouetteParameters& params) {
+inline CUDA_FUNCTION float weight_shadow(const float importance, const SilhouetteParameters& params) {
 	switch(params.shadowSizeWeight) {
 		case PShadowSizeWeight::Values::INVERSE_SQR:
 			return ei::sq(1.f / (1.f + importance));
@@ -392,7 +392,7 @@ CUDA_FUNCTION float weight_shadow(const float importance, const SilhouetteParame
 	}
 }
 
-CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene, DeviceImportanceSums<CURRENT_DEV>* sums,
+inline CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene, DeviceImportanceSums<CURRENT_DEV>* sums,
 								const ei::Ray& shadowRay, SilPathVertex& vertex, const float importance,
 								const scene::PrimitiveHandle& shadowHitId, const float lightDistance,
 								const float firstShadowDistance, const LightType lightType,
@@ -477,12 +477,12 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 
 } // namespace
 
-CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
-									 const scene::SceneDescriptor<CURRENT_DEV>& scene,
-									 const SilhouetteParameters& params,
-									 const Pixel& coord, math::Rng& rng,
-									 Importances<CURRENT_DEV>** importances,
-									 DeviceImportanceSums<CURRENT_DEV>* sums) {
+inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
+											const scene::SceneDescriptor<CURRENT_DEV>& scene,
+											const SilhouetteParameters& params,
+											const Pixel& coord, math::Rng& rng,
+											Importances<CURRENT_DEV>** importances,
+											DeviceImportanceSums<CURRENT_DEV>* sums) {
 	Spectrum throughput{ ei::Vec3{1.0f} };
 	// We gotta keep track of our vertices
 	// TODO: flexible length!
@@ -706,7 +706,7 @@ CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CUR
 	}
 }
 
-CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
+inline CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 										 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 										 const Pixel& coord, math::Rng& rng,
 										 Importances<CURRENT_DEV>** importances,

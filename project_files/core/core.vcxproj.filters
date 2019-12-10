@@ -191,6 +191,9 @@
     <Filter Include="Source Files\core\renderer\decimaters\animation\pt">
       <UniqueIdentifier>{0babb1e5-3e22-4117-b91b-f1d1d5e471f2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\scene\attributes">
+      <UniqueIdentifier>{b060c607-044c-41fd-b68c-01a36de93d29}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -273,9 +276,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\cameras\focus.cpp">
       <Filter>Source Files\core\cameras</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\core\scene\attribute.cpp">
-      <Filter>Source Files\core\scene</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\util\assert.cpp">
       <Filter>Source Files\util</Filter>
@@ -429,6 +429,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\util\string_pool.cpp">
       <Filter>Source Files\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\attributes\attribute.cpp">
+      <Filter>Source Files\core\scene\attributes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -864,9 +867,6 @@
     <ClInclude Include="..\..\deps\cub\cub\warp\specializations\warp_scan_smem.cuh">
       <Filter>Source Files\deps\cub\warp\specializations</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\export\interface.h">
-      <Filter>Source Files\core\export</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\util\degrad.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
@@ -912,9 +912,6 @@
     <ClInclude Include="..\..\src\core\renderer\parameter.hpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\export\api.h">
-      <Filter>Source Files\core\export</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\core\scene\lights\background.hpp">
       <Filter>Source Files\core\scene\lights</Filter>
     </ClInclude>
@@ -932,9 +929,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\accel_structs\accel_struct_info.hpp">
       <Filter>Source Files\core\scene\accel_structs</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\attribute.hpp">
-      <Filter>Source Files\core\scene</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\core\scene\materials\emissive.hpp">
       <Filter>Source Files\core\scene\materials</Filter>
@@ -1310,6 +1304,24 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\string_pool.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\util\fixed_hashmap.hpp">
+      <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\attributes\attribute.hpp">
+      <Filter>Source Files\core\scene\attributes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\attributes\attribute_handles.hpp">
+      <Filter>Source Files\core\scene\attributes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\attributes\attribute_sizes.hpp">
+      <Filter>Source Files\core\scene\attributes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\export\core_api.h">
+      <Filter>Source Files\core\export</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\export\core_interface.h">
+      <Filter>Source Files\core\export</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

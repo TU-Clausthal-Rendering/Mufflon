@@ -42,8 +42,6 @@ private:
 	void compute_max_importance();
 	float query_importance(const ei::Vec3& hitPoint, const scene::PrimitiveHandle& hitId);
 
-	u32 get_memory_requirement() const;
-
 	void update_reduction_factors();
 
 	void initialize_decimaters();

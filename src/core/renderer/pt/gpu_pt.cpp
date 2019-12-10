@@ -17,12 +17,13 @@ void init_rngs(u32 num, int seed, math::Rng* rngs);
 } // namespace gpupt_detail
 
 GpuPathTracer::GpuPathTracer() :
+	RendererBase<Device::CUDA, PtTargets>{},
 	m_params{}
 	//m_rng{ static_cast<u32>(std::random_device{}()) }
 {}
 
 void GpuPathTracer::iterate() {
-	//auto scope = Profiler::instance().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
+	//auto scope = Profiler::core().start<GpuProfileState>("GPU PT iteration", ProfileLevel::LOW);
 
 	copy(&m_sceneDesc->lightTree.posGuide, &m_params.neeUsePositionGuide, sizeof(bool));
 	cuda::check_error(gpupt_detail::call_kernel(std::move(m_outputBuffer),

@@ -2,7 +2,8 @@
 
 #include "polygon_mesh.hpp"
 #include "util/assert.hpp"
-#include "core/scene/attribute.hpp"
+#include "core/scene/attributes/attribute.hpp"
+#include "core/scene/attributes/attribute_handles.hpp"
 #include "core/scene/types.hpp"
 #include "util/range.hpp"
 #include <ei/3dtypes.hpp>
@@ -74,18 +75,6 @@ public:
 		std::size_t readPoints;
 		std::size_t readNormals;
 		std::size_t readUvs;
-	};
-
-	// Associates an attribute name with a type (vertex- or faceattributehandle)
-	template < class T >
-	struct VAttrDesc {
-		using Type = T;
-		std::string name;
-	};
-	template < class T >
-	struct FAttrDesc {
-		using Type = T;
-		std::string name;
 	};
 
 	class FaceIterator {
@@ -160,32 +149,50 @@ public:
 	~Polygons();
 
 	void reserve(std::size_t vertices, std::size_t edges, std::size_t tris, std::size_t quads);
+
+	VertexAttributeHandle add_vertex_attribute(StringView name, AttributeType type) {
+		return m_vertexAttributes.add_attribute(AttributeIdentifier{ type, name });
+	}
+	FaceAttributeHandle add_face_attribute(StringView name, AttributeType type) {
+		return m_faceAttributes.add_attribute(AttributeIdentifier{ type, name });
+	}
+	template < class T >
+	VertexAttributeHandle add_vertex_attribute(StringView name) {
+		return m_vertexAttributes.add_attribute(AttributeIdentifier{ get_attribute_type<T>(), name });
+	}
+	template < class T >
+	FaceAttributeHandle add_face_attribute(StringView name) {
+		return m_faceAttributes.add_attribute(AttributeIdentifier{ get_attribute_type<T>(), name });
+	}
+
+	std::optional<VertexAttributeHandle> find_vertex_attribute(StringView name, const AttributeType& type) const {
+		const AttributeIdentifier ident{ type, name };
+		return m_vertexAttributes.find_attribute(ident);
+	}
+	std::optional<FaceAttributeHandle> find_face_attribute(StringView name, const AttributeType& type) const {
+		const AttributeIdentifier ident{ type, name };
+		return m_faceAttributes.find_attribute(ident);
+	}
 	
 	template < class T >
-	VertexAttributeHandle add_vertex_attribute(std::string name) {
-		return m_vertexAttributes.add_attribute<T>(std::move(name));
+	void remove_vertex_attribute(const std::string& name) {
+		const AttributeIdentifier ident{ get_attribute_type<T>(), name };
+		if(const auto handle = m_vertexAttributes.find_attribute(ident); handle.has_value())
+			m_vertexAttributes.remove_attribute(handle.value());
 	}
 	template < class T >
-	FaceAttributeHandle add_face_attribute(std::string name) {
-		return m_faceAttributes.add_attribute<T>(std::move(name));
+	void remove_face_attribute(const std::string& name) {
+		const AttributeIdentifier ident{ get_attribute_type<T>(), name };
+		if(const auto handle = m_faceAttributes.find_attribute(ident); handle.has_value())
+			m_faceAttributes.remove_attribute(handle.value());
 	}
-
-	bool has_vertex_attribute(StringView name) {
-		return m_vertexAttributes.has_attribute(name);
-	}
-	bool has_face_attribute(StringView name) {
-		return m_faceAttributes.has_attribute(name);
-	}
-
-	void remove_attribute(StringView name) {
-		throw std::runtime_error("Operation not implemented yet");
-	}
+	void remove_curvature();
 
 	// Synchronizes the default attributes position, normal, uv, matindex 
 	template < Device dev >
 	void synchronize();
 
-	template < Device dev >
+	/*template < Device dev >
 	void synchronize(VertexAttributeHandle hdl) {
 		m_vertexAttributes.synchronize<dev>(hdl);
 	}
@@ -196,7 +203,7 @@ public:
 	template < Device dev, bool face >
 	void synchronize(StringView name) {
 		get_attributes<face>().synchronize<dev>(name);
-	}
+	}*/
 
 	template < Device dev >
 	void unload() {
@@ -217,8 +224,8 @@ public:
 	// Updates the descriptor with the given set of attributes
 	template < Device dev >
 	void update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
-									 const std::vector<const char*>& vertexAttribs,
-									 const std::vector<const char*>& faceAttribs);
+									 const std::vector<AttributeIdentifier>& vertexAttribs,
+									 const std::vector<AttributeIdentifier>& faceAttribs);
 
 	// Adds a new vertex.
 	VertexHandle add(const Point& point, const Normal& normal, const UvCoordinate& uv);
@@ -259,13 +266,9 @@ public:
 	 * The number of read values will be capped by the number of vertice present
 	 * after the starting position.
 	 */
-	std::size_t add_bulk(StringView name, const VertexHandle& startVertex,
+	std::size_t add_bulk(const VertexAttributeHandle& hdl, const VertexHandle& startVertex,
 						 std::size_t count, util::IByteReader& attrStream);
-	std::size_t add_bulk(StringView name, const FaceHandle& startVertex,
-						 std::size_t count, util::IByteReader& attrStream);
-	std::size_t add_bulk(VertexAttributeHandle hdl, const VertexHandle& startVertex,
-						 std::size_t count, util::IByteReader& attrStream);
-	std::size_t add_bulk(FaceAttributeHandle hdl, const FaceHandle& startVertex,
+	std::size_t add_bulk(const FaceAttributeHandle& hdl, const FaceHandle& startFace,
 						 std::size_t count, util::IByteReader& attrStream);
 
 	// Implements tessellation for the mesh
@@ -287,7 +290,7 @@ public:
 	void garbage_collect(std::function<void(VertexHandle, VertexHandle)> vCallback = {});
 
 	// Transforms polygon data
-	void transform(const ei::Mat3x4& transMat, const ei::Vec3& scale);
+	void transform(const ei::Mat3x4& transMat);
 
 	// Computes the "mean_curvature" attribute for all vertices
 	void compute_curvature();
@@ -315,40 +318,52 @@ public:
 	}
 
 	template < Device dev, class T >
-	ArrayDevHandle_t<dev, T> acquire(VertexAttributeHandle hdl) {
+	ArrayDevHandle_t<dev, T> acquire(const VertexAttributeHandle& hdl) {
 		return m_vertexAttributes.acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	ArrayDevHandle_t<dev, T> acquire(FaceAttributeHandle hdl) {
+	ArrayDevHandle_t<dev, T> acquire(const FaceAttributeHandle& hdl) {
 		return m_faceAttributes.acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	ConstArrayDevHandle_t<dev, T> acquire_const(VertexAttributeHandle hdl) {
-		return m_vertexAttributes.acquire_const<dev, T>(hdl);
+	ConstArrayDevHandle_t<dev, T> acquire_const(const VertexAttributeHandle& hdl) {
+		return this->template acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
-	ConstArrayDevHandle_t<dev, T> acquire_const(FaceAttributeHandle hdl) {
-		return m_faceAttributes.acquire_const<dev, T>(hdl);
+	ConstArrayDevHandle_t<dev, T> acquire_const(const FaceAttributeHandle& hdl) {
+		return this->template acquire<dev, T>(hdl);
 	}
-	template < Device dev, class T, bool face >
-	ArrayDevHandle_t<dev, T> acquire(StringView name) {
-		return get_attributes<face>().acquire<dev, T>(name);
+	template < Device dev, class T >
+	ArrayDevHandle_t<dev, T> acquire_vertex(const AttributeIdentifier& ident) {
+		if(const auto handle = m_vertexAttributes.find_attribute(ident); handle.has_value())
+			return this->template acquire<dev, T>(handle.value());
+		return {};
 	}
-	template < Device dev, class T, bool face >
-	ConstArrayDevHandle_t<dev, T> acquire_const(StringView name) {
-		return get_attributes<face>().acquire_const<dev, T>(name);
+	template < Device dev, class T >
+	ArrayDevHandle_t<dev, T> acquire_face(const AttributeIdentifier& ident) {
+		if(const auto handle = m_faceAttributes.find_attribute(ident); handle.has_value())
+			return this->template acquire<dev, T>(handle.value());
+		return {};
+	}
+	template < Device dev, class T >
+	ConstArrayDevHandle_t<dev, T> acquire_const_vertex(const AttributeIdentifier& ident) {
+		return this->template acquire_vertex<dev, T>(ident);
+	}
+	template < Device dev, class T >
+	ConstArrayDevHandle_t<dev, T> acquire_const_face(const AttributeIdentifier& ident) {
+		return this->template acquire_face<dev, T>(ident);
 	}
 
-	VertexAttributeHandle get_points_hdl() const noexcept {
+	const VertexAttributeHandle& get_points_hdl() const noexcept {
 		return m_pointsHdl;
 	}
-	VertexAttributeHandle get_normals_hdl() const noexcept {
+	const VertexAttributeHandle& get_normals_hdl() const noexcept {
 		return m_normalsHdl;
 	}
-	VertexAttributeHandle get_uvs_hdl() const noexcept {
+	const VertexAttributeHandle& get_uvs_hdl() const noexcept {
 		return m_uvsHdl;
 	}
-	FaceAttributeHandle get_material_indices_hdl() const noexcept {
+	const FaceAttributeHandle& get_material_indices_hdl() const noexcept {
 		return m_matIndicesHdl;
 	}
 
@@ -376,11 +391,6 @@ public:
 		return m_meshData->n_faces();
 	}
 
-	// Get a list of all materials which are referenced by any primitive
-	const std::unordered_set<MaterialIndex>& get_unique_materials() const {
-		return m_uniqueMaterials;
-	}
-
 	PolygonMeshType& get_mesh() noexcept {
 		return *m_meshData;
 	}
@@ -388,9 +398,6 @@ public:
 	const PolygonMeshType& get_mesh() const noexcept {
 		return *m_meshData;
 	}
-
-	// Returns whether any polygon has a displacement map associated with the given material assignment
-	bool has_displacement_mapping(const Scenario& scenario) const noexcept;
 
 	bool was_displacement_mapping_applied() const noexcept {
 		return m_wasDisplaced;
@@ -462,6 +469,7 @@ private:
 	VertexAttributeHandle m_pointsHdl;
 	VertexAttributeHandle m_normalsHdl;
 	VertexAttributeHandle m_uvsHdl;
+	std::optional<VertexAttributeHandle> m_curvatureHdl;
 	FaceAttributeHandle m_matIndicesHdl;
 	// Vertex-index buffer, first for the triangles, then for quads
 	IndexBuffers m_indexBuffer;
@@ -474,11 +482,6 @@ private:
 	ei::Box m_boundingBox;
 	std::size_t m_triangles = 0u;
 	std::size_t m_quads = 0u;
-
-	// Whenever a primitive is added the table of all referenced
-	// materials will be updated. Assumption: a material reference
-	// will not change afterwards.
-	std::unordered_set<MaterialIndex> m_uniqueMaterials;
 
 	// Keeps track of whether displacement mapping was already applied or not
 	bool m_wasDisplaced = false;

@@ -144,12 +144,6 @@
     <ClInclude Include="..\..\src\util\assert.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\mffloader\interface\api.h">
-      <Filter>Source Files\mffloader\interface</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\mffloader\interface\interface.h">
-      <Filter>Source Files\mffloader\interface</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\mffloader\parsing\json_loader.hpp">
       <Filter>Source Files\mffloader\parsing</Filter>
     </ClInclude>
@@ -173,6 +167,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\util\string_pool.hpp">
       <Filter>Source Files\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\mffloader\interface\mff_interface.h">
+      <Filter>Source Files\mffloader\interface</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\mffloader\interface\mff_api.h">
+      <Filter>Source Files\mffloader\interface</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

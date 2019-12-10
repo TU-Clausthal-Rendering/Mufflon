@@ -346,10 +346,10 @@ protected:
     }
 
     bool WriteDouble(double d) {
-        if (internal::Double(d).IsNanOrInf()) {
+        if (internal::Double(d).isnanOrInf()) {
             if (!(writeFlags & kWriteNanAndInfFlag))
                 return false;
-            if (internal::Double(d).IsNan()) {
+            if (internal::Double(d).isnan()) {
                 PutReserve(*os_, 3);
                 PutUnsafe(*os_, 'N'); PutUnsafe(*os_, 'a'); PutUnsafe(*os_, 'N');
                 return true;
@@ -544,11 +544,11 @@ inline bool Writer<StringBuffer>::WriteUint64(uint64_t u) {
 
 template<>
 inline bool Writer<StringBuffer>::WriteDouble(double d) {
-    if (internal::Double(d).IsNanOrInf()) {
+    if (internal::Double(d).isnanOrInf()) {
         // Note: This code path can only be reached if (RAPIDJSON_WRITE_DEFAULT_FLAGS & kWriteNanAndInfFlag).
         if (!(kWriteDefaultFlags & kWriteNanAndInfFlag))
             return false;
-        if (internal::Double(d).IsNan()) {
+        if (internal::Double(d).isnan()) {
             PutReserve(*os_, 3);
             PutUnsafe(*os_, 'N'); PutUnsafe(*os_, 'a'); PutUnsafe(*os_, 'N');
             return true;

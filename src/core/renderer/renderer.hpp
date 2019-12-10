@@ -82,8 +82,8 @@ public:
 	/* Triggers prior/after a different animation frame has been set.
 	 * A separate scene loading event will be fired in-between.
 	 */
-	virtual void on_animation_frame_changing(const u32 from, const u32 to) {}
-	virtual void on_animation_frame_changed(const u32 from, const u32 to) {
+	virtual void on_animation_frame_changing(const u32 /*from*/, const u32 /*to*/) {}
+	virtual void on_animation_frame_changed(const u32 /*from*/, const u32 /*to*/) {
 		m_lastReset.set(ResetEvent::ANIMATION);
 	}
 
@@ -108,7 +108,7 @@ public:
 	 * A separate scene loading event will be fired in-between.
 	 */
 	virtual void on_scenario_changing() {}
-	virtual void on_scenario_changed(scene::ConstScenarioHandle newScenario) {
+	virtual void on_scenario_changed(scene::ConstScenarioHandle /*newScenario*/) {
 		m_lastReset.set(ResetEvent::SCENARIO);
 	}
 

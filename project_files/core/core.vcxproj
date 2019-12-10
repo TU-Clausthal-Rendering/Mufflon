@@ -20,7 +20,10 @@
     <ClCompile Include="..\..\src\core\cameras\pinhole.cpp" />
     <ClCompile Include="..\..\src\core\data_structs\dm_hashgrid.cpp" />
     <ClCompile Include="..\..\src\core\data_structs\dm_octree.cpp" />
-    <ClCompile Include="..\..\src\core\export\interface.cpp" />
+    <ClCompile Include="..\..\src\core\export\interface.cpp">
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NOMINMAX;_USE_MATH_DEFINES;MUFFLON_ENABLE_OPEN_DENOISE;CORE_EXPORTS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NOMINMAX;_USE_MATH_DEFINES;MUFFLON_ENABLE_OPEN_DENOISE;CORE_EXPORTS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
     <ClCompile Include="..\..\src\core\memory\generic_resource.cpp" />
     <ClCompile Include="..\..\src\core\memory\synchronize.cpp" />
     <ClCompile Include="..\..\src\core\opengl\gl_context.cpp" />
@@ -60,7 +63,7 @@
     <ClCompile Include="..\..\src\core\renderer\wireframe\cpu_wireframe.cpp" />
     <ClCompile Include="..\..\src\core\renderer\wireframe\gl_wireframe.cpp" />
     <ClCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cpp" />
-    <ClCompile Include="..\..\src\core\scene\attribute.cpp" />
+    <ClCompile Include="..\..\src\core\scene\attributes\attribute.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
     <ClCompile Include="..\..\src\core\scene\instance.cpp" />
@@ -206,8 +209,8 @@
     <ClInclude Include="..\..\src\core\data_structs\dm_octree.hpp" />
     <ClInclude Include="..\..\src\core\data_structs\kdtree.hpp" />
     <ClInclude Include="..\..\src\core\data_structs\photon_map.hpp" />
-    <ClInclude Include="..\..\src\core\export\api.h" />
-    <ClInclude Include="..\..\src\core\export\interface.h" />
+    <ClInclude Include="..\..\src\core\export\core_api.h" />
+    <ClInclude Include="..\..\src\core\export\core_interface.h" />
     <ClInclude Include="..\..\src\core\export\texture_data.h" />
     <ClInclude Include="..\..\src\core\math\curvature.hpp" />
     <ClInclude Include="..\..\src\core\math\functions.hpp" />
@@ -315,7 +318,9 @@
     <ClInclude Include="..\..\src\core\scene\accel_structs\kdtree.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\lbvh.hpp" />
     <ClInclude Include="..\..\src\core\scene\accel_structs\tangent_space.hpp" />
-    <ClInclude Include="..\..\src\core\scene\attribute.hpp" />
+    <ClInclude Include="..\..\src\core\scene\attributes\attribute.hpp" />
+    <ClInclude Include="..\..\src\core\scene\attributes\attribute_handles.hpp" />
+    <ClInclude Include="..\..\src\core\scene\attributes\attribute_sizes.hpp" />
     <ClInclude Include="..\..\src\core\scene\descriptors.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon_mesh.hpp" />
@@ -370,6 +375,7 @@
     <ClInclude Include="..\..\src\util\cie_xyz.hpp" />
     <ClInclude Include="..\..\src\util\degrad.hpp" />
     <ClInclude Include="..\..\src\util\filesystem.hpp" />
+    <ClInclude Include="..\..\src\util\fixed_hashmap.hpp" />
     <ClInclude Include="..\..\src\util\flag.hpp" />
     <ClInclude Include="..\..\src\util\indexed_string_map.hpp" />
     <ClInclude Include="..\..\src\util\int_types.hpp" />
@@ -791,7 +797,7 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
       <Message>Copied the necessary .dll's into the execution directory</Message>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>cudart.lib;OpenMeshCored.lib;OpenMeshToolsd.lib;tbb.lib;tbbmalloc.lib;OpenImageDenoise.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cudart.lib;OpenMeshCored.lib;OpenMeshToolsd.lib;OpenImageDenoise.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\lib;$(SolutionDir)external\oidn-0.9\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>DebugFastLink</GenerateDebugInformation>
     </Link>
@@ -802,9 +808,9 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
       <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)</KeepDir>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
-      <AdditionalOptions>--expt-relaxed-constexpr --expt-extended-lambda -Xcompiler "/wd4819 /wd4800" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>--expt-relaxed-constexpr --expt-extended-lambda -Xcompiler /openmp -Xcompiler "/wd4819 /wd4800" %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
-      <CodeGeneration>compute_50,sm_50</CodeGeneration>
+      <CodeGeneration>compute_52,sm_52</CodeGeneration>
       <InterleaveSourceInPTX>true</InterleaveSourceInPTX>
     </CudaCompile>
     <CudaLink>
@@ -833,7 +839,7 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>cudart.lib;OpenMeshCore.lib;OpenMeshTools.lib;tbb.lib;tbbmalloc.lib;OpenImageDenoise.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cudart.lib;OpenMeshCore.lib;OpenMeshTools.lib;OpenImageDenoise.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\lib;$(SolutionDir)external\oidn-0.9\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
@@ -845,9 +851,9 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
       <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
       <KeepDir>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)</KeepDir>
       <CompileOut>$(SolutionDir)build\temp\$(ProjectName)\$(Configuration)\%(Filename).cu.obj</CompileOut>
-      <AdditionalOptions>--expt-relaxed-constexpr --expt-extended-lambda -Xcompiler "/wd4819 /wd4800" -Xcicc -O3 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>--expt-relaxed-constexpr --expt-extended-lambda -Xcompiler /openmp -Xcompiler "/wd4819 /wd4800" -Xcicc -O3 %(AdditionalOptions)</AdditionalOptions>
       <NvccCompilation>compile</NvccCompilation>
-      <CodeGeneration>compute_52,sm_52 </CodeGeneration>
+      <CodeGeneration>compute_52,sm_52</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
       <Message>Copied the necessary .dll's into the execution directory</Message>

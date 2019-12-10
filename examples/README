@@ -1,0 +1,15 @@
+The python example has to be executed from the same directory as the bindings.py module.
+The C and C++ examples may be compiled and executed wherever, but you have to ensure that the proper include, link, and rpath are set. The C example is tested with C99, the C++ requires at least C++17 (for string_view and filesystem).
+
+Example compile/link commands (assuming execution in install/build directory):
+
+C:
+gcc -std=c99 -c -g -I"include" example.c
+gcc example.o -o example -L"." -lcore -L"." -mffloader -Wl,rpath="$ORIGIN/."
+
+C++:
+g++ -std=c++17 -c -g -I"include" example.cpp
+g++ example.o -o example -L"." -lcore -L"." -mffloader -lstdc++fs -Wl,rpath="$ORIGIN/."
+
+
+BEWARE: There is currently a bug when combining gcc-8.3 and libstdc++6 leading to segfaults in std::filesystem::path. Since CUDA 10 doesn't support gcc-9 yet, be careful to compile the examples with gcc-8.3 as well!

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/math/sampling.hpp"
 #include "core/scene/textures/interface.hpp"
 #include "material_definitions.hpp"
@@ -8,7 +8,7 @@
 
 namespace mufflon { namespace scene { namespace materials {
 
-CUDA_FUNCTION MatSampleTorrance fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
+inline CUDA_FUNCTION MatSampleTorrance fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
 									  const ei::Vec4* texValues,
 									  int texOffset,
 									  const typename MatTorrance::NonTexParams& params) {
@@ -23,11 +23,11 @@ CUDA_FUNCTION MatSampleTorrance fetch(const textures::ConstTextureDevHandle_t<CU
 
 
 // The importance sampling routine
-CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
+inline CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 									  const Direction& incidentTS,
 									  Boundary& boundary,
 									  const math::RndSet2_1& rndSet,
-									  bool) {
+									  bool /*adjoint*/) {
 	float iDotH;
 	Direction halfTS;
 	AngularPdf cavityPdf;
@@ -72,13 +72,13 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleTorrance& params,
 		params.albedo * sdiv(g, gi),
 		math::PathEventType::REFLECTED,
 		excidentTS,
-		cavityPdf * sdiv(gi, ei::abs(4.0f * incidentTS.z * halfTS.z)),
-		cavityPdf * sdiv(ge, ei::abs(4.0f * excidentTS.z * halfTS.z))
+		{ cavityPdf * sdiv(gi, ei::abs(4.0f * incidentTS.z * halfTS.z)),
+		  cavityPdf * sdiv(ge, ei::abs(4.0f * excidentTS.z * halfTS.z)) }
 	};
 }
 
 // The evaluation routine
-CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleTorrance& params,
+inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleTorrance& params,
 											  const Direction& incidentTS,
 											  const Direction& excidentTS,
 											  Boundary& boundary) {
@@ -109,21 +109,21 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleTorrance& params,
 
 	return math::BidirSampleValue {
 		params.albedo * sdiv(g * d, ei::abs(4.0f * incidentTS.z * excidentTS.z)),
-		AngularPdf(sdiv(gi * d, ei::abs(4.0f * incidentTS.z))),
-		AngularPdf(sdiv(ge * d, ei::abs(4.0f * excidentTS.z)))
+		{ AngularPdf(sdiv(gi * d, ei::abs(4.0f * incidentTS.z))),
+		  AngularPdf(sdiv(ge * d, ei::abs(4.0f * excidentTS.z))) }
 	};
 }
 
 // The albedo routine
-CUDA_FUNCTION Spectrum albedo(const MatSampleTorrance& params) {
+inline CUDA_FUNCTION Spectrum albedo(const MatSampleTorrance& params) {
 	return params.albedo;
 }
 
-CUDA_FUNCTION math::SampleValue emission(const MatSampleTorrance& params, const scene::Direction& geoN, const scene::Direction& excident) {
+inline CUDA_FUNCTION math::SampleValue emission(const MatSampleTorrance& /*params*/, const scene::Direction& /*geoN*/, const scene::Direction& /*excident*/) {
 	return math::SampleValue{};
 }
 
-CUDA_FUNCTION float pdf_max(const MatSampleTorrance& params) {
+inline CUDA_FUNCTION float pdf_max(const MatSampleTorrance& params) {
 	switch(params.ndf) {
 		case NDF::BECKMANN:
 			if(params.roughness < 1.f / std::sqrt(2.f))

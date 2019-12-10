@@ -176,6 +176,7 @@ void assertString(ParserState& state, const rapidjson::Value::ConstMemberIterato
 	}
 }
 
+
 template <>
 std::int32_t read<std::int32_t>(ParserState& state, const rapidjson::Value& val) {
 	assertNumber(state, val);

@@ -7,6 +7,7 @@
 #include <cuda_runtime_api.h>
 #include <ei/3dtypes.hpp>
 #include <ei/3dintersection.hpp>
+#include <math.h>
 
 namespace mufflon { namespace scene { namespace accel_struct {
 
@@ -14,7 +15,7 @@ namespace {
 
 constexpr float SCENE_SCALE_EPS = 1e-4f;
 
-CUDA_FUNCTION __forceinline void add_epsilon(ei::Vec3& rayOrigin, const ei::Vec3& dir, const ei::Vec3& geoNormal) {
+CUDA_FUNCTION __forceinline__ void add_epsilon(ei::Vec3& rayOrigin, const ei::Vec3& dir, const ei::Vec3& geoNormal) {
 	ei::Vec3 offset = geoNormal * SCENE_SCALE_EPS;
 	if(dot(geoNormal, dir) >= 0.0f)
 		rayOrigin += offset;
@@ -43,7 +44,7 @@ __device__ __forceinline__ float spanBeginKepler(float a0, float a1, float b0, f
 __device__ __forceinline__ float spanEndKepler(float a0, float a1, float b0, float b1, float c0, float c1, float d) { return fmin_fmin(fmaxf(a0, a1), fmaxf(b0, b1), fmax_fmin(c0, c1, d)); }
 
 
-CUDA_FUNCTION bool intersect(const ei::Box& bb,
+inline CUDA_FUNCTION bool intersect(const ei::Box& bb,
 	const ei::FastRay& ray,
 	const float tmax, float& cmin) {//, float& cmax) {
 #ifdef __CUDA_ARCH__
@@ -94,8 +95,8 @@ CUDA_FUNCTION __forceinline__ float computeU(const float v, const float A1, cons
 
 // Quad intersection test
 // Implementation from http://www.sci.utah.edu/~kpotter/publications/ramsey-2004-RBPI.pdf
-//CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::FastRay& ray, ei::Vec2& uv) {
-CUDA_FUNCTION bool intersectQuad(const ei::Vec3& p00, const ei::Vec3& p10, const ei::Vec3& p11, const ei::Vec3& p01,
+//inline CUDA_FUNCTION float intersectQuad(const ei::Tetrahedron& quad, const ei::FastRay& ray, ei::Vec2& uv) {
+inline CUDA_FUNCTION bool intersectQuad(const ei::Vec3& p00, const ei::Vec3& p10, const ei::Vec3& p11, const ei::Vec3& p01,
 								 const ei::FastRay& ray, float& resT1, float& resT2,
 								 ei::Vec2& uv1, ei::Vec2& uv2) {
 	// The following equations may degenare if one or two components of the ray.direction
@@ -178,7 +179,7 @@ CUDA_FUNCTION bool intersectQuad(const ei::Vec3& p00, const ei::Vec3& p10, const
 }
 
 template < Device dev, bool alphatesting >
-CUDA_FUNCTION bool intersects_primitve(
+inline CUDA_FUNCTION bool intersects_primitve(
 	const SceneDescriptor<dev>& scene,
 	const LodDescriptor<dev>& obj,
 	const ei::FastRay& ray,
@@ -317,7 +318,7 @@ CUDA_FUNCTION bool intersects_primitve(
 
 // Transition from the top-level BVH to the object space BVH.
 // Returns false, if the object is not hit (in which case nothing is changed).
-template < Device dev > CUDA_FUNCTION
+template < Device dev > inline CUDA_FUNCTION
 bool world_to_object_space(const SceneDescriptor<dev>& scene, const i32 instanceId,
 						   const ei::FastRay& ray, ei::FastRay& currentRay, float& rayScale,
 						   float& tmax, const LodDescriptor<dev>*& obj, const LBVH<dev>*& currentBvh) {
@@ -348,7 +349,7 @@ bool world_to_object_space(const SceneDescriptor<dev>& scene, const i32 instance
 
 // Go back to the scene BVH and adjust tmax. Does nothing if the current
 // state is already in scene space.
-template < Device dev > CUDA_FUNCTION
+template < Device dev > inline CUDA_FUNCTION
 void object_to_world_space(const ei::FastRay& ray, ei::FastRay& currentRay, float& rayScale,
 						   const LBVH<dev>& sceneBvh, const LBVH<dev>*& currentBvh, float& tmax,
 						   const LodDescriptor<dev>*& obj) {
@@ -523,8 +524,9 @@ RayIntersectionResult first_intersection(
 		if(primId >= offsetSpheres) { // Sphere?
 			const i32 sphId = primId - offsetSpheres;
 			const ei::Vec3 hitPoint = ray.origin + hitT * ray.direction;
-			const Point center = transform(obj.spheres.spheres[sphId].center, scene.instanceToWorld[hitInstanceId]);
-			geoNormal = normalize(hitPoint - center); // Normalization required for acos() below
+			const auto localHitPoint = transform(hitPoint, scene.worldToInstance[hitInstanceId]);
+			const Point& center = obj.spheres.spheres[sphId].center;
+			geoNormal = normalize(localHitPoint - center); // Normalization required for acos() below
 
 			if(geoNormal.x == 0.0f && geoNormal.y == 0.0f)
 				tangentX = ei::Vec3(1.0f, 0.0f, 0.0f);
@@ -534,7 +536,6 @@ RayIntersectionResult first_intersection(
 			uv.x = atan2f(geoNormal.z, geoNormal.x) / (2.0f * ei::PI) + 0.5f;
 			uv.y = acosf(-geoNormal.y) / ei::PI;
 			surfParams.st = uv;
-			return RayIntersectionResult{ hitT, { hitInstanceId, hitPrimId }, geoNormal, tangentX, uv, surfParams };
 		} else {
 			const i32* indices = (i32*)obj.polygon.vertexIndices;
 			const ei::Vec3* meshVertices = obj.polygon.vertices;

@@ -19,8 +19,6 @@ namespace gui.Dll
                 s_logLevel = value;
                 if (!Core.core_set_log_level(s_logLevel))
                     throw new Exception(Core.core_get_dll_error());
-                if (!Loader.loader_set_log_level(s_logLevel))
-                    throw new Exception(Loader.loader_get_dll_error());
             }
         }
 

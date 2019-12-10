@@ -84,7 +84,7 @@ void ShadowPhotonVisualizer::post_reset() {
 				const auto& lod = m_sceneDesc.lods[m_sceneDesc.lodIndices[i]];
 				const auto& polygon = lod.polygon;
 				for(u32 v = 0u; v < polygon.numVertices; ++v) {
-					const ei::Vec3 vertex = ei::transform(polygon.vertices[v], m_sceneDesc.instanceToWorld[i]);
+					const ei::Vec3 vertex = ei::transform(polygon.vertices[v], m_sceneDesc.compute_instance_to_world_transformation(i));
 					// Transform the normal to world space (per-vertex normals are in object space)
 					// TODO: shouldn't we rather use the geometric normal?
 					const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ m_sceneDesc.worldToInstance[i] });
@@ -590,10 +590,11 @@ std::array<ei::Vec3, 3u> ShadowPhotonVisualizer::get_triangle_vertices(const sce
 		polygon.vertexIndices[vertexOffset + 1],
 		polygon.vertexIndices[vertexOffset + 2]
 	};
+	const auto instToWorld = m_sceneDesc.compute_instance_to_world_transformation(hitId.instanceId);
 	return std::array<ei::Vec3, 3u>{{
-		ei::transform(polygon.vertices[indices.x], m_sceneDesc.instanceToWorld[hitId.instanceId]),
-		ei::transform(polygon.vertices[indices.y], m_sceneDesc.instanceToWorld[hitId.instanceId]),
-		ei::transform(polygon.vertices[indices.z], m_sceneDesc.instanceToWorld[hitId.instanceId]),
+		ei::transform(polygon.vertices[indices.x], instToWorld),
+		ei::transform(polygon.vertices[indices.y], instToWorld),
+		ei::transform(polygon.vertices[indices.z], instToWorld)
 	}};
 }
 
@@ -608,11 +609,12 @@ std::array<ei::Vec3, 4u> ShadowPhotonVisualizer::get_quad_vertices(const scene::
 		polygon.vertexIndices[vertexOffset + 2],
 		polygon.vertexIndices[vertexOffset + 3]
 	};
+	const auto instToWorld = m_sceneDesc.compute_instance_to_world_transformation(hitId.instanceId);
 	return std::array<ei::Vec3, 4u>{{
-		ei::transform(polygon.vertices[indices.x], m_sceneDesc.instanceToWorld[hitId.instanceId]),
-		ei::transform(polygon.vertices[indices.y], m_sceneDesc.instanceToWorld[hitId.instanceId]),
-		ei::transform(polygon.vertices[indices.z], m_sceneDesc.instanceToWorld[hitId.instanceId]),
-		ei::transform(polygon.vertices[indices.w], m_sceneDesc.instanceToWorld[hitId.instanceId])
+		ei::transform(polygon.vertices[indices.x], instToWorld),
+		ei::transform(polygon.vertices[indices.y], instToWorld),
+		ei::transform(polygon.vertices[indices.z], instToWorld),
+		ei::transform(polygon.vertices[indices.w], instToWorld)
 	}};
 }
 

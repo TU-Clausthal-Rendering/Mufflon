@@ -17,7 +17,8 @@ void check_assert(bool condition, const char* file, int line, const char* condSt
 #define DEBUG_ENABLED
 #endif // _DEBUG
 #else // _MSC_VER
-#define debugBreak __builtin_trap()
+#include "signal.h"
+#define debugBreak raise(SIGTRAP)
 #ifndef NDEBUG
 #define DEBUG_ENABLED
 #endif // NDEBUG

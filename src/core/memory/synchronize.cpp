@@ -4,6 +4,8 @@
 
 namespace mufflon {
 
+bool g_hasCudaEnabled = true;
+
 void copy_cuda_opengl(void* dst, GLuint src, std::size_t byteOffset, std::size_t size) {
 	// Gotta map the OpenGL resource
 	// TODO: maybe we can find out if we need to maintain parts of the buffer or not? For now assume we do

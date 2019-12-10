@@ -1,5 +1,4 @@
 #include "binary.hpp"
-#include "core/export/interface.h"
 #include "util/log.hpp"
 #include "util/punning.hpp"
 #include "util/string_view.hpp"
@@ -14,60 +13,54 @@ namespace mff_loader::binary {
 
 using namespace mufflon;
 
-namespace {
+BinaryLoader::FileDescriptor::FileDescriptor(fs::path file, const char* mode) :
+	m_desc(std::fopen(file.string().c_str(), mode)) {
+	if(m_desc == nullptr)
+		throw std::ios_base::failure("Failed to open file '" + file.string()
+									 + "' with mode '" + mode + "'");
+}
 
-// RAII wrapper around C file descriptor
-class FileDescriptor {
-public:
-	FileDescriptor(fs::path file, const char* mode) :
-		m_desc(std::fopen(file.string().c_str(), mode))
-	{
-		if(m_desc == nullptr)
-			throw std::ios_base::failure("Failed to open file '" + file.string()
-										 + "' with mode '" + mode + "'");
+BinaryLoader::FileDescriptor::FileDescriptor(FileDescriptor&& other) :
+	m_desc{ other.m_desc } {
+	other.m_desc = nullptr;
+}
+
+BinaryLoader::FileDescriptor& BinaryLoader::FileDescriptor::operator=(FileDescriptor&& other) {
+	std::swap(m_desc, other.m_desc);
+	return *this;
+}
+
+BinaryLoader::FileDescriptor::~FileDescriptor() {
+	this->close();
+}
+
+void BinaryLoader::FileDescriptor::close() noexcept {
+	if(m_desc != nullptr) {
+		// Nothing we can do if this fails - not like we care, either
+		(void)std::fclose(m_desc);
+		m_desc = nullptr;
 	}
+}
 
-	~FileDescriptor() {
-		this->close();
+// Advances a C file descriptor (possibly in multiple steps)
+BinaryLoader::FileDescriptor& BinaryLoader::FileDescriptor::seek(u64 offset, std::ios_base::seekdir dir) {
+	int origin = 0u;
+	switch(dir) {
+		case std::ios_base::beg: origin = SEEK_SET; break;
+		case std::ios_base::end: origin = SEEK_END; break;
+		case std::ios_base::cur:
+		default: origin = SEEK_CUR;
 	}
-
-	void close() {
-		if(m_desc != nullptr) {
-			// Nothing we can do if this fails - not like we care, either
-			(void) std::fclose(m_desc);
-			m_desc = nullptr;
-		}
-	}
-
-	FILE* get() {
-		return m_desc;
-	}
-
-	// Advances a C file descriptor (possibly in multiple steps)
-	FileDescriptor& seek(u64 offset, std::ios_base::seekdir dir = std::ios_base::cur) {
-		int origin = 0u;
-		switch(dir) {
-			case std::ios_base::beg: origin = SEEK_SET; break;
-			case std::ios_base::end: origin = SEEK_END; break;
-			case std::ios_base::cur:
-			default: origin = SEEK_CUR;
-		}
-		while(offset > std::numeric_limits<long>::max()) {
-			if(std::fseek(m_desc, std::numeric_limits<long>::max(), origin) != 0)
-				throw std::runtime_error("Failed to seek C file descriptor to desired position");
-			offset -= std::numeric_limits<long>::max();
-			origin = SEEK_CUR;
-		}
-		if(std::fseek(m_desc, static_cast<long>(offset), origin) != 0)
+	while(offset > static_cast<u64>(std::numeric_limits<long>::max())) {
+		if(std::fseek(m_desc, std::numeric_limits<long>::max(), origin) != 0)
 			throw std::runtime_error("Failed to seek C file descriptor to desired position");
-		return *this;
+		offset -= std::numeric_limits<long>::max();
+		origin = SEEK_CUR;
 	}
-
-private:
-	FILE* m_desc = nullptr;
-};
-
-} // namespace
+	if(std::fseek(m_desc, static_cast<long>(offset), origin) != 0)
+		throw std::runtime_error("Failed to seek C file descriptor to desired position");
+	return *this;
+}
 
 
 
@@ -139,29 +132,8 @@ void BinaryLoader::clear_state() {
 	m_namePool.clear();
 }
 
-AttribDesc BinaryLoader::map_bin_attrib_type(AttribType type) {
-	switch(type) {
-		case AttribType::CHAR: return AttribDesc{ AttributeType::ATTR_CHAR, 1u };
-		case AttribType::UCHAR: return AttribDesc{ AttributeType::ATTR_UCHAR, 1u };
-		case AttribType::SHORT: return AttribDesc{ AttributeType::ATTR_SHORT, 1u };
-		case AttribType::USHORT: return AttribDesc{ AttributeType::ATTR_USHORT, 1u };
-		case AttribType::INT: return AttribDesc{ AttributeType::ATTR_INT, 1u };
-		case AttribType::UINT: return AttribDesc{ AttributeType::ATTR_UINT, 1u };
-		case AttribType::LONG: return AttribDesc{ AttributeType::ATTR_LONG, 1u };
-		case AttribType::ULONG: return AttribDesc{ AttributeType::ATTR_ULONG, 1u };
-		case AttribType::FLOAT: return AttribDesc{ AttributeType::ATTR_FLOAT, 1u };
-		case AttribType::DOUBLE: return AttribDesc{ AttributeType::ATTR_DOUBLE, 1u };
-		case AttribType::UCHAR2: return AttribDesc{ AttributeType::ATTR_UCHAR, 2u };
-		case AttribType::UCHAR3: return AttribDesc{ AttributeType::ATTR_UCHAR, 3u };
-		case AttribType::UCHAR4: return AttribDesc{ AttributeType::ATTR_UCHAR, 4u };
-		case AttribType::INT2: return AttribDesc{ AttributeType::ATTR_INT, 2u };
-		case AttribType::INT3: return AttribDesc{ AttributeType::ATTR_INT, 3u };
-		case AttribType::INT4: return AttribDesc{ AttributeType::ATTR_INT, 4u };
-		case AttribType::FLOAT2: return AttribDesc{ AttributeType::ATTR_FLOAT, 2u };
-		case AttribType::FLOAT3: return AttribDesc{ AttributeType::ATTR_FLOAT, 3u };
-		case AttribType::FLOAT4: return AttribDesc{ AttributeType::ATTR_FLOAT, 4u };
-		default: return AttribDesc{ AttributeType::ATTR_COUNT, 0u };
-	}
+GeomAttributeType BinaryLoader::map_bin_attrib_type(AttribType type) {
+	return static_cast<GeomAttributeType>(type);
 }
 
 // Read vertices with applied normal compression, but no deflating
@@ -169,18 +141,14 @@ void BinaryLoader::read_normal_compressed_vertices(const ObjectState& object, co
 	if(lod.numVertices == 0)
 		return;
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
-	FileDescriptor points{ m_filePath, "rb" };
-	FileDescriptor normals{ m_filePath, "rb" };
-	FileDescriptor uvs{ m_filePath, "rb" };
 
-	points.seek(currOffset, std::ios_base::beg);
-	normals.seek(currOffset + 3u * sizeof(float) * lod.numVertices, std::ios_base::beg);
-	uvs.seek(currOffset + (3u * sizeof(float) + sizeof(u32)) * lod.numVertices, std::ios_base::beg);
+	m_fileDescs[0u].seek(currOffset, std::ios_base::beg);
+	m_fileDescs[2u].seek(currOffset + (3u * sizeof(float) + sizeof(u32)) * lod.numVertices, std::ios_base::beg);
 	std::size_t pointsRead = 0u;
 	std::size_t uvsRead = 0u;
 
-	BulkLoader pointsBulk{ BulkLoader::BULK_FILE, { points.get() } };
-	BulkLoader uvsBulk{ BulkLoader::BULK_FILE, { uvs.get() } };
+	BulkLoader pointsBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
+	BulkLoader uvsBulk{ BulkType::BULK_FILE, { m_fileDescs[2u].get() } };
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
 		util::pun<Vec3>(object.aabb.max)
@@ -205,23 +173,20 @@ void BinaryLoader::read_normal_compressed_vertices(const ObjectState& object, co
 
 // Read vertices without deflation and without normal compression
 void BinaryLoader::read_normal_uncompressed_vertices(const ObjectState& object, const LodState& lod) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_normal_uncompressed_vertices");
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_normal_uncompressed_vertices");
 	if(lod.numVertices == 0)
 		return;
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
-	FileDescriptor points{ m_filePath, "rb" };
-	FileDescriptor normals{ m_filePath, "rb" };
-	FileDescriptor uvs{ m_filePath, "rb" };
 
-	points.seek(currOffset, std::ios_base::beg);
-	normals.seek(currOffset + 3u * sizeof(float) * lod.numVertices, std::ios_base::beg);
-	uvs.seek(currOffset + 2u * 3u * sizeof(float) * lod.numVertices, std::ios_base::beg);
+	m_fileDescs[0u].seek(currOffset, std::ios_base::beg);
+	m_fileDescs[1u].seek(currOffset + 3u * sizeof(float) * lod.numVertices, std::ios_base::beg);
+	m_fileDescs[2u].seek(currOffset + 2u * 3u * sizeof(float) * lod.numVertices, std::ios_base::beg);
 	std::size_t pointsRead = 0u;
 	std::size_t normalsRead = 0u;
 	std::size_t uvsRead = 0u;
-	BulkLoader pointsBulk{ BulkLoader::BULK_FILE, { points.get() } };
-	BulkLoader normalsBulk{ BulkLoader::BULK_FILE, { normals.get() } };
-	BulkLoader uvsBulk{ BulkLoader::BULK_FILE, { uvs.get() } };
+	BulkLoader pointsBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
+	BulkLoader normalsBulk{ BulkType::BULK_FILE, { m_fileDescs[1u].get() } };
+	BulkLoader uvsBulk{ BulkType::BULK_FILE, { m_fileDescs[2u].get() } };
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
 		util::pun<Vec3>(object.aabb.max)
@@ -239,7 +204,7 @@ void BinaryLoader::read_normal_uncompressed_vertices(const ObjectState& object, 
 }
 
 // Reads the attribute parameters, but not the actual data
-void BinaryLoader::read_uncompressed_attribute(const ObjectState& object, const LodState& lod) {
+void BinaryLoader::read_uncompressed_attribute() {
 	read(m_attribStateBuffer.name);
 	read(m_attribStateBuffer.meta);
 	m_attribStateBuffer.metaFlags = read<u32>();
@@ -258,19 +223,18 @@ void BinaryLoader::read_compressed_attribute(const unsigned char*& data) {
 void BinaryLoader::read_uncompressed_vertex_attributes(const ObjectState& object, const LodState& lod) {
 	if(lod.numVertices == 0 || lod.numVertAttribs == 0)
 		return;
-	FileDescriptor attr{ m_filePath, "rb" };
-	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { attr.get() } };
+	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	BulkLoader attrBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
-		read_uncompressed_attribute(object, lod);
+		read_uncompressed_attribute();
 		auto attrHdl = polygon_request_vertex_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 														m_attribStateBuffer.type);
-		if(attrHdl.index == INVALID_INDEX)
+		if(attrHdl.name == nullptr)
 			throw std::runtime_error("Failed to add vertex attribute to object '" + std::string(object.name) + "'");
-		if(polygon_set_vertex_attribute_bulk(lod.lodHdl, &attrHdl, 0u,
+		if(polygon_set_vertex_attribute_bulk(lod.lodHdl, attrHdl, 0u,
 											 lod.numVertices,
 											 &attrBulk) == INVALID_SIZE)
 			throw std::runtime_error("Failed to set vertex attribute data for object '" + std::string(object.name) + "'");
@@ -285,19 +249,18 @@ void BinaryLoader::read_uncompressed_vertex_attributes(const ObjectState& object
 void BinaryLoader::read_uncompressed_face_attributes(const ObjectState& object, const LodState& lod) {
 	if((lod.numTriangles == 0 && lod.numQuads == 0) || lod.numFaceAttribs == 0)
 		return;
-	FileDescriptor attr{ m_filePath, "rb" };
-	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { attr.get() } };
+	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	BulkLoader attrBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
-		read_uncompressed_attribute(object, lod);
+		read_uncompressed_attribute();
 		auto attrHdl = polygon_request_face_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 													  m_attribStateBuffer.type);
-		if(attrHdl.index == INVALID_INDEX)
+		if(attrHdl.name == nullptr)
 			throw std::runtime_error("Failed to add face attribute to object '" + std::string(object.name) + "'");
-		if(polygon_set_face_attribute_bulk(lod.lodHdl, &attrHdl, 0u,
+		if(polygon_set_face_attribute_bulk(lod.lodHdl, attrHdl, 0u,
 										   lod.numTriangles + lod.numQuads,
 										   &attrBulk) == INVALID_SIZE)
 			throw std::runtime_error("Failed to set face attribute data for object '" + std::string(object.name) + "'");
@@ -312,19 +275,18 @@ void BinaryLoader::read_uncompressed_face_attributes(const ObjectState& object, 
 void BinaryLoader::read_uncompressed_sphere_attributes(const ObjectState& object, const LodState& lod) {
 	if(lod.numSpheres == 0 || lod.numSphereAttribs == 0)
 		return;
-	FileDescriptor attr{ m_filePath, "rb" };
-	attr.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader attrBulk{ BulkLoader::BULK_FILE, { attr.get() } };
+	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	BulkLoader attrBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
-		read_uncompressed_attribute(object, lod);
+		read_uncompressed_attribute();
 		auto attrHdl = spheres_request_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 												 m_attribStateBuffer.type);
-		if(attrHdl.index == INVALID_INDEX)
+		if(attrHdl.name == nullptr)
 			throw std::runtime_error("Failed to add sphere attribute to object '" + std::string(object.name) + "'");
-		if(spheres_set_attribute_bulk(lod.lodHdl, &attrHdl, 0u,
+		if(spheres_set_attribute_bulk(lod.lodHdl, attrHdl, 0u,
 									  lod.numSpheres,
 									  &attrBulk) == INVALID_SIZE)
 			throw std::runtime_error("Failed to set sphere attribute data for object '" + std::string(object.name) + "'");
@@ -338,9 +300,8 @@ void BinaryLoader::read_uncompressed_sphere_attributes(const ObjectState& object
 void BinaryLoader::read_uncompressed_face_materials(const ObjectState& object, const LodState& lod) {
 	if(lod.numTriangles == 0 && lod.numQuads == 0)
 		return;
-	FileDescriptor matIdxs{ m_filePath, "rb" };
-	matIdxs.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader matsBulk{ BulkLoader::BULK_FILE, { matIdxs.get() } };
+	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	BulkLoader matsBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	const u32 faces = lod.numTriangles + lod.numQuads;
 	if(polygon_set_material_idx_bulk(lod.lodHdl, static_cast<FaceHdl>(0u),
@@ -356,9 +317,8 @@ void BinaryLoader::read_uncompressed_face_materials(const ObjectState& object, c
 void BinaryLoader::read_uncompressed_sphere_materials(const ObjectState& object, const LodState& lod) {
 	if(lod.numSpheres == 0)
 		return;
-	FileDescriptor matIdxs{ m_filePath, "rb" };
-	matIdxs.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader matsBulk{ BulkLoader::BULK_FILE, { matIdxs.get() } };
+	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	BulkLoader matsBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(spheres_set_material_idx_bulk(lod.lodHdl, static_cast<SphereHdl>(0u),
 									 lod.numSpheres, &matsBulk) == INVALID_SIZE)
@@ -371,7 +331,7 @@ void BinaryLoader::read_uncompressed_sphere_materials(const ObjectState& object,
 }
 
 void BinaryLoader::read_uncompressed_triangles(const ObjectState& object, const LodState& lod) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_uncompressed_triangles");
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_uncompressed_triangles");
 	if(lod.numTriangles == 0)
 		return;
 	// Read the faces (cannot do that bulk-like)
@@ -385,7 +345,7 @@ void BinaryLoader::read_uncompressed_triangles(const ObjectState& object, const 
 }
 
 void BinaryLoader::read_uncompressed_quads(const ObjectState& object, const LodState& lod) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_uncompressed_quads");
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_uncompressed_quads");
 	if(lod.numQuads == 0)
 		return;
 	// Read the faces (cannot do that bulk-like)
@@ -401,9 +361,8 @@ void BinaryLoader::read_uncompressed_quads(const ObjectState& object, const LodS
 void BinaryLoader::read_uncompressed_spheres(const ObjectState& object, const LodState& lod) {
 	if(lod.numSpheres == 0)
 		return;
-	FileDescriptor spheres{ m_filePath, "rb" };
-	spheres.seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
-	BulkLoader spheresBulk{ BulkLoader::BULK_FILE, { spheres.get() } };
+	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
+	BulkLoader spheresBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
 		util::pun<Vec3>(object.aabb.max)
@@ -453,9 +412,9 @@ void BinaryLoader::read_compressed_normal_compressed_vertices(const ObjectState&
 	const Vec2* uvs = reinterpret_cast<const Vec2*>(vertexData.data() + lod.numVertices
 													* (3u * sizeof(float) + sizeof(u32)));
 
-	BulkLoader pointsBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader pointsBulk{ BulkType::BULK_ARRAY, {} };
 	pointsBulk.descriptor.bytes = reinterpret_cast<const char*>(points);
-	BulkLoader uvsBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader uvsBulk{ BulkType::BULK_ARRAY, {} };
 	uvsBulk.descriptor.bytes = reinterpret_cast<const char*>(uvs);
 	std::size_t pointsRead = 0u;
 	std::size_t uvsRead = 0u;
@@ -492,9 +451,9 @@ void BinaryLoader::read_compressed_normal_uncompressed_vertices(const ObjectStat
 	std::size_t pointsRead = 0u;
 	std::size_t normalsRead = 0u;
 	std::size_t uvsRead = 0u;
-	BulkLoader pointsBulk{ BulkLoader::BULK_ARRAY };
-	BulkLoader normalsBulk{ BulkLoader::BULK_ARRAY };
-	BulkLoader uvsBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader pointsBulk{ BulkType::BULK_ARRAY, {} };
+	BulkLoader normalsBulk{ BulkType::BULK_ARRAY, {} };
+	BulkLoader uvsBulk{ BulkType::BULK_ARRAY, {} };
 	pointsBulk.descriptor.bytes = reinterpret_cast<const char*>(points);
 	normalsBulk.descriptor.bytes = reinterpret_cast<const char*>(normals);
 	uvsBulk.descriptor.bytes = reinterpret_cast<const char*>(uvs);
@@ -550,9 +509,9 @@ void BinaryLoader::read_compressed_spheres(const ObjectState& object, const LodS
 														 * 4u * sizeof(float));
 
 	std::size_t readSpheres = 0u;
-	BulkLoader spheresBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader spheresBulk{ BulkType::BULK_ARRAY, {} };
 	spheresBulk.descriptor.bytes = reinterpret_cast<const char*>(spheres);
-	BulkLoader matsBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader matsBulk{ BulkType::BULK_ARRAY, {} };
 	matsBulk.descriptor.bytes = reinterpret_cast<const char*>(matIndices);
 	AABB aabb{
 		util::pun<Vec3>(object.aabb.min),
@@ -579,17 +538,17 @@ void BinaryLoader::read_compressed_vertex_attributes(const ObjectState& object, 
 
 	std::vector<unsigned char> attributeData = decompress();
 	const unsigned char* attributes = attributeData.data();
-	BulkLoader attrBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader attrBulk{ BulkType::BULK_ARRAY, {} };
 	attrBulk.descriptor.bytes = reinterpret_cast<const char*>(attributes);
 
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
 		read_compressed_attribute(attributes);
 		auto attrHdl = polygon_request_vertex_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 														m_attribStateBuffer.type);
-		if(attrHdl.index == INVALID_INDEX)
+		if(attrHdl.name == nullptr)
 			throw std::runtime_error("Failed to add vertex attribute to object '" + std::string(object.name) + "'");
 
-		if(polygon_set_vertex_attribute_bulk(lod.lodHdl, &attrHdl, 0, lod.numVertices, &attrBulk) == INVALID_SIZE)
+		if(polygon_set_vertex_attribute_bulk(lod.lodHdl, attrHdl, 0, lod.numVertices, &attrBulk) == INVALID_SIZE)
 			throw std::runtime_error("Failed to set vertex attribute data for object '" + std::string(object.name) + "'");
 		
 		attrBulk.descriptor.bytes += m_attribStateBuffer.bytes;
@@ -609,17 +568,17 @@ void BinaryLoader::read_compressed_face_attributes(const ObjectState& object, co
 
 	std::vector<unsigned char> attributeData = decompress();
 	const unsigned char* attributes = attributeData.data();
-	BulkLoader attrBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader attrBulk{ BulkType::BULK_ARRAY, {} };
 	attrBulk.descriptor.bytes = reinterpret_cast<const char*>(attributes);
 
 	for(u32 i = 0u; i < lod.numFaceAttribs; ++i) {
 		read_compressed_attribute(attributes);
 		auto attrHdl = polygon_request_face_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 													  m_attribStateBuffer.type);
-		if(attrHdl.index == INVALID_INDEX)
+		if(attrHdl.name == nullptr)
 			throw std::runtime_error("Failed to add face attribute to object '" + std::string(object.name) + "'");
 
-		if(polygon_set_face_attribute_bulk(lod.lodHdl, &attrHdl, 0, lod.numTriangles + lod.numQuads, &attrBulk) == INVALID_SIZE)
+		if(polygon_set_face_attribute_bulk(lod.lodHdl, attrHdl, 0, lod.numTriangles + lod.numQuads, &attrBulk) == INVALID_SIZE)
 			throw std::runtime_error("Failed to set face attribute data for object '" + std::string(object.name) + "'");
 
 		attrBulk.descriptor.bytes += m_attribStateBuffer.bytes;
@@ -634,7 +593,7 @@ void BinaryLoader::read_compressed_face_materials(const ObjectState& object, con
 
 	std::vector<unsigned char> matData = decompress();
 	const u16* matIndices = reinterpret_cast<const u16*>(matData.data());
-	BulkLoader matsBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader matsBulk{ BulkType::BULK_ARRAY, {} };
 	matsBulk.descriptor.bytes = reinterpret_cast<const char*>(matIndices);
 
 	if(polygon_set_material_idx_bulk(lod.lodHdl, 0, lod.numTriangles + lod.numQuads, &matsBulk) == INVALID_SIZE)
@@ -653,17 +612,17 @@ void BinaryLoader::read_compressed_sphere_attributes(const ObjectState& object, 
 								 + std::string(object.name) + "'");
 	std::vector<unsigned char> attributeData = decompress();
 	const unsigned char* attributes = attributeData.data();
-	BulkLoader attrBulk{ BulkLoader::BULK_ARRAY };
+	BulkLoader attrBulk{ BulkType::BULK_ARRAY, {} };
 	attrBulk.descriptor.bytes = reinterpret_cast<const char*>(attributes);
 
 	for(u32 i = 0u; i < lod.numSphereAttribs; ++i) {
 		read_compressed_attribute(attributes);
 		auto attrHdl = spheres_request_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 												 m_attribStateBuffer.type);
-		if(attrHdl.index == INVALID_INDEX)
+		if(attrHdl.name == nullptr)
 			throw std::runtime_error("Failed to add sphere attribute to object '" + std::string(object.name) + "'");
 
-		if(spheres_set_attribute_bulk(lod.lodHdl, &attrHdl, 0, lod.numSpheres, &attrBulk) == INVALID_SIZE)
+		if(spheres_set_attribute_bulk(lod.lodHdl, attrHdl, 0, lod.numSpheres, &attrBulk) == INVALID_SIZE)
 			throw std::runtime_error("Failed to set sphere attribute data for object '" + std::string(object.name) + "'");
 
 		attrBulk.descriptor.bytes += m_attribStateBuffer.bytes;
@@ -673,7 +632,7 @@ void BinaryLoader::read_compressed_sphere_attributes(const ObjectState& object, 
 }
 
 u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_lod");
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_lod");
 
 	// Remember where we were in the file
 	const std::ifstream::off_type currOffset = m_fileStream.tellg() - m_fileStart;
@@ -736,7 +695,7 @@ u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 		read_uncompressed_face_attributes(object, lodState);
 		read_uncompressed_spheres(object, lodState);
 
-		logInfo("[BinaryLoader::read_lod] Loaded LoD ", actualLod, " of object object '",
+		logPedantic("[BinaryLoader::read_lod] Loaded LoD ", actualLod, " of object object '",
 				object.name, "' with ", lodState.numVertices, " vertices, ",
 				lodState.numTriangles, " triangles, ", lodState.numQuads, " quads, ",
 				lodState.numSpheres, " spheres");
@@ -749,7 +708,7 @@ u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 
 void BinaryLoader::read_object() {
 	m_objects.back().name = m_namePool.insert(read<StringView>());
-	logInfo("[BinaryLoader::read_object] Loading object '", m_objects.back().name, "'");
+	logPedantic("[BinaryLoader::read_object] Loading object '", m_objects.back().name, "'");
 	m_objects.back().flags = static_cast<ObjectFlags>( read<u32>() );
 	m_objects.back().keyframe = read<u32>();
 	m_objects.back().animObjId = read<u32>();
@@ -766,15 +725,21 @@ void BinaryLoader::read_object() {
 }
 
 bool BinaryLoader::read_instances(const u32 globalLod,
-								  const std::unordered_map<StringView, u32>& objectLods,
-								  const std::unordered_map<StringView, u32>& instanceLods) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::read_instances");
+								  const util::FixedHashMap<StringView, u32>& objectLods,
+								  util::FixedHashMap<StringView, InstanceMapping>& instanceLods) {
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_instances");
+	sprintf(m_loadingStage.data(), "Loading instances%c", '\0');
 	std::vector<uint8_t> hasInstance(m_objects.size(), false);
 	const u32 numInstances = read<u32>();
+	const u32 instDispInterval = std::max(1u, numInstances / 200u);
 	for(u32 i = 0u; i < numInstances; ++i) {
 		if(m_abort)
 			return false;
-		const auto name = m_namePool.insert(read<StringView>());
+		// Only set the string every x instances to avoid overhead
+		if(i % instDispInterval == 0)
+			sprintf(m_loadingStage.data(), "Loading instance %u / %u%c",
+					i, numInstances, '\0');
+		const auto name = read<StringView>();
 		const u32 objId = read<u32>();
 		const u32 keyframe = read<u32>();
 		const u32 animInstId = read<u32>();
@@ -783,39 +748,54 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 		u32 lod = globalLod;
 		if(auto iter = objectLods.find(m_objects[objId].name); iter != objectLods.end())
 			lod = iter->second;
-		if(auto iter = instanceLods.find(name); iter != instanceLods.end())
-			lod = iter->second;
+		const auto instIter = instanceLods.find(name);
+		if(instIter != instanceLods.end())
+			lod = instIter->second.customLod;
 
+		// Only log below a certain threshold
 		logPedantic("[BinaryLoader::read_instances] Creating given instance (keyframe ", keyframe,
 					", animInstId ", animInstId, ") for object '", name, "\'");
-		InstanceHdl instHdl = world_create_instance(name.data(), m_objects[objId].objHdl, keyframe);
+		InstanceHdl instHdl = world_create_instance(m_objects[objId].objHdl, keyframe);
 		if(instHdl == nullptr)
 			throw std::runtime_error("Failed to create instance for object ID "
 									 + std::to_string(objId));
+		if(instIter != instanceLods.end())
+			instIter->second.handle = instHdl;
 
 		// We now have a valid instance: time to check if we have the required LoD
-		if(!object_has_lod(m_objects[objId].objHdl, lod)) {
+		// Only do so for non-animated instances though to avoid loading all LoDs into memory
+		if((m_keepTrackOfAabb || keyframe == 0xFFFFFFFF) && !object_has_lod(m_objects[objId].objHdl, lod)) {
 			// We don't -> gotta load it
 			lod = read_lod(m_objects[objId], lod);
 		}
 
-		if(!instance_set_transformation_matrix(instHdl, &transMat))
+		if(!instance_set_transformation_matrix(instHdl, &transMat, m_loadWorldToInstTrans))
 			throw std::runtime_error("Failed to set transformation matrix for instance of object ID "
 									 + std::to_string(objId));
 
-		ei::Box instanceAabb;
-		if(!instance_get_bounding_box(instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
-			throw std::runtime_error("Failed to get bounding box for instance of object ID "
-									 + std::to_string(objId));
-		m_aabb = ei::Box(m_aabb, instanceAabb);
+		if(m_keepTrackOfAabb) {
+			ei::Box instanceAabb;
+			if(!instance_get_bounding_box(instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
+				throw std::runtime_error("Failed to get bounding box for instance of object ID "
+										 + std::to_string(objId));
+			m_aabb = ei::Box(m_aabb, instanceAabb);
+		}
 
 		hasInstance[objId] = true;
 	}
 
+	logInfo("[BinaryLoader::read_instances] Loaded ", numInstances, " instances");
+	sprintf(m_loadingStage.data(), "Creating default instances%c", '\0');
 	// Create identity instances for objects not having one yet
-	for(u32 i = 0u; i < static_cast<u32>(hasInstance.size()); ++i) {
+	const auto objectCount = hasInstance.size();
+	const u32 objDispInterval = std::max(1u, static_cast<u32>(objectCount) / 10u);
+	u32 defaultCreatedInstances = 0u;
+	for(u32 i = 0u; i < static_cast<u32>(objectCount); ++i) {
 		if(m_abort)
 			return false;
+		// Only set the string every x objects to avoid overhead
+		if(i % objDispInterval == 0)
+			sprintf(m_loadingStage.data(), "Checking default instance for object %u / %zu%c", i, objectCount, '\0');
 		if(!hasInstance[i]) {
 			StringView objName = m_objects[i].name;
 			logPedantic("[BinaryLoader::read_instances] Creating default instance for object '",
@@ -828,7 +808,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			u32 lod = globalLod;
 			if(auto iter = objectLods.find(objName); iter != objectLods.end())
 				lod = iter->second;
-			InstanceHdl instHdl = world_create_instance(m_nameBuffer.c_str(), m_objects[i].objHdl, 0xFFFFFFFF);
+			InstanceHdl instHdl = world_create_instance(m_objects[i].objHdl, 0xFFFFFFFF);
 			if(instHdl == nullptr)
 				throw std::runtime_error("Failed to create instance for object ID "
 										 + std::to_string(i));
@@ -839,18 +819,23 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 				read_lod(m_objects[i], lod);
 			}
 
-			ei::Box instanceAabb;
-			if(!instance_get_bounding_box(instHdl,  reinterpret_cast<Vec3*>(&instanceAabb.min),  reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
-				throw std::runtime_error("Failed to get bounding box for instance of object ID "
-										 + std::to_string(i));
-			m_aabb = ei::Box(m_aabb, instanceAabb);
+			if(m_keepTrackOfAabb) {
+				ei::Box instanceAabb;
+				if(!instance_get_bounding_box(instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
+					throw std::runtime_error("Failed to get bounding box for instance of object ID "
+											 + std::to_string(i));
+				m_aabb = ei::Box(m_aabb, instanceAabb);
+			}
+			++defaultCreatedInstances;
 		}
 	}
+	logInfo("[BinaryLoader::read_instances] Created ", defaultCreatedInstances, " default instances");
 	
 	return true;
 }
 
 void BinaryLoader::deinstance() {
+	sprintf(m_loadingStage.data(), "Performing deinstancing%c", '\0');
 	// Both animated and not animated instances
 	auto applyTranformation = [](const u32 frame) {
 		const u32 numInstances = world_get_instance_count(frame);
@@ -867,13 +852,16 @@ void BinaryLoader::deinstance() {
 }
 
 void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::load_lod");
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::load_lod");
 	m_filePath = file;
+
+	for(u32 i = 0u; i < 3u; ++i)
+		m_fileDescs[i] = FileDescriptor{ m_filePath, "rb" };
 
 	if(!fs::exists(m_filePath))
 		throw std::runtime_error("Binary file '" + m_filePath.string() + "' doesn't exist");
 
-	logInfo("[BinaryLoader::load_lod] Loading LoD ", lod, " for object ID ", objId,
+	logPedantic("[BinaryLoader::load_lod] Loading LoD ", lod, " for object ID ", objId,
 			" from file '", m_filePath.string(), "'");
 
 	try {
@@ -933,15 +921,19 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 }
 
 bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
-							 const std::unordered_map<StringView, mufflon::u32>& objectLods,
-							 const std::unordered_map<StringView, mufflon::u32>& instanceLods,
-							 bool deinstance) {
-	auto scope = Profiler::instance().start<CpuProfileState>("BinaryLoader::load_file");
+							 const util::FixedHashMap<StringView, mufflon::u32>& objectLods,
+							 util::FixedHashMap<StringView, InstanceMapping>& instanceLods,
+							 const bool deinstance, const bool loadWorldToInstTrans,
+							 const bool keepTrackOfAabb) {
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::load_file");
+	m_loadWorldToInstTrans = loadWorldToInstTrans;
+	m_keepTrackOfAabb = keepTrackOfAabb;
 	m_filePath = std::move(file);
 	if(!fs::exists(m_filePath))
 		throw std::runtime_error("Binary file '" + m_filePath.string() + "' doesn't exist");
 	m_aabb.min = ei::Vec3{ 1e30f };
 	m_aabb.max = ei::Vec3{ -1e30f };
+	sprintf(m_loadingStage.data(), "Loading binary file%c", '\0');
 	logInfo("[BinaryLoader::load_file] Loading binary file '", m_filePath.string(), "'");
 	try {
 		// Open the binary file and enable exception management
@@ -951,6 +943,8 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		m_fileStream.exceptions(std::ifstream::failbit);
 		// Needed to get a C file descriptor offset
 		m_fileStart = m_fileStream.tellg();
+		for(u32 i = 0u; i < 3u; ++i)
+			m_fileDescs[i] = FileDescriptor{ m_filePath, "rb" };
 
 		if(m_abort)
 			return false;
@@ -980,11 +974,28 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		m_objJumpTable.resize(read<u32>());
 		for(std::size_t i = 0u; i < m_objJumpTable.size(); ++i)
 			m_objJumpTable[i] = read<u64>();
+		{	// Quickly jump to the instance section to peek at their count
+			const auto currPos = m_fileStream.tellg();
+			m_fileStream.seekg(instanceStart + sizeof(u32), std::ifstream::beg);
+			const auto instanceCount = read<u32>();
+			m_fileStream.seekg(currPos, std::ifstream::beg);
+			// Since there may be implicit (default) instances, add object count to be sure
+			// If we're using deinstancing, the number of objects increases by the number of instances
+			// (conservative estimate)
+			world_reserve_objects_instances(static_cast<u32>(m_objJumpTable.size() + (deinstance ? instanceCount : 0u)),
+											static_cast<u32>(instanceCount + m_objJumpTable.size()));
+		}
 
+		const auto objectCount = m_objJumpTable.size();
+		const std::size_t objDispInterval = std::max<std::size_t>(1u, objectCount / 200u);
 		// Next come the objects
-		for(std::size_t i = 0u; i < m_objJumpTable.size(); ++i) {
+		for(std::size_t i = 0u; i < objectCount; ++i) {
 			if(m_abort)
 				return false;
+			if(i % objDispInterval == 0u)
+				sprintf(m_loadingStage.data(), "Reading object definition %zu / %zu%c",
+						i, objectCount, '\0');
+
 			m_objects.push_back(ObjectState{});
 			// Jump to the right position in file
 			m_fileStream.seekg(m_objJumpTable[i], std::ifstream::beg);
@@ -996,6 +1007,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 				throw std::runtime_error("Invalid object magic constant (object " + std::to_string(i) + ")");
 			read_object();
 		}
+		logInfo("[BinaryLoader::load_file] Parsed ", objectCount, " objects");
 
 		// Now come instances
 		m_fileStream.seekg(instanceStart, std::ios_base::beg);
@@ -1006,6 +1018,8 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		if(deinstance)
 			this->deinstance();
 		this->clear_state();
+		for(u32 i = 0u; i < 3u; ++i)
+			m_fileDescs[i].close();
 	} catch(const std::exception&) {
 		// Clean up before leaving throwing
 		this->clear_state();

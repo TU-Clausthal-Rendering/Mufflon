@@ -8,10 +8,11 @@
 #include "core/scene/lights/light_tree_sampling.hpp"
 #include "core/renderer/targets/render_targets.hpp"
 #include "core/renderer/footprint.hpp"
+#include <math.h>
 
 namespace mufflon { namespace renderer {
 
-CUDA_FUNCTION void update_guide_heuristic(float& guideWeight, int pathLen, AngularPdf pdfForw) {
+inline CUDA_FUNCTION void update_guide_heuristic(float& guideWeight, int pathLen, AngularPdf pdfForw) {
 	if(pathLen > 0) {
 		float pSq = pdfForw * pdfForw;
 		//guideWeight *= 1.0f - expf(-pSq / 5.0f);
@@ -29,7 +30,7 @@ struct PtVertexExt {
 	AreaPdf incidentPdf;
 	FootprintV0 footprint;
 
-	CUDA_FUNCTION void init(const PathVertex<PtVertexExt>& thisVertex,
+	inline CUDA_FUNCTION void init(const PathVertex<PtVertexExt>& thisVertex,
 							const AreaPdf inAreaPdf,
 							const AngularPdf inDirPdf,
 							const float pChoice) {
@@ -41,13 +42,13 @@ struct PtVertexExt {
 			this->footprint.init(0.f, 0.f, pChoice);
 	}
 
-	CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& prevVertex,
+	inline CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& prevVertex,
 							  const PathVertex<PtVertexExt>& thisVertex,
 							  const math::PdfPair pdf,
 							  const Connection& incident,
-							  const Spectrum& throughput,
-							  const float continuationPropability,
-							  const Spectrum& transmission,
+							  const Spectrum& /*throughput*/,
+							  const float /*continuationPropability*/,
+							  const Spectrum& /*transmission*/,
 							  float& guideWeight) {
 		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
 		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
@@ -59,10 +60,10 @@ struct PtVertexExt {
 		guideWeight = 1.f / (1.f + footprint.get_solid_angle());
 	}
 
-	CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& thisVertex,
-							  const scene::Direction& excident,
-							  const VertexSample& sample,
-							  float& guideWeight) {}
+	inline CUDA_FUNCTION void update(const PathVertex<PtVertexExt>& /*thisVertex*/,
+							  const scene::Direction& /*excident*/,
+							  const VertexSample& /*sample*/,
+							  float& /*guideWeight*/) {}
 };
 
 using PtPathVertex = PathVertex<PtVertexExt>;
@@ -71,7 +72,7 @@ using PtPathVertex = PathVertex<PtVertexExt>;
 /*
  * Create one sample path (actual PT algorithm)
  */
-CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT_DEV> outputBuffer,
+inline CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT_DEV> outputBuffer,
 							 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 							 const PtParameters& params,
 							 const Pixel coord,

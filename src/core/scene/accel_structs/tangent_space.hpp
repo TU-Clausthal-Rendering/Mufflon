@@ -7,7 +7,7 @@ namespace mufflon { namespace scene { namespace accel_struct {
 
 
 
-CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CURRENT_DEV>& scene, const RayIntersectionResult& intersection) {
+inline CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CURRENT_DEV>& scene, const RayIntersectionResult& intersection) {
 	// TODO: check for displacement mapping?
 	const LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[intersection.hitId.instanceId]];
 
@@ -72,7 +72,7 @@ CUDA_FUNCTION TangentSpace tangent_space_geom_to_shader(const SceneDescriptor<CU
  * which are necessary to support non-uniform scaling.
  * The curvature is constant over the face.
  */
-CUDA_FUNCTION float compute_face_curvature(
+inline CUDA_FUNCTION float compute_face_curvature(
 		const SceneDescriptor<CURRENT_DEV>& scene,
 		const PrimitiveHandle& hitId,
 		const Direction& geoNormal) {
@@ -83,7 +83,8 @@ CUDA_FUNCTION float compute_face_curvature(
 	if(static_cast<u32>(hitId.primId) < object.polygon.numTriangles) {
 		// Triangle
 		vertexIndices += 3u * hitId.primId;
-		const ei::Mat3x3 transform { scene.instanceToWorld[hitId.instanceId] };
+		const ei::Mat3x4 instanceToWorld = scene.compute_instance_to_world_transformation(hitId.instanceId);
+		const ei::Mat3x3 transform{ instanceToWorld };
 		const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
 		auto c = math::compute_curvature(geoNormal, transform * positions[vertexIndices[0]],
 										 transform * positions[vertexIndices[1]],
@@ -96,7 +97,8 @@ CUDA_FUNCTION float compute_face_curvature(
 		// Quad
 		const u32 quadId = (hitId.primId - object.polygon.numTriangles);
 		vertexIndices += 4u * quadId + 3u * object.polygon.numTriangles;
-		const ei::Mat3x3 transform { scene.instanceToWorld[hitId.instanceId] };
+		const ei::Mat3x4 instanceToWorld = scene.compute_instance_to_world_transformation(hitId.instanceId);
+		const ei::Mat3x3 transform { instanceToWorld };
 		const ei::Mat3x3 rotationInvScale = transpose(ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
 		auto c = math::compute_curvature(geoNormal, transform * positions[vertexIndices[0]],
 										 transform * positions[vertexIndices[1]],
@@ -125,9 +127,9 @@ CUDA_FUNCTION float compute_face_curvature(
  *	- interpolation from high curvature vertices over large regions
  *	  e.g. beveled box.
  */
-CUDA_FUNCTION float fetch_curvature(const SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION float fetch_curvature(const SceneDescriptor<CURRENT_DEV>& scene,
 		const PrimitiveHandle& hitId, const ei::Vec2& surfParam,
-		const Direction& geoNormal) {
+		const Direction& /*geoNormal*/) {
 	const LodDescriptor<CURRENT_DEV>& object = scene.lods[scene.lodIndices[hitId.instanceId]];
 	const u32* vertexIndices = object.polygon.vertexIndices;
 	const float* curvature = static_cast<const float*>(object.polygon.vertexAttributes[0]);

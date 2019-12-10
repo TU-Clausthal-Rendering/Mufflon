@@ -4,6 +4,7 @@
 #include "types.hpp"
 #include "util/string_pool.hpp"
 #include "util/string_view.hpp"
+#include "util/fixed_hashmap.hpp"
 #include <unordered_map>
 #include <optional>
 #include <vector>
@@ -16,6 +17,11 @@ namespace mufflon { namespace scene {
  */
 class Scenario {
 public:
+	struct CustomInstanceProperty {
+		bool masked = false;
+		u32 lod = NO_CUSTOM_LOD;
+	};
+
 	struct TessellationInfo {
 		std::optional<float> level{};
 		bool adaptive{ false };
@@ -24,17 +30,21 @@ public:
 
 	static constexpr u32 NO_CUSTOM_LOD = std::numeric_limits<u32>::max();
 
-	Scenario(util::StringPool& namePool);
+	Scenario(const u32 index, util::StringPool& namePool);
 	Scenario(const Scenario&) = delete;
 	Scenario(Scenario&&) = default;
 	Scenario& operator=(const Scenario&) = delete;
 	Scenario& operator=(Scenario&&) = delete;
 	~Scenario() = default;
 
+	// Reserve material/custom property slots (actual additions must not exceed this)
+	void reserve_material_slots(const std::size_t count);
+	void reserve_custom_object_properties(const std::size_t objects);
+	void reserve_custom_instance_properties(const std::size_t instances);
 	/*
-	 * Add a new material entry to the table. The index of the material depends on the
-	 * order of declarations and is unchanging for a scenario.
-	 */
+		* Add a new material entry to the table. The index of the material depends on the
+		* order of declarations and is unchanging for a scenario.
+		*/
 	MaterialIndex declare_material_slot(StringView binaryName);
 	MaterialIndex get_num_material_slots() const noexcept { return static_cast<MaterialIndex>(m_materialAssignment.size()); }
 	// Get the index of a slot from its name.
@@ -76,6 +86,8 @@ public:
 		m_cameraChanged = true;
 	}
 
+	// Returns if there is either an object or instance marked as masked
+	bool has_masked_properties() const noexcept { return m_hasMasking; }
 	// Getter/setter for per-object and per-instance properties
 	bool is_masked(ConstObjectHandle hdl) const noexcept;
 	bool is_masked(ConstInstanceHandle hdl) const noexcept;
@@ -99,6 +111,8 @@ public:
 	void set_name(StringView name) noexcept {
 		m_name = name;
 	}
+
+	u32 get_index() const noexcept { return m_index; }
 
 	// Note: no method to change name! because it is being used as
 	// key in worldcontainer
@@ -179,11 +193,6 @@ private:
 		MaterialHandle material;
 	};
 
-	struct CustomInstanceProperty {
-		bool masked = false;
-		u32 lod = NO_CUSTOM_LOD;
-	};
-
 	struct CustomObjectProperty {
 		std::optional<TessellationInfo> tessInfo{};
 		bool masked = false;
@@ -198,10 +207,11 @@ private:
 	mutable bool m_materialAssignmentChanged = true;
 
 	StringView m_name;
+	const u32 m_index;
 	// Map from binaryName to a material index (may use string_views as keys
 	// for lookups -> uses a map).
 	util::StringPool& m_namePool;
-	std::unordered_map<StringView, MaterialIndex> m_materialIndices;
+	util::FixedHashMap<StringView, MaterialIndex> m_materialIndices;
 	// Map an index to a material including all its names.
 	std::vector<MaterialDesc> m_materialAssignment;
 	// All lights which are enabled in this scenario
@@ -218,8 +228,9 @@ private:
 	bool m_hasObjectTessellation = false;
 
 	// Object blacklisting and other custom traits
-	std::unordered_map<ConstObjectHandle, CustomObjectProperty> m_perObjectCustomization;
-	std::unordered_map<ConstInstanceHandle, CustomInstanceProperty> m_perInstanceCustomization;
+	util::FixedHashMap<ConstObjectHandle, CustomObjectProperty> m_perObjectCustomization;
+	util::FixedHashMap<ConstInstanceHandle, CustomInstanceProperty> m_perInstanceCustomization;
+	bool m_hasMasking = false;
 };
 
 }} // namespace mufflon::scene

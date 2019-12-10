@@ -155,7 +155,7 @@ void DynamicFragmentBuffer::doScan()
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_auxBuffer.at(i));
 
 		// Bind the auxiliary buffer for the next step or unbind (in the last step)
-		if (i + 1 < m_auxBuffer.size())
+		if (i + 1 < static_cast<int>(m_auxBuffer.size()))
 			// shader storage buffer binding
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_auxBuffer.at(i + 1));
 		else glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);

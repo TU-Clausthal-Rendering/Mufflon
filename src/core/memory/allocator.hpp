@@ -1,6 +1,7 @@
 #pragma once
 
 #include "residency.hpp"
+#include "synchronize.hpp"
 #include "util/assert.hpp"
 #include "core/cuda/error.hpp"
 #include "core/opengl/gl_buffer.hpp"
@@ -56,10 +57,6 @@ public:
 	static T* realloc(T* ptr, std::size_t prev, std::size_t next) {
 		static_assert(std::is_trivially_copyable<T>::value,
 					  "Must be trivially copyable");
-		static_assert(std::is_trivially_constructible<T>::value,
-					  "Must be trivially constructible");
-		static_assert(std::is_trivially_destructible<T>::value,
-					  "Must be trivially destructible");
 		(void)prev;
 		void* newPtr = std::realloc(ptr, sizeof(T) * next);
 		if(newPtr == nullptr)
@@ -125,11 +122,9 @@ public:
 	}
 
 	template < class T >
-	static T* free(T* ptr, std::size_t n) {
+	static T* free(T* ptr, std::size_t /*n*/) {
 		if(ptr != nullptr) {
-			// Call destructors manually, because the memory was allocated raw
-			for(std::size_t i = 0; i < n; ++i)
-				ptr[i].~T();
+			static_assert(std::is_trivially_destructible<T>::value, "Cannot deallocate complex types on CUDA side like this!");
 			cuda::check_error(cudaFree(ptr));
 		}
 		return nullptr;
@@ -182,7 +177,7 @@ public:
 	}
 
 	template < class T >
-	static gl::BufferHandle<T> free(gl::BufferHandle<T> handle, std::size_t n) {
+	static gl::BufferHandle<T> free(gl::BufferHandle<T> handle, std::size_t /*n*/) {
 		if(handle.id != 0)
 			gl::deleteBuffer(handle.id);
 		return gl::BufferHandle<T>{0, 0};

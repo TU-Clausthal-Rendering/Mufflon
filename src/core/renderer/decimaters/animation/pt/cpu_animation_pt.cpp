@@ -83,7 +83,7 @@ void CpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 
 		const auto processTime = CpuProfileState::get_process_time();
 		const auto cycles = CpuProfileState::get_cpu_cycle();
-		auto scope = Profiler::instance().start<CpuProfileState>("Silhouette decimation");
+		auto scope = Profiler::core().start<CpuProfileState>("Silhouette decimation");
 #pragma PARALLEL_FOR
 		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
 			m_decimaters[i]->upload_importance(m_params.impWeightMethod);
@@ -208,6 +208,7 @@ void CpuShadowSilhouettesPT::compute_max_importance() {
 
 void CpuShadowSilhouettesPT::initialize_decimaters() {
 	auto& objects = m_currentScene->get_objects();
+	const auto& instances = m_currentScene->get_instances();
 	m_decimaters.clear();
 	m_decimaters.resize(objects.size());
 
@@ -223,9 +224,11 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 		const auto& scenario = *scene::WorldContainer::instance().get_current_scenario();
 		// Find the highest-res LoD referenced by an object's instances
 		u32 lowestLevel = scenario.get_custom_lod(obj.first);
-		for(const auto& inst : obj.second)
-			if(const auto level = scenario.get_effective_lod(inst); level < lowestLevel)
+		for(u32 j = 0u; j < obj.second.count; ++j) {
+			scene::ConstInstanceHandle instance = instances[obj.second.offset + j];
+			if(const auto level = scenario.get_effective_lod(instance); level < lowestLevel)
 				lowestLevel = level;
+		}
 
 		// TODO: this only works if instances don't specify LoD levels
 		auto& lod = obj.first->get_lod(lowestLevel);
@@ -244,8 +247,11 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 																				 m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 
 		// Make sure that all LoDs reference the correct reduced version
-		for(const auto& inst : obj.second)
-			obj.first->get_lod(scenario.get_effective_lod(inst)).reference_reduced_version(lod);
+		for(u32 j = 0u; j < obj.second.count; ++j) {
+			const auto idx = obj.second.offset + j;
+			scene::ConstInstanceHandle instance = instances[obj.second.offset + j];
+			obj.first->get_lod(scenario.get_effective_lod(instance)).reference_reduced_version(lod);
+		}
 	}
 	m_importances = make_udevptr_array<Device::CPU, silhouette::pt::Importances<Device::CPU>*, false>(m_decimaters.size());
 

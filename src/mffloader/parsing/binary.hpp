@@ -3,7 +3,8 @@
 #include "util/filesystem.hpp"
 #include "util/flag.hpp"
 #include "util/int_types.hpp"
-#include "core/export/interface.h"
+#include "util/fixed_hashmap.hpp"
+#include "core_interface.h"
 #include <ei/3dtypes.hpp>
 #include <atomic>
 #include <fstream>
@@ -11,13 +12,19 @@
 #include "util/string_pool.hpp"
 #include "util/string_view.hpp"
 #include <vector>
-#include <unordered_map>
 
 namespace mff_loader::binary {
 
+struct InstanceMapping {
+	mufflon::u32 customLod;
+	InstanceHdl handle;
+};
+
 class BinaryLoader {
 public:
-	BinaryLoader() = default;
+	BinaryLoader(std::string& stage) :
+		m_loadingStage{ stage }
+	{}
 
 	/* Loads the specified file with the given global LoD level and optionally
 	 * specific LoDs for given objects (by name). Returns false if loading was
@@ -26,9 +33,10 @@ public:
 	 * this object; calling this function again will overwrite them, however.
 	 */
 	bool load_file(fs::path file, const mufflon::u32 globalLod,
-				   const std::unordered_map<mufflon::StringView, mufflon::u32>& objectLods,
-				   const std::unordered_map<mufflon::StringView, mufflon::u32>& instanceLods,
-				   bool deinstance);
+				   const mufflon::util::FixedHashMap<mufflon::StringView, mufflon::u32>& objectLods,
+				   mufflon::util::FixedHashMap<mufflon::StringView, InstanceMapping>& instanceLods,
+				   const bool deinstance, const bool loadWorldToInstTrans,
+				   const bool keepTrackOfAabb);
 
 	void load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod);
 
@@ -51,6 +59,25 @@ private:
 	static constexpr mufflon::u32 INSTANCE_MAGIC = 'I' | ('n' << 8u) | ('s' << 16u) | ('t' << 24u);
 	static constexpr mufflon::u32 LOD_MAGIC = 'L' | ('O' << 8u) | ('D' << 16u) | ('_' << 24u);
 	static constexpr mufflon::u32 ATTRIBUTE_MAGIC = 'A' | ('t' << 8u) | ('t' << 16u) | ('r' << 24u);
+
+	// RAII wrapper around C file descriptor
+	class FileDescriptor {
+	public:
+		FileDescriptor() = default;
+		FileDescriptor(fs::path file, const char* mode);
+		FileDescriptor(const FileDescriptor&) = delete;
+		FileDescriptor(FileDescriptor&&);
+		FileDescriptor& operator=(const FileDescriptor&) = delete;
+		FileDescriptor& operator=(FileDescriptor&&);
+		~FileDescriptor();
+		void close() noexcept;
+		FILE* get() const noexcept { return m_desc; }
+		// Advances a C file descriptor (possibly in multiple steps)
+		FileDescriptor& seek(mufflon::u64 offset, std::ios_base::seekdir dir = std::ios_base::cur);
+
+	private:
+		FILE* m_desc = nullptr;
+	};
 
 	struct GlobalFlag : public mufflon::util::Flags<mufflon::u32> {
 		static constexpr mufflon::u32 NONE = 0;
@@ -90,7 +117,7 @@ private:
 		std::string name;
 		std::string meta;
 		mufflon::u32 metaFlags;
-		AttribDesc type;
+		GeomAttributeType type;
 		mufflon::u64 bytes;
 	};
 
@@ -147,9 +174,9 @@ private:
 	// Cleans up the internal data structures
 	void clear_state();
 
-	static AttribDesc map_bin_attrib_type(AttribType type);
+	static GeomAttributeType map_bin_attrib_type(AttribType type);
 	// Uncompressed data
-	void read_uncompressed_attribute(const ObjectState& object, const LodState& lod);
+	void read_uncompressed_attribute();
 	void read_normal_compressed_vertices(const ObjectState& object, const LodState& lod);
 	void read_normal_uncompressed_vertices(const ObjectState& object, const LodState& lod);
 	void read_uncompressed_triangles(const ObjectState& object, const LodState& lod);
@@ -174,8 +201,8 @@ private:
 	void read_compressed_sphere_attributes(const ObjectState& object, const LodState& lod);
 
 	bool read_instances(const mufflon::u32 globalLod,
-						const std::unordered_map<mufflon::StringView, mufflon::u32>& objectLods,
-						const std::unordered_map<mufflon::StringView, mufflon::u32>& instanceLods);
+						const mufflon::util::FixedHashMap<mufflon::StringView, mufflon::u32>& objectLods,
+						mufflon::util::FixedHashMap<mufflon::StringView, InstanceMapping>& instanceLods);
 	void deinstance();
 	void read_object();
 	mufflon::u32 read_lod(const ObjectState& object, mufflon::u32 lod);
@@ -187,6 +214,8 @@ private:
 	mufflon::util::StringPool m_namePool;
 	AttribState m_attribStateBuffer;
 	std::string m_nameBuffer;
+	// We need at most three file descriptors at any time, so we keep them around
+	FileDescriptor m_fileDescs[3u];
 	// Parsed data
 	// The material names are wrapped in [mat:...] for ease of use in the JSON parser
 	std::vector<std::string> m_materialNames;
@@ -195,7 +224,10 @@ private:
 	ei::Box m_aabb;
 
 	// These are for aborting a load and keeping track of progress
+	bool m_loadWorldToInstTrans = false;
+	bool m_keepTrackOfAabb = true;
 	std::atomic_bool m_abort = false;
+	std::string& m_loadingStage;
 };
 
 } // namespace mff_loader::binary

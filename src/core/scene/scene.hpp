@@ -9,6 +9,7 @@
 #include "core/scene/accel_structs/accel_struct_info.hpp"
 #include "core/scene/object.hpp"
 #include "core/scene/accel_structs/lbvh.hpp"
+#include "util/fixed_hashmap.hpp"
 #include <memory>
 #include <tuple>
 #include <vector>
@@ -27,33 +28,48 @@ class Scenario;
  */
 class Scene {
 public:
-	Scene(const Scenario& scenario, const u32 animationPathIndex) :
+	// Holds offset into instance list as well as number of instances
+	// for one object
+	struct InstanceRef {
+		u32 offset;
+		u32 count;
+	};
+
+	Scene(const Scenario& scenario, const u32 animationPathIndex,
+		  util::FixedHashMap<ObjectHandle, InstanceRef>&& objects,
+		  std::vector<InstanceHandle>&& instances,
+		  const std::vector<ei::Mat3x4>& worldToInstanceTransformation,
+		  const ei::Box& aabb) :
 		m_scenario(scenario),
-		m_animationPathIndex(animationPathIndex)
-	{
-		m_boundingBox.min = ei::Vec3{std::numeric_limits<float>::max()};
-		m_boundingBox.max = ei::Vec3{-std::numeric_limits<float>::max()};
-	}
+		m_animationPathIndex(animationPathIndex),
+		m_objects{ std::move(objects) },
+		m_instances{ std::move(instances) },
+		m_worldToInstanceTransformation{ worldToInstanceTransformation },
+		m_boundingBox{ aabb }
+	{}
 	Scene(const Scene&) = delete;
 	Scene(Scene&&) = delete;
 	Scene& operator=(const Scene&) = delete;
 	Scene& operator=(Scene&&) = delete;
 	~Scene() = default;
 
+	// Reserves the maximum number of objects to avoid reallocations
+	/*void reserve_objects(const u32 count);
+	void reserve_instances(const u32 count);
 	// Add an instance to be rendered
-	void add_instance(InstanceHandle hdl);
+	void add_instance(InstanceHandle hdl);*/
 
 	void load_media(const std::vector<materials::Medium>& media);
 
 	// Synchronizes entire scene to the device
 	template < Device dev >
 	void synchronize() {
-		for(auto& obj : m_objects) {
+		// TODO
+		/*for(auto& obj : m_objects) {
 			for(InstanceHandle instance : obj.second) {
 				(void)instance;
-				// TODO
 			}
-		}
+		}*/
 		m_lightTree.synchronize<dev>(m_boundingBox);
 		m_media.synchronize<dev>();
 	}
@@ -101,6 +117,7 @@ public:
 
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {
+		(void)camera;
 		mAssert(camera != nullptr);
 		m_cameraDescChanged.for_each([](auto& elem) { elem.changed = true; });
 		// TODO: this function is obsolete, once the scene querries the 'changed' flag from the scenario itself.
@@ -127,20 +144,23 @@ public:
 	 *
 	 * Usage example:
 	 * scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>(
-	 *		std::make_tuple(scene::geometry::Polygons::VAttrDesc<int>{"T1"},
-	 *						scene::geometry::Polygons::VAttrDesc<int>{"T2"}),
+	 *		{ AttributeIdentifier{AttributeType::INT3, "RGB_color"} },
 	 *		{}, // No face attributes
-	 *		std::make_tuple(scene::geometry::Spheres::AttrDesc<float>{"S1"})
+	 *		{ AttributeIdentifier{AttributeType::FLOAT, "grayscale"} }
 	 * );
 	 */
 	template < Device dev >
-	const SceneDescriptor<dev>& get_descriptor(const std::vector<const char*>& vertexAttribs,
-											   const std::vector<const char*>& faceAttribs,
-											   const std::vector<const char*>& sphereAttribs);
+	const SceneDescriptor<dev>& get_descriptor(const std::vector<AttributeIdentifier>& vertexAttribs,
+											   const std::vector<AttributeIdentifier>& faceAttribs,
+											   const std::vector<AttributeIdentifier>& sphereAttribs);
 
 	// Get access to the existing objects in the scene (subset from the world)
-	const std::unordered_map<ObjectHandle, std::vector<InstanceHandle>>& get_objects() const noexcept {
+	const util::FixedHashMap<ObjectHandle, InstanceRef>& get_objects() const noexcept {
 		return m_objects;
+	}
+
+	const std::vector<InstanceHandle>& get_instances() const noexcept {
+		return m_instances;
 	}
 
 
@@ -162,9 +182,9 @@ private:
 
 	template < Device dev >
 	struct AttributeNames {
-		std::vector<const char*> lastVertexAttribs;
-		std::vector<const char*> lastFaceAttribs;
-		std::vector<const char*> lastSphereAttribs;
+		std::vector<AttributeIdentifier> lastVertexAttribs;
+		std::vector<AttributeIdentifier> lastFaceAttribs;
+		std::vector<AttributeIdentifier> lastSphereAttribs;
 	};
 
 	template < Device dev >
@@ -175,7 +195,11 @@ private:
 
 	// List of instances and thus objects to-be-rendered
 	// We need this to ensure we only create one descriptor per object
-	std::unordered_map<ObjectHandle, std::vector<InstanceHandle>> m_objects;
+	util::FixedHashMap<ObjectHandle, InstanceRef> m_objects;
+	// List of instances; object list entries hold an index into this
+	std::vector<InstanceHandle> m_instances;
+	const std::vector<ei::Mat3x4>& m_worldToInstanceTransformation;
+
 	GenericResource m_media;			// Device copy of the media. It is not possible to access the world from a CUDA compiled file.
 	//ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene
 	GenericResource m_materials;		// Device instanciation of Material parameter packs and an offset table (first table then data).
@@ -191,7 +215,7 @@ private:
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, LodDescriptor<Device::CPU>[]>,
 		unique_device_ptr<Device::CUDA, LodDescriptor<Device::CUDA>[]>,
-		unique_device_ptr<NotGl<Device::OPENGL>, LodDescriptor<Device::OPENGL>[]>> m_lodDevDesc;
+		unique_device_ptr<NotGl<Device::OPENGL>(), LodDescriptor<Device::OPENGL>[]>> m_lodDevDesc;
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
 		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>,
@@ -199,7 +223,7 @@ private:
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, ei::Mat3x4[]>,
 		unique_device_ptr<Device::CUDA, ei::Mat3x4[]>,
-		unique_device_ptr<Device::OPENGL, ei::Mat3x4[]>> m_invInstTransformsDesc;
+		unique_device_ptr<Device::OPENGL, ei::Mat3x4[]>> m_instToWorldTransformsDesc;
 	util::TaggedTuple<
 		unique_device_ptr<Device::CPU, u32[]>,
 		unique_device_ptr<Device::CUDA, u32[]>> m_instLodIndicesDesc;

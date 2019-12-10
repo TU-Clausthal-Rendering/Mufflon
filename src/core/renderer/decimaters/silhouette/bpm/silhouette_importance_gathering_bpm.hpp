@@ -2,7 +2,7 @@
 
 #include "silhouette_bpm_common.hpp"
 #include "silhouette_bpm_params.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/renderer/pt/pt_common.hpp"
@@ -13,12 +13,12 @@ namespace mufflon { namespace renderer { namespace decimaters { namespace silhou
 
 namespace {
 
-CUDA_FUNCTION constexpr float get_luminance(const ei::Vec3& vec) {
+inline CUDA_FUNCTION constexpr float get_luminance(const ei::Vec3& vec) {
 	constexpr ei::Vec3 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
 	return ei::dot(LUM_WEIGHT, vec);
 }
 
-CUDA_FUNCTION void record_direct_hit(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
+inline CUDA_FUNCTION void record_direct_hit(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
 									 const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
 									 const float cosAngle, const float sharpness) {
 	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
@@ -39,7 +39,7 @@ CUDA_FUNCTION void record_direct_hit(const scene::PolygonsDescriptor<CURRENT_DEV
 		cuda::atomic_add<CURRENT_DEV>(importances[min].fluxImportance, sharpness * (1.f - ei::abs(cosAngle)));
 }
 
-CUDA_FUNCTION void record_flux(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
+inline CUDA_FUNCTION void record_flux(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
 							   const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint, const float flux) {
 	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
 	const u32 primIdx = vertexCount == 3u ? primId : (primId - polygon.numTriangles);
@@ -61,7 +61,7 @@ CUDA_FUNCTION void record_flux(const scene::PolygonsDescriptor<CURRENT_DEV>& pol
 }
 
 #if 0
-CUDA_FUNCTION void record_silhouette_vertex_contribution(Importances<CURRENT_DEV>* importances,
+inline CUDA_FUNCTION void record_silhouette_vertex_contribution(Importances<CURRENT_DEV>* importances,
 														 DeviceImportanceSums<CURRENT_DEV>& sums,
 														 const u32 vertexIndex, const float importance) {
 	// Reminder: local index will refer to the decimated mesh
@@ -73,7 +73,7 @@ CUDA_FUNCTION void record_shadow(DeviceImportanceSums<CURRENT_DEV>& sums, const 
 	cuda::atomic_add<CURRENT_DEV>(sums.shadowImportance, irradiance);
 }
 
-CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
+inline CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
 											  const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint, const float irradiance) {
 	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
 	const u32 primIdx = vertexCount == 3u ? primId : (primId - polygon.numTriangles);
@@ -93,7 +93,7 @@ CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CU
 		cuda::atomic_add<CURRENT_DEV>(importances[min].irradiance, irradiance);
 }
 
-CUDA_FUNCTION bool trace_shadow_silhouette(const scene::SceneDescriptor<CURRENT_DEV>& scene, Importances<CURRENT_DEV>** importances,
+inline CUDA_FUNCTION bool trace_shadow_silhouette(const scene::SceneDescriptor<CURRENT_DEV>& scene, Importances<CURRENT_DEV>** importances,
 										   DeviceImportanceSums<CURRENT_DEV>* sums, const ei::Ray& shadowRay,
 										   const SilPathVertex& vertex, const float importance) {
 	constexpr float DIST_EPSILON = 0.001f;
@@ -163,7 +163,7 @@ CUDA_FUNCTION bool trace_shadow_silhouette(const scene::SceneDescriptor<CURRENT_
 	return false;
 }
 
-CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene, DeviceImportanceSums<CURRENT_DEV>* sums,
+inline CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene, DeviceImportanceSums<CURRENT_DEV>* sums,
 								const ei::Ray& shadowRay, const SilPathVertex& vertex, const float importance) {
 	constexpr float DIST_EPSILON = 0.001f;
 
@@ -189,7 +189,7 @@ CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene
 #endif // 0
 
 // MIS weight for merges
-CUDA_FUNCTION float get_mis_weight(const SilPathVertex& viewVertex, const math::PdfPair pdf,
+inline CUDA_FUNCTION float get_mis_weight(const SilPathVertex& viewVertex, const math::PdfPair pdf,
 								   const PhotonDesc& photon) {
 	// Add the merge at the previous view path vertex
 	mAssert(viewVertex.previous() != nullptr);
@@ -204,7 +204,7 @@ CUDA_FUNCTION float get_mis_weight(const SilPathVertex& viewVertex, const math::
 }
 
 // MIS weight for unidirectional hits.
-CUDA_FUNCTION float get_mis_weight(const SilPathVertex& thisVertex, const AngularPdf pdfBack,
+inline CUDA_FUNCTION float get_mis_weight(const SilPathVertex& thisVertex, const AngularPdf pdfBack,
 								   const AreaPdf startPdf, int numPhotons, float mergeArea) {
 	mAssert(thisVertex.previous() != nullptr);
 	// There is one merge which is not yet accounted for
@@ -219,7 +219,7 @@ CUDA_FUNCTION float get_mis_weight(const SilPathVertex& thisVertex, const Angula
 
 } // namespace
 
-CUDA_FUNCTION void trace_importance_photon(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION void trace_importance_photon(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 										   data_structs::HashGrid<CURRENT_DEV, PhotonDesc>& photonMap,
 										   const SilhouetteParameters& params,
 										   const int idx, const int photonCount,
@@ -264,7 +264,7 @@ CUDA_FUNCTION void trace_importance_photon(const scene::SceneDescriptor<CURRENT_
 }
 
 
-CUDA_FUNCTION void sample_importance(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+inline CUDA_FUNCTION void sample_importance(const scene::SceneDescriptor<CURRENT_DEV>& scene,
 									 const data_structs::HashGrid<CURRENT_DEV, PhotonDesc>& photonMap,
 									 const SilhouetteParameters& params,
 									 const Pixel& coord, math::Rng& rng,
@@ -328,7 +328,7 @@ CUDA_FUNCTION void sample_importance(const scene::SceneDescriptor<CURRENT_DEV>& 
 }
 
 
-CUDA_FUNCTION void sample_vis_importance(SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
+inline CUDA_FUNCTION void sample_vis_importance(SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 										 const scene::SceneDescriptor<CURRENT_DEV>& scene,
 										 const Pixel& coord, math::Rng& rng,
 										 Importances<CURRENT_DEV>** importances,

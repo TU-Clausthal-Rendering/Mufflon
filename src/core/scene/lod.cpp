@@ -7,20 +7,12 @@
 
 namespace mufflon::scene {
 
-bool Lod::is_emissive(const Scenario& scenario) const noexcept {
-	for(MaterialIndex m : m_geometry.template get<geometry::Polygons>().get_unique_materials())
-		if(scenario.get_assigned_material(m)->get_properties().is_emissive()) return true;
-	for(MaterialIndex m : m_geometry.template get<geometry::Spheres>().get_unique_materials())
-		if(scenario.get_assigned_material(m)->get_properties().is_emissive()) return true;
-	return false;
-}
-
 void Lod::clear_accel_structure() {
 	m_accelStruct.mark_invalid();
 }
 
 template < Device dev >
-LodDescriptor<dev> Lod::get_descriptor() {
+LodDescriptor<dev> Lod::get_descriptor(const bool allowSerialBvhBuild) {
 	// TODO: LOD that shit
 	LodDescriptor<dev> desc{
 		m_geometry.get<geometry::Polygons>().get_descriptor<dev>(),
@@ -29,15 +21,43 @@ LodDescriptor<dev> Lod::get_descriptor() {
 		AccelDescriptor{}
 	};
 	desc.numPrimitives = desc.polygon.numTriangles + desc.polygon.numQuads + desc.spheres.numSpheres;
+	// If we're allowed to have a serial BVH build, we make it dependent on the number of primitives
+	const bool parallelBuild = allowSerialBvhBuild ? (desc.numPrimitives >= 1000) : true;
+
 	// (Re)build acceleration structure if necessary
 	if(m_accelStruct.needs_rebuild()) {
-		logInfo("[Lod::get_descriptor] Building accelleration structure for object '", m_parent->get_name(),
-				"' with ", desc.numPrimitives, " primitives (", desc.polygon.numTriangles, "T / ", desc.polygon.numQuads, "Q / ", desc.spheres.numSpheres, "S).");
-		auto timer = Profiler::instance().start<CpuProfileState>("[Lod::get_descriptor] build object BVH.");
-		m_accelStruct.build(desc, get_bounding_box());
+		logPedantic("[Lod::get_descriptor] Building accelleration structure for object '",
+					m_parent->get_name(), "' with ", desc.numPrimitives, " primitives (",
+					desc.polygon.numTriangles, "T / ", desc.polygon.numQuads, "Q / ",
+					desc.spheres.numSpheres, "S).");
+		auto timer = Profiler::core().start<CpuProfileState>("[Lod::get_descriptor] build object BVH.");
+		m_accelStruct.build(desc, get_bounding_box(), parallelBuild);
 	}
 	desc.accelStruct = m_accelStruct.acquire_const<dev>();
 	return desc;
+}
+void Lod::update_flags(const Scenario& scenario, std::unordered_set<MaterialIndex>& uniqueMatCache) {
+	auto& polys = this->template get_geometry<geometry::Polygons>();
+	auto& spheres = this->template get_geometry<geometry::Spheres>();
+
+	// Collect the unique material indices of the LoD
+	const auto* polyMatIndices = polys.template acquire_const<Device::CPU, MaterialIndex>(polys.get_material_indices_hdl());
+	const auto* sphereMatIndices = spheres.template acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
+	uniqueMatCache.clear();
+	for(std::size_t i = 0u; i < polys.get_face_count(); ++i)
+		uniqueMatCache.insert(polyMatIndices[i]);
+	for(std::size_t i = 0u; i < spheres.get_sphere_count(); ++i)
+		uniqueMatCache.insert(sphereMatIndices[i]);
+
+	// Now check for each scenario if it is emissive and/or displaced
+	// and flag the LoD accordingly
+	for(const auto mat : uniqueMatCache) {
+		const auto* material = scenario.get_assigned_material(mat);
+		if(material->get_properties().is_emissive())
+			m_flags |= (1llu << static_cast<u64>(2u * scenario.get_index()));
+		if(material->get_displacement_map() != nullptr)
+			m_flags |= (1llu << static_cast<u64>(2u * scenario.get_index() + 1u));
+	}
 }
 
 void Lod::displace(tessellation::TessLevelOracle& tessellater, const Scenario& scenario) {
@@ -57,26 +77,26 @@ void Lod::tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scen
 
 template < Device dev >
 void Lod::update_attribute_descriptor(LodDescriptor<dev>& descriptor,
-										 const std::vector<const char*>& vertexAttribs,
-										 const std::vector<const char*>& faceAttribs,
-										 const std::vector<const char*>& sphereAttribs) {
+										 const std::vector<AttributeIdentifier>& vertexAttribs,
+										 const std::vector<AttributeIdentifier>& faceAttribs,
+										 const std::vector<AttributeIdentifier>& sphereAttribs) {
 	m_geometry.get<geometry::Polygons>().update_attribute_descriptor<dev>(descriptor.polygon, vertexAttribs, faceAttribs);
 	m_geometry.get<geometry::Spheres>().update_attribute_descriptor<dev>(descriptor.spheres, sphereAttribs);
 }
 
-template LodDescriptor<Device::CPU> Lod::get_descriptor<Device::CPU>();
-template LodDescriptor<Device::CUDA> Lod::get_descriptor<Device::CUDA>();
-template LodDescriptor<Device::OPENGL> Lod::get_descriptor<Device::OPENGL>();
+template LodDescriptor<Device::CPU> Lod::get_descriptor<Device::CPU>(const bool allowSerialBvhBuild);
+template LodDescriptor<Device::CUDA> Lod::get_descriptor<Device::CUDA>(const bool allowSerialBvhBuild);
+template LodDescriptor<Device::OPENGL> Lod::get_descriptor<Device::OPENGL>(const bool allowSerialBvhBuild);
 template void Lod::update_attribute_descriptor<Device::CPU>(LodDescriptor<Device::CPU>&,
-															   const std::vector<const char*>&,
-															   const std::vector<const char*>&,
-															   const std::vector<const char*>&);
+															   const std::vector<AttributeIdentifier>&,
+															   const std::vector<AttributeIdentifier>&,
+															   const std::vector<AttributeIdentifier>&);
 template void Lod::update_attribute_descriptor<Device::CUDA>(LodDescriptor<Device::CUDA>&,
-																const std::vector<const char*>&,
-																const std::vector<const char*>&,
-																const std::vector<const char*>&);
+																const std::vector<AttributeIdentifier>&,
+																const std::vector<AttributeIdentifier>&,
+																const std::vector<AttributeIdentifier>&);
 template void Lod::update_attribute_descriptor<Device::OPENGL>(LodDescriptor<Device::OPENGL>&,
-																const std::vector<const char*>&,
-																const std::vector<const char*>&,
-																const std::vector<const char*>&);
+																const std::vector<AttributeIdentifier>&,
+																const std::vector<AttributeIdentifier>&,
+																const std::vector<AttributeIdentifier>&);
 } // namespace mufflon::scene

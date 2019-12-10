@@ -121,7 +121,7 @@ private:
 		return candidates[m];
 	}
 
-	std::pair<float,int> closest_to(const std::pair<float,int>* candidates, int count, int splitDim, float wantedPos) {
+	std::pair<float,int> closest_to(const std::pair<float,int>* candidates, int count, int /*splitDim*/, float wantedPos) {
 		float minD = ei::abs(candidates[0].first - wantedPos);
 		int minC = 0;
 		for(int i = 1; i < count; ++i) {

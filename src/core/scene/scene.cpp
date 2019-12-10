@@ -17,6 +17,11 @@
 #include "core/scene/tessellation/uniform.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include <ei/3dintersection.hpp>
+#ifdef __cpp_lib_execution
+#include <execution>
+#else // __cpp_lib_execution
+#warning "Parallel STL algorithms are not supported by your standard library. This may result in a slight renderer slowdown"
+#endif // __cpp_lib_execution
 
 namespace mufflon { namespace scene {
 
@@ -33,17 +38,6 @@ bool Scene::is_sane() const noexcept {
 		}
 	}
 	return true;
-}
-
-void Scene::add_instance(InstanceHandle hdl) {
-	auto iter = m_objects.find(&hdl->get_object());
-	if(iter == m_objects.end())
-		m_objects.emplace(&hdl->get_object(), std::vector<InstanceHandle>{hdl}).first;
-	else
-		iter->second.push_back(hdl);
-	// Check if we already have the object somewhere
-	m_boundingBox = ei::Box{ m_boundingBox, hdl->get_bounding_box(m_scenario.get_effective_lod(hdl)) };
-	clear_accel_structure();
 }
 
 void Scene::load_media(const std::vector<materials::Medium>& media) {
@@ -63,7 +57,7 @@ void Scene::load_materials() {
 	const std::size_t MAT_SLOTS = m_scenario.get_num_material_slots();
 	std::size_t offset = round_to_align<alignof(materials::MaterialDescriptorBase)>(sizeof(int) * MAT_SLOTS);
 	for(MaterialIndex i = 0; i < m_scenario.get_num_material_slots(); ++i) {
-		mAssert(offset <= std::numeric_limits<i32>::max());
+		mAssert(offset <= static_cast<std::size_t>(std::numeric_limits<i32>::max()));
 		offsets.push_back(i32(offset));
 		//offset += materials::get_handle_pack_size();
 		offset += m_scenario.get_assigned_material(i)->get_descriptor_size(dev);
@@ -98,9 +92,9 @@ void Scene::load_materials() {
 }
 
 template < Device dev >
-const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>& vertexAttribs,
-												  const std::vector<const char*>& faceAttribs,
-												  const std::vector<const char*>& sphereAttribs) {
+const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIdentifier>& vertexAttribs,
+												  const std::vector<AttributeIdentifier>& faceAttribs,
+												  const std::vector<AttributeIdentifier>& sphereAttribs) {
 	synchronize<dev>();
 	SceneDescriptor<dev>& sceneDescriptor = m_descStore.template get<SceneDescriptor<dev>>();
 	if constexpr(dev == Device::OPENGL) {
@@ -115,24 +109,24 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 		&& lastFaceAttribs.size() == faceAttribs.size()
 		&& lastSphereAttribs.size() == sphereAttribs.size();
 	if(sameAttribs)
-		for(auto name : vertexAttribs) {
-			if(std::find_if(lastVertexAttribs.cbegin(), lastVertexAttribs.cend(), [name](const char* n) { return std::strcmp(name, n) != 0; }) != lastVertexAttribs.cend()) {
+		for(auto ident : vertexAttribs) {
+			if(std::find_if(lastVertexAttribs.cbegin(), lastVertexAttribs.cend(), [ident](const auto& n) { return ident == n; }) != lastVertexAttribs.cend()) {
 				sameAttribs = false;
 				lastVertexAttribs = vertexAttribs;
 				break;
 			}
 		}
 	if(sameAttribs)
-		for(auto name : faceAttribs) {
-			if(std::find_if(lastFaceAttribs.cbegin(), lastFaceAttribs.cend(), [name](const char* n) { return std::strcmp(name, n) != 0; }) != lastFaceAttribs.cend()) {
+		for(auto ident : faceAttribs) {
+			if(std::find_if(lastFaceAttribs.cbegin(), lastFaceAttribs.cend(), [ident](const auto& n) { return ident == n; }) != lastFaceAttribs.cend()) {
 				sameAttribs = false;
 				lastFaceAttribs = faceAttribs;
 				break;
 			}
 		}
 	if(sameAttribs)
-		for(auto name : sphereAttribs) {
-			if(std::find_if(lastSphereAttribs.cbegin(), lastSphereAttribs.cend(), [name](const char* n) { return std::strcmp(name, n) != 0; }) != lastSphereAttribs.cend()) {
+		for(auto ident : sphereAttribs) {
+			if(std::find_if(lastSphereAttribs.cbegin(), lastSphereAttribs.cend(), [ident](const auto& n) { return ident == n; }) != lastSphereAttribs.cend()) {
 				sameAttribs = false;
 				lastSphereAttribs = sphereAttribs;
 				break;
@@ -152,89 +146,167 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 	// TODO: this currently assumes that we do not add or alter geometry, which is clearly wrong
 	// TODO: also needs to check for changed LoDs
 	const bool geometryChanged = m_accelStruct.needs_rebuild();
-	if(geometryChanged || sceneDescriptor.lodIndices == nullptr) {
+	if(geometryChanged || sceneDescriptor.lodIndices == nullptr || !sameAttribs) {
 		// Invalidate other descriptors
 		if(geometryChanged)
 			m_descStore.for_each([](auto& elem) { elem.lodIndices = {}; });
 
-		std::vector<ei::Mat3x4> instanceTransformations;
-		std::vector<ei::Mat3x4> invInstanceTransformations;
-		std::vector<u32> lodIndices;
-		std::vector<LodDescriptor<dev>> lodDescs;
-		std::vector<ei::Box> lodAabbs;
+		std::unique_ptr<u32[]> lodIndices;
+		std::unique_ptr<LodDescriptor<dev>[]> lodDescs;
+		std::unique_ptr<ei::Box[]> lodAabbs;
 
 		m_boundingBox.max = ei::Vec3{ -std::numeric_limits<float>::max() };
 		m_boundingBox.min = ei::Vec3{ std::numeric_limits<float>::max() };
 
 		// Create the object and instance descriptors
-		std::size_t instanceCount = 0u;
-		u32 lodCount = 0u;
 		// This keeps track of instances for a given LoD
-		std::unordered_map<u32, std::vector<InstanceHandle>> lodMapping;
 
-		for(auto& obj : m_objects) {
+		std::vector<std::vector<u32>> usedLods(get_max_thread_num());
+		//std::vector<std::unordered_map<u32, u32>> usedLods(get_max_thread_num());
+
+		// Preallocate the CPU-side arrays so we can multi-thread
+		const auto totalInstanceCount = m_worldToInstanceTransformation.size();
+		lodIndices = std::make_unique<u32[]>(totalInstanceCount);
+		// All non-present instances get a LoD-index of 0xFFFFFFFF
+		std::memset(lodIndices.get(), std::numeric_limits<u32>::max(),
+					sizeof(u32) * totalInstanceCount);
+		// TODO: this is a conservative estimate and wastes some memory for scenes
+		// with many LoDs
+		std::size_t descCountEstimate = 0u;
+		for(auto& obj : m_objects)
+			descCountEstimate += obj.first->get_lod_slot_count();
+		lodDescs = std::make_unique<LodDescriptor<dev>[]>(descCountEstimate);
+		lodAabbs = std::make_unique<ei::Box[]>(descCountEstimate);
+
+		// We parallelize this part for cases with many objects
+		const int objCount = static_cast<int>(m_objects.size());
+		std::atomic_uint32_t lodIndex = 0u;
+
+		const auto t0 = std::chrono::high_resolution_clock::now();
+		const bool objLevelParallelism = dev == Device::CPU && objCount >= 50;
+#pragma PARALLEL_FOR_COND_DYNAMIC(objLevelParallelism)
+		for(int o = 0; o < objCount; ++o) {
+			auto& obj = *(m_objects.begin() + o);
 			mAssert(obj.first != nullptr);
-			mAssert(obj.second.size() != 0u);
+			mAssert(obj.second.count != 0u);
 
-			// First gather which LoDs have which instance
-			lodMapping.clear();
-			for(InstanceHandle inst : obj.second) {
+			// First gather which LoDs of this objects are used and
+			// collect the instance transformations
+			const auto lodSlots = static_cast<u32>(obj.first->get_lod_slot_count());
+			auto& currUsedLods = usedLods[get_current_thread_idx()];
+			currUsedLods.clear();
+			currUsedLods.resize(lodSlots);
+			std::fill(currUsedLods.begin(), currUsedLods.end(), std::numeric_limits<u32>::max());
+			const auto endIndex = obj.second.offset + obj.second.count;
+			u32 lodCounter = 0u;
+			for(std::size_t i = obj.second.offset; i < endIndex; ++i) {
+				const auto inst = m_instances[i];
 				mAssert(inst != nullptr);
 				const u32 instanceLod = m_scenario.get_effective_lod(inst);
-				mAssert(instanceLod < obj.first->get_lod_slot_count());
-				lodMapping[instanceLod].push_back(inst);
-
-				instanceTransformations.push_back(inst->get_transformation_matrix());
-				invInstanceTransformations.push_back(inst->get_inverse_transformation_matrix());
+				mAssert(instanceLod < lodSlots);
+				if(currUsedLods[instanceLod] == std::numeric_limits<u32>::max())
+					currUsedLods[instanceLod] = lodCounter++;
 			}
 
+			// Reserve the proper amount of LoD descriptors
+			const auto threadLodIndex = lodIndex.fetch_add(lodCounter);
+			auto currLodIndex = threadLodIndex;
 			// Now that we know all instances a LoD has we can create the descriptors uniquely
 			// and also perform displacement mapping if necessary
 			u32 prevLevel = std::numeric_limits<u32>::max();
-			for(const auto& mapping : lodMapping) {
-				// Now we can do the per-LoD things like dispalcement mapping and fetching descriptors
+			for(u32 i = 0u; i < lodSlots; i++) {
+				if(currUsedLods[i] == std::numeric_limits<u32>::max())
+					continue;
+				// Now we can do the per-LoD things like displacement mapping and fetching descriptors
 				if(prevLevel != std::numeric_limits<u32>::max())
-					lodDescs.back().next = mapping.first;
-				Lod* lod = &obj.first->get_lod(mapping.first);
+					lodDescs[currLodIndex - 1u].next = i;
+				Lod* lod = &obj.first->get_lod(i);
 				mAssert(lod != nullptr);
 				if(Lod* reduced = lod->get_reduced_version(); reduced != nullptr)
 					lod = reduced;
 
-				lodDescs.push_back(lod->template get_descriptor<dev>());
-				lodDescs.back().previous = prevLevel;
-				lodAabbs.push_back(lod->get_bounding_box());
+				// Determine if it's worth it to use a parallel build
+				lodDescs[currLodIndex] = lod->template get_descriptor<dev>(objLevelParallelism);
+				lodDescs[currLodIndex].previous = prevLevel;
+				lodAabbs[currLodIndex] = lod->get_bounding_box();
 				if(!sameAttribs)
-					lod->update_attribute_descriptor(lodDescs.back(), vertexAttribs, faceAttribs, sphereAttribs);
-
-				// Gotta expand the scene bounding box
-				for(InstanceHandle inst : mapping.second) {
-					m_boundingBox = ei::Box(m_boundingBox, inst->get_bounding_box(mapping.first));
-					lodIndices.push_back(lodCount);
-				}
-				++lodCount;
+					lod->update_attribute_descriptor(lodDescs[currLodIndex], vertexAttribs, faceAttribs, sphereAttribs);
+				++currLodIndex;
 			}
-			lodDescs.back().previous = prevLevel;
+			if(!currUsedLods.empty())
+				lodDescs[currLodIndex - 1u].previous = prevLevel;
 
-			instanceCount += obj.second.size();
+			// Now write the proper instance indices and expand bounding box
+			for(std::size_t i = obj.second.offset; i < endIndex; ++i) {
+				const auto inst = m_instances[i];
+				const u32 instanceLod = m_scenario.get_effective_lod(inst);
+				const u32 index = currUsedLods[instanceLod];
+
+				const auto instanceIndex = inst->get_index();
+				lodIndices[instanceIndex] = threadLodIndex + index;
+				const auto aabb = inst->get_bounding_box(instanceLod, m_worldToInstanceTransformation[inst->get_index()]);
+				m_boundingBox = ei::Box(m_boundingBox, aabb);
+			}
 		}
 
+		sceneDescriptor.validInstanceIndex = m_instances.front()->get_index();
+		const auto t1 = std::chrono::high_resolution_clock::now();
+		logInfo("[Scene::get_descriptor] Build descriptors for ", lodIndex.load(),
+				" LoDs in ", std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count(),
+				"ms");
+
 		// Allocate the device memory and copy over the descriptors
-		auto& lodDevDesc = m_lodDevDesc.template get<unique_device_ptr<NotGl<dev>, LodDescriptor<dev>[]>>();
-		lodDevDesc = make_udevptr_array<NotGl<dev>, LodDescriptor<dev>>(lodDescs.size());
-		copy(lodDevDesc.get(), lodDescs.data(), lodDescs.size() * sizeof(LodDescriptor<dev>));
+		// Some of these don't need to be copied can be just taken when we're on the CPU
+		auto& lodDevDesc = m_lodDevDesc.template get<unique_device_ptr<NotGl<dev>(), LodDescriptor<dev>[]>>();
+		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
+		if constexpr(dev == Device::CPU) {
+			lodDevDesc.reset(Allocator<Device::CPU>::realloc(lodDescs.release(), descCountEstimate, lodIndex.load()));
+			lodAabbsDesc.reset(Allocator<Device::CPU>::realloc(lodAabbs.release(), descCountEstimate, lodIndex.load()));
+			sceneDescriptor.worldToInstance = m_worldToInstanceTransformation.data();
+		} else {
+			auto& instTransformsDesc = m_instTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
+			lodDevDesc = make_udevptr_array<NotGl<dev>(), LodDescriptor<dev>>(lodIndex.load());
+			lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodIndex.load());
+			copy(lodDevDesc.get(), lodDescs.get(), sizeof(LodDescriptor<dev>) * lodIndex.load());
+			copy(lodAabbsDesc.get(), lodAabbs.get(), sizeof(ei::Box) * lodIndex.load());
 
-		auto& instTransformsDesc = m_instTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
-		instTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(instanceTransformations.size());
-		copy(instTransformsDesc.get(), instanceTransformations.data(), sizeof(ei::Mat3x4) * instanceTransformations.size());
+			// Transformation matrices only have to be uploaded for non-CPU devices
+			instTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(totalInstanceCount);
+			copy(instTransformsDesc.get(), m_worldToInstanceTransformation.data(), sizeof(ei::Mat3x4) * totalInstanceCount);
+			sceneDescriptor.worldToInstance = instTransformsDesc.get();
 
-		auto& invInstTransformsDesc = m_invInstTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
-		invInstTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(invInstanceTransformations.size());
-		copy(invInstTransformsDesc.get(), invInstanceTransformations.data(), sizeof(ei::Mat3x4) * invInstanceTransformations.size());
+			if constexpr(dev == Device::OPENGL) {
+				// Only OpenGL renderers really need the instance-to-world transformations
+				auto& instToWorldTransformsDesc = m_instToWorldTransformsDesc.template get<unique_device_ptr<dev, ei::Mat3x4[]>>();
+				instToWorldTransformsDesc = make_udevptr_array<dev, ei::Mat3x4>(m_instances.size());
+				// Compute the inverse instance transformations
+				auto instToWorldTransformation = std::make_unique<ei::Mat3x4[]>(totalInstanceCount);
+
+				// TODO: enable parallelism (OpenMP compiling bugs out)
+				const auto begin = m_worldToInstanceTransformation.data();
+				const auto end = begin + totalInstanceCount;
+				const auto outBegin = instToWorldTransformation.get();
+				std::transform(
+#ifdef __cpp_lib_execution
+							   std::execution::par_unseq,
+#endif // __cpp_lib_execution
+							   begin, end, outBegin, [](const ei::Mat3x4& matrix) {
+					return InstanceData<Device::CPU>::compute_instance_to_world_transformation(matrix);
+				});
+
+				copy(instToWorldTransformsDesc.get(), instToWorldTransformation.get(), sizeof(ei::Mat3x4) * m_instances.size());
+				sceneDescriptor.instanceToWorld = instToWorldTransformsDesc.get();
+			}
+		}
 
 		if constexpr(dev != Device::OPENGL) {
 			auto& instLodIndicesDesc = m_instLodIndicesDesc.template get<unique_device_ptr<dev, u32[]>>();
-			instLodIndicesDesc = make_udevptr_array<dev, u32>(lodIndices.size());
-			copy<u32>(instLodIndicesDesc.get(), lodIndices.data(), sizeof(u32) * lodIndices.size());
+			if constexpr(dev == Device::CPU) {
+				instLodIndicesDesc.reset(lodIndices.release());
+			} else {
+				instLodIndicesDesc = make_udevptr_array<dev, u32>(totalInstanceCount);
+				copy<u32>(instLodIndicesDesc.get(), lodIndices.get(), sizeof(u32) * totalInstanceCount);
+			}
 			sceneDescriptor.lodIndices = instLodIndicesDesc.get();
 		} else {
 			// We cannot create a new lodIndices array here, because the type for OpenGL is the same as for the CPU side,
@@ -242,58 +314,12 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
 			sceneDescriptor.lodIndices = sceneDescriptor.cpuDescriptor->lodIndices;
 		}
 
-		auto& lodAabbsDesc = m_lodAabbsDesc.template get<unique_device_ptr<dev, ei::Box[]>>();
-		lodAabbsDesc = make_udevptr_array<dev, ei::Box>(lodAabbs.size());
-		copy(lodAabbsDesc.get(), lodAabbs.data(), sizeof(ei::Box) * lodAabbs.size());
-
-		sceneDescriptor.numLods = static_cast<u32>(lodDescs.size());
-		sceneDescriptor.numInstances = static_cast<i32>(instanceCount);
+		sceneDescriptor.numLods = static_cast<u32>(lodIndex.load());
+		sceneDescriptor.numInstances = static_cast<i32>(totalInstanceCount);
 		sceneDescriptor.diagSize = len(m_boundingBox.max - m_boundingBox.min);
 		sceneDescriptor.aabb = m_boundingBox;
 		sceneDescriptor.lods = lodDevDesc.get();
 		sceneDescriptor.aabbs = lodAabbsDesc.get();
-		sceneDescriptor.instanceToWorld = instTransformsDesc.get();
-		sceneDescriptor.worldToInstance = invInstTransformsDesc.get();
-
-	} else if(!sameAttribs) {
-		// Only update the descriptors and reupload them
-		std::vector<LodDescriptor<dev>> lodDescs;
-		// This keeps track of instances for a given LoD
-		std::unordered_map<u32, std::vector<InstanceHandle>> lodMapping;
-
-		for(auto& obj : m_objects) {
-			mAssert(obj.first != nullptr);
-			mAssert(obj.second.size() != 0u);
-
-			// First gather which LoDs have which instance
-			lodMapping.clear();
-			for(InstanceHandle inst : obj.second) {
-				mAssert(inst != nullptr);
-				const u32 instanceLod = m_scenario.get_effective_lod(inst);
-				mAssert(instanceLod < obj.first->get_lod_slot_count());
-				lodMapping[instanceLod].push_back(inst);
-			}
-
-			// Now that we know all instances a LoD has we can create the descriptors uniquely
-			u32 prevLevel = std::numeric_limits<u32>::max();
-			for(const auto& mapping : lodMapping) {
-				// Now we can do per-LoD things like displacement mapping
-				if(prevLevel != std::numeric_limits<u32>::max())
-					lodDescs.back().next = mapping.first;
-				Lod* lod = &obj.first->get_lod(mapping.first);
-				if(Lod* reduced = lod->get_reduced_version(); reduced != nullptr)
-					lod = reduced;
-				lodDescs.push_back(lod->template get_descriptor<dev>());
-				if(!sameAttribs)
-					lod->update_attribute_descriptor(lodDescs.back(), vertexAttribs, faceAttribs, sphereAttribs);
-			}
-			lodDescs.back().previous = prevLevel;
-		}
-		// Allocate the device memory and copy over the descriptors
-		auto& lodDevDesc = m_lodDevDesc.get<unique_device_ptr<NotGl<dev>, LodDescriptor<dev>[]>>();
-		lodDevDesc = make_udevptr_array<NotGl<dev>, LodDescriptor<dev>>(lodDescs.size());
-		copy(lodDevDesc.get(), lodDescs.data(), lodDescs.size() * sizeof(LodDescriptor<dev>));
-		sceneDescriptor.lods = lodDevDesc.get();
 	}
 
 	// Materials
@@ -320,10 +346,17 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<const char*>
     if(dev != Device::OPENGL) {
 		// Rebuild Instance BVH?
 		if (m_accelStruct.needs_rebuild()) {
-			auto scope = Profiler::instance().start<CpuProfileState>("build_instance_bvh");
-			m_accelStruct.build(sceneDescriptor);
+			auto scope = Profiler::core().start<CpuProfileState>("build_instance_bvh");
+
+			const auto t0 = std::chrono::high_resolution_clock::now();
+			m_accelStruct.build(sceneDescriptor, static_cast<u32>(m_instances.size()));
 			m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = true;
 			m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = true;
+
+			const auto t1 = std::chrono::high_resolution_clock::now();
+			logInfo("[Scene::get_descriptor] Build instance BVH for ", m_instances.size(),
+					" instances in ", std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count(),
+					"ms");
 		}
 		sceneDescriptor.accelStruct = m_accelStruct.template acquire_const<dev>();
     }
@@ -401,13 +434,16 @@ bool Scene::retessellate(const float tessLevel) {
 	// Track if we did perform tessellation and if we need to rebuild the light tree
 	bool performedTessellation = false;
 	bool needLighttreeRebuild = false;
+	// TODO: get rid of the mapping (too low performance)
 	std::unordered_map<u32, std::vector<InstanceHandle>> lodMapping;
 	std::vector<ei::Mat3x4> instTrans;
 	for(auto& obj : m_objects) {
 		lodMapping.clear();
 
 		// First gather the instance-LoD-mapping
-		for(InstanceHandle inst : obj.second) {
+		const auto endIndex = obj.second.offset + obj.second.count;
+		for(std::size_t i = obj.second.offset; i < endIndex; ++i) {
+			const auto inst = m_instances[i];
 			const u32 instanceLod = m_scenario.get_effective_lod(inst);
 			lodMapping[instanceLod].push_back(inst);
 		}
@@ -416,11 +452,11 @@ bool Scene::retessellate(const float tessLevel) {
 			// Check if we have displacement or plain tessellation
 			Lod* lod = &obj.first->get_lod(mapping.first);
 
-			if(lod->has_displacement_mapping(m_scenario)) {
+			if(lod->is_displaced(m_scenario)) {
 				// First get the relevant instance transformations
 				instTrans.clear();
-				for(InstanceHandle inst : mapping.second)
-					instTrans.push_back(inst->get_transformation_matrix());
+				/*for(InstanceHandle inst : mapping.second)
+					instTrans.push_back(inst->get_transformation_matrix());*/
 				// Then we may adaptively tessellate
 
 				// TODO: more adequate tessellation level and more adequate tessellator
@@ -453,8 +489,8 @@ bool Scene::retessellate(const float tessLevel) {
 					if(objTessInfo->adaptive) {
 						// First get the relevant instance transformations
 						instTrans.clear();
-						for(InstanceHandle inst : mapping.second)
-							instTrans.push_back(inst->get_transformation_matrix());
+						/*for(InstanceHandle inst : mapping.second)
+							instTrans.push_back( inst->get_transformation_matrix());*/
 						tessellation::CameraDistanceOracle oracle{ objTessLevel, get_camera(), m_animationPathIndex,
 																	  m_scenario.get_resolution(), instTrans };
 						lod->tessellate(oracle, &m_scenario, objTessInfo->usePhong);
@@ -477,13 +513,10 @@ bool Scene::retessellate(const float tessLevel) {
 
 void Scene::compute_curvature() {
 	for(auto& obj : m_objects) {
-		printf(obj.first->get_name().cbegin());
 		for(u32 level = 0; level < obj.first->get_lod_slot_count(); ++level) {
 			if(obj.first->has_lod_available(level)) {
 				Lod& lod = obj.first->get_lod(level);
 				geometry::Polygons& polygons = lod.get_geometry<geometry::Polygons>();
-				printf(" %lu lod: %llu po: %llu\n", level, u64(&lod), u64(&polygons));
-				fflush(stdout);
 				polygons.compute_curvature();
 			}
 		}
@@ -497,7 +530,7 @@ void Scene::remove_curvature() {
 				Lod& lod = obj.first->get_lod(level);
 				geometry::Polygons& polygons = lod.get_geometry<geometry::Polygons>();
 				try {
-					polygons.remove_attribute("mean_curvature");
+					polygons.remove_curvature();
 				} catch(...) {}
 			}
 		}
@@ -511,14 +544,14 @@ template void Scene::load_materials<Device::OPENGL>();
 template void Scene::update_camera_medium<Device::CPU>(SceneDescriptor<Device::CPU>& descriptor);
 template void Scene::update_camera_medium<Device::CUDA>(SceneDescriptor<Device::CUDA>& descriptor);
 template void Scene::update_camera_medium<Device::OPENGL>(SceneDescriptor<Device::OPENGL>& descriptor);
-template const SceneDescriptor<Device::CPU>& Scene::get_descriptor<Device::CPU>(const std::vector<const char*>&,
-																				const std::vector<const char*>&,
-																				const std::vector<const char*>&);
-template const SceneDescriptor<Device::CUDA>& Scene::get_descriptor<Device::CUDA>(const std::vector<const char*>&,
-																				  const std::vector<const char*>&,
-																				  const std::vector<const char*>&);
-template const SceneDescriptor<Device::OPENGL>& Scene::get_descriptor<Device::OPENGL>(const std::vector<const char*>&,
-																					  const std::vector<const char*>&,
-																					  const std::vector<const char*>&);
+template const SceneDescriptor<Device::CPU>& Scene::get_descriptor<Device::CPU>(const std::vector<AttributeIdentifier>&,
+																				const std::vector<AttributeIdentifier>&,
+																				const std::vector<AttributeIdentifier>&);
+template const SceneDescriptor<Device::CUDA>& Scene::get_descriptor<Device::CUDA>(const std::vector<AttributeIdentifier>&,
+																				  const std::vector<AttributeIdentifier>&,
+																				  const std::vector<AttributeIdentifier>&);
+template const SceneDescriptor<Device::OPENGL>& Scene::get_descriptor<Device::OPENGL>(const std::vector<AttributeIdentifier>&,
+																					  const std::vector<AttributeIdentifier>&,
+																					  const std::vector<AttributeIdentifier>&);
 
 }} // namespace mufflon::scene

@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "core/math/sampling.hpp"
 #include "core/scene/textures/interface.hpp"
 #include "material_definitions.hpp"
@@ -8,7 +8,7 @@
 
 namespace mufflon { namespace scene { namespace materials {
 
-CUDA_FUNCTION MatSampleWalter fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
+inline CUDA_FUNCTION MatSampleWalter fetch(const textures::ConstTextureDevHandle_t<CURRENT_DEV>* textures,
 									const ei::Vec4* texValues,
 									int texOffset,
 									const typename MatWalter::NonTexParams& params) {
@@ -24,7 +24,7 @@ CUDA_FUNCTION MatSampleWalter fetch(const textures::ConstTextureDevHandle_t<CURR
 }
 
 // The importance sampling routine
-CUDA_FUNCTION math::PathSample sample(const MatSampleWalter& params,
+inline CUDA_FUNCTION math::PathSample sample(const MatSampleWalter& params,
 									  const Direction& incidentTS,
 									  Boundary& boundary,
 									  const math::RndSet2_1& rndSet,
@@ -117,12 +117,12 @@ CUDA_FUNCTION math::PathSample sample(const MatSampleWalter& params,
 
 	return math::PathSample {
 		Spectrum { throughput }, eventType, excidentTS,
-		pdfForw, pdfBack
+		{ pdfForw, pdfBack }
 	};
 }
 
 // The evaluation routine
-CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& params,
+inline CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& params,
 											  const Direction& incidentTS,
 											  const Direction& excidentTS,
 											  Boundary& boundary) {
@@ -167,8 +167,8 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& params,
 			g = geoshadowing_vcavity_reflection(gi, ge);
 		return math::BidirSampleValue {
 			Spectrum{ sdiv(g * d, 4.0f * incidentTS.z * excidentTS.z) },
-			AngularPdf{ sdiv(gi * d, 4.0f * ei::abs(incidentTS.z)) },
-			AngularPdf{ sdiv(ge * d, 4.0f * ei::abs(excidentTS.z)) }
+			{ AngularPdf{ sdiv(gi * d, 4.0f * ei::abs(incidentTS.z)) },
+			  AngularPdf{ sdiv(ge * d, 4.0f * ei::abs(excidentTS.z)) } }
 		};
 	}
 
@@ -181,23 +181,23 @@ CUDA_FUNCTION math::BidirSampleValue evaluate(const MatSampleWalter& params,
 	float bsdf = g * common * sdiv(n_e * n_e, ei::abs(incidentTS.z * excidentTS.z));
 	return math::BidirSampleValue {
 		Spectrum{bsdf},
-		AngularPdf(gi * common * sdiv(n_e * n_e, ei::abs(incidentTS.z))),
-		AngularPdf(ge * common * sdiv(n_i * n_i, ei::abs(excidentTS.z)))
+		{ AngularPdf(gi * common * sdiv(n_e * n_e, ei::abs(incidentTS.z))),
+		  AngularPdf(ge * common * sdiv(n_i * n_i, ei::abs(excidentTS.z))) }
 	};
 }
 
 // The albedo routine
-CUDA_FUNCTION Spectrum albedo(const MatSampleWalter& params) {
+inline CUDA_FUNCTION Spectrum albedo(const MatSampleWalter& params) {
 	// Compute a pseudo value based on the absorption.
 	// The problem: the true amount of transmittance depends on the depth of the medium.
 	return 1.0f / (Spectrum{1.0f} + params.absorption);
 }
 
-CUDA_FUNCTION math::SampleValue emission(const MatSampleWalter& params, const scene::Direction& geoN, const scene::Direction& excident) {
+inline CUDA_FUNCTION math::SampleValue emission(const MatSampleWalter& /*params*/, const scene::Direction& /*geoN*/, const scene::Direction& /*excident*/) {
 	return math::SampleValue{};
 }
 
-CUDA_FUNCTION float pdf_max(const MatSampleWalter& params) {
+inline CUDA_FUNCTION float pdf_max(const MatSampleWalter& params) {
 	switch(params.ndf) {
 		case NDF::BECKMANN:
 			if(params.roughness < 1.f / std::sqrt(2.f))

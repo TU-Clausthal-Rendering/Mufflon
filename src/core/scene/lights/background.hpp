@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "lights.hpp"
-#include "core/export/api.h"
+#include "core/export/core_api.h"
 #include "util/assert.hpp"
 #include "core/scene/handles.hpp"
 #include "core/scene/textures/texture.hpp"
@@ -73,7 +73,7 @@ public:
 					std::get<EnvmapParams>(m_params).summedAreaTable->synchronize<newDev>();
 				break;
 			case BackgroundType::SKY_HOSEK:	// Fallthrough - nothing to be done
-			case BackgroudType::COLORED:	// Fallthrough - nothing to be done
+			case BackgroundType::COLORED:	// Fallthrough - nothing to be done
 			default:
 				break;
 		}
@@ -88,13 +88,10 @@ public:
 					std::get<EnvmapParams>(m_params).summedAreaTable->unload<dev>();
 				break;
 			case BackgroundType::SKY_HOSEK:	// Fallthrough - nothing to be done
-			case BackgroudType::COLORED:	// Fallthrough - nothing to be done
+			case BackgroundType::COLORED:	// Fallthrough - nothing to be done
 			default:
 				break;
 		}
-		if(m_envLight) m_envLight->unload<dev>();
-		if(m_summedAreaTable) m_summedAreaTable->unload<dev>();
-		m_skyModel.unload<dev>();
 	}
 
 	template< Device dev >
@@ -157,7 +154,7 @@ private:
 	// be either monochromatic, an environment map, or an analytic sky model.
 	// This boils down to a tagged union
 	struct MonochromParams {
-		Spectrum color{ 0.f };
+		Spectrum color{ 0.f, 0.f, 0.f };
 	};
 	struct EnvmapParams {
 		TextureHandle envLight{ nullptr };

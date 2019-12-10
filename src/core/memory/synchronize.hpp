@@ -4,9 +4,12 @@
 #include "core/cuda/error.hpp"
 #include "core/opengl/gl_texture.hpp"
 #include "core/opengl/gl_buffer.hpp"
+#include <cstdlib>
+#include <cstring>
 
 namespace mufflon { // There is no memory namespace on purpose
 
+extern bool g_hasCudaEnabled;
 
 // Functions for unloading a handle from the device
 template < class T >
@@ -32,7 +35,10 @@ template < typename T >
 inline void copy(T* dst, const T* src, std::size_t size ) {
 	static_assert(std::is_trivially_copyable<T>::value,
 					  "Must be trivially copyable");
-	cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyDefault));
+	if(g_hasCudaEnabled)
+		cuda::check_error(cudaMemcpy(dst, src, size, cudaMemcpyDefault));
+	else
+		std::memcpy(dst, src, size);
 }
 
 // Copy operations between OpenGL and CUDA
@@ -43,31 +49,38 @@ template < typename T >
 inline void copy(gl::BufferHandle<T> dst, const T* src, std::size_t size) {
 	static_assert(std::is_trivially_copyable<T>::value,
 		"Must be trivially copyable");
-	// Gotta check where the pointer resides
-	cudaPointerAttributes attribs;
-	auto res = cudaPointerGetAttributes(&attribs, src);
-	if(res == cudaErrorInvalidValue || attribs.type == cudaMemoryTypeUnregistered  || attribs.type == cudaMemoryTypeHost) {
-		// Host memory; gotta clear the CUDA error
-		gl::bufferSubData(dst.id, dst.get_byte_offset(), size, src);
-		cudaGetLastError();
+	if(g_hasCudaEnabled) {
+		// Gotta check where the pointer resides
+		cudaPointerAttributes attribs;
+		auto res = cudaPointerGetAttributes(&attribs, src);
+		if(res == cudaErrorInvalidValue || attribs.type == cudaMemoryTypeUnregistered  || attribs.type == cudaMemoryTypeHost) {
+			// Host memory; gotta clear the CUDA error
+			gl::bufferSubData(dst.id, dst.get_byte_offset(), size, src);
+			cudaGetLastError();
+		} else {
+			copy_cuda_opengl(dst.id, dst.offset * sizeof(T), static_cast<const void*>(src), size);
+		}
 	} else {
-		copy_cuda_opengl(dst.id, dst.offset * sizeof(T), static_cast<const void*>(src), size);
+		gl::bufferSubData(dst.id, dst.get_byte_offset(), size, src);
 	}
 }
 
 template < typename T >
 inline void copy(T* dst, gl::BufferHandle<T> src, std::size_t size) {
-	// Gotta check where the pointer resides
-	cudaPointerAttributes attribs;
-	auto res = cudaPointerGetAttributes(&attribs, dst);
-	if(res == cudaErrorInvalidValue || attribs.type == cudaMemoryTypeUnregistered || attribs.type == cudaMemoryTypeHost) {
-		// Host memory; gotta clear the CUDA error
-		gl::getBufferSubData(src.id, src.get_byte_offset(), size, dst);
-		cudaGetLastError();
+	if(g_hasCudaEnabled) {
+		// Gotta check where the pointer resides
+		cudaPointerAttributes attribs;
+		auto res = cudaPointerGetAttributes(&attribs, dst);
+		if(res == cudaErrorInvalidValue || attribs.type == cudaMemoryTypeUnregistered || attribs.type == cudaMemoryTypeHost) {
+			// Host memory; gotta clear the CUDA error
+			gl::getBufferSubData(src.id, src.get_byte_offset(), size, dst);
+			cudaGetLastError();
+		} else {
+			copy_cuda_opengl(static_cast<void*>(dst), src.id, src.offset * sizeof(T), size);
+		}
 	} else {
-		copy_cuda_opengl(static_cast<void*>(dst), src.id, src.offset * sizeof(T), size);
+		gl::getBufferSubData(src.id, src.get_byte_offset(), size, dst);
 	}
-
 }
 
 template < typename T >
@@ -76,7 +89,7 @@ inline void copy(gl::BufferHandle<T> dst, gl::BufferHandle<T> src, std::size_t s
 }
 
 template < typename T >
-inline void copy(gl::TextureHandle dst, gl::BufferHandle<T> src, std::size_t size) {
+inline void copy(gl::TextureHandle /*dst*/, gl::BufferHandle<T> /*src*/, std::size_t /*size*/) {
 	// TODO gl
 }
 

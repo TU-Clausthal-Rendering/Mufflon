@@ -5,11 +5,13 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:gui.View"
         mc:Ignorable="d"
-        Title="Loading World" Height="120" Width="250"
+        Title="Loading World" Height="120" Width="350"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None">
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="10"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
@@ -17,7 +19,13 @@
                    Name="LoadingTextBlock"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"/>
-        <Button Grid.Row="1" Name="CancelLoadButton"
+        <ProgressBar Grid.Row="1"
+                     Width="230"
+                     IsIndeterminate="True"/>
+        <TextBlock Grid.Row="2" Text="{Binding LoadingText, UpdateSourceTrigger=PropertyChanged}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"/>
+        <Button Grid.Row="3" Name="CancelLoadButton"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Click="Cancel_Click">Cancel</Button>

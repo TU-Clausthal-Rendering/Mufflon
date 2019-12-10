@@ -6,7 +6,6 @@
 #include "util/int_types.hpp"
 #include "util/degrad.hpp"
 #include "util/cie_xyz.hpp"
-#include "core/export/interface.h"
 #include "core/scene/handles.hpp"
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
@@ -21,7 +20,7 @@ namespace {
 
 // Reads a file completely and returns the string containing all bytes
 std::string read_file(fs::path path) {
-	auto scope = Profiler::instance().start<CpuProfileState>("JSON read_file", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JSON read_file", ProfileLevel::HIGH);
 	logPedantic("[read_file] Loading JSON file '", path.string(), "' into RAM");
 	const std::uintmax_t fileSize = fs::file_size(path);
 	std::string fileString;
@@ -29,7 +28,7 @@ std::string read_file(fs::path path) {
 
 	std::ifstream file(path, std::ios::binary);
 	file.read(&fileString[0u], fileSize);
-	if(file.gcount() != fileSize)
+	if(file.gcount() != static_cast<std::streamsize>(fileSize))
 		logWarning("[read_file] File '", path.string(), "'not read completely");
 	// Finalize the string
 	fileString[file.gcount()] = '\0';
@@ -38,32 +37,53 @@ std::string read_file(fs::path path) {
 
 // Reads an optional array
 template < class T >
-std::vector<T> read_opt_array(ParserState& state, const rapidjson::Value& parent, const char* name) {
-	std::vector<T> vec;
-	try {
-		read(state, get(state, parent, name), vec);
-	} catch(const ParserException& pe) {
-		(void)pe;
-		if(state.expected == ParserState::Value::NONE)
-			state.objectNames.pop_back();
-		vec = std::vector<T>{ read<T>(state, get(state, parent, name)) };
+std::enable_if_t<is_array<T>(), std::vector<T>> read_opt_array_array(ParserState& state,
+																	 const rapidjson::Value& parent,
+																	 const char* name) {
+	std::vector<T> vec{};
+	if(auto valIter = get(state, parent, name, false); valIter != parent.MemberEnd()) {
+		// Check if it's cascaded arrays
+		if(valIter->value.IsArray() && valIter->value.Size() > 0 && valIter->value[0].IsArray())
+			read(state, valIter, vec);
+		else
+			vec.push_back(read<T>(state, valIter));
 	}
 	return vec;
 }
 template < class T >
-std::vector<T> read_opt_array(ParserState& state, const rapidjson::Value& parent, const char* name, const T& optVal) {
-	std::vector<T> vec;
-	try {
-		if(auto valIter = get(state, parent, name, false); valIter != parent.MemberEnd())
+std::enable_if_t<!is_array<T>(), std::vector<T>> read_opt_array(ParserState& state,
+																const rapidjson::Value& parent,
+																const char* name) {
+	std::vector<T> vec{};
+	if(auto valIter = get(state, parent, name, false); valIter != parent.MemberEnd())
+		read(state, valIter, vec);
+	return vec;
+}
+template < class T >
+std::enable_if_t<is_array<T>(), std::vector<T>> read_opt_array_array(ParserState& state,
+																	 const rapidjson::Value& parent,
+																	 const char* name, const T& optVal) {
+	std::vector<T> vec{};
+	if(auto valIter = get(state, parent, name, false); valIter != parent.MemberEnd()) {
+		// Check if it's cascaded arrays
+		if(valIter->value.IsArray() && valIter->value.Size() > 0 && valIter->value[0].IsArray())
 			read(state, valIter, vec);
 		else
-			vec = std::vector<T>{ optVal };
-	} catch(const ParserException& pe) {
-		(void)pe;
-		if(state.expected == ParserState::Value::NONE)
-			state.objectNames.pop_back();
-		vec = std::vector<T>{ read_opt<T>(state, parent, name, optVal) };
+			vec.push_back(read<T>(state, valIter));
+	} else {
+		vec.push_back(optVal);
 	}
+	return vec;
+}
+template < class T >
+std::enable_if_t<!is_array<T>(), std::vector<T>> read_opt_array(ParserState& state,
+																const rapidjson::Value& parent,
+																const char* name, const T& optVal) {
+	std::vector<T> vec{};
+	if(auto valIter = get(state, parent, name, false); valIter != parent.MemberEnd())
+		read(state, valIter, vec);
+	else
+		vec.push_back(optVal);
 	return vec;
 }
 
@@ -93,14 +113,14 @@ JsonException::JsonException(const std::string& str, rapidjson::ParseResult res)
 void JsonLoader::clear_state() {
 	m_jsonString.clear();
 	m_state.reset();
-	m_binaryFile.clear();
 	m_materialMap.clear();
+	m_loadingStage.clear();
 }
 
 TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, MipmapType mipmapType,
 									std::optional<TextureFormat> targetFormat,
 									TextureCallback callback, void* userParams) {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
 	logPedantic("[JsonLoader::load_texture] Loading texture '", name, "'");
 	// Make the path relative to the file
 	fs::path path(name);
@@ -120,7 +140,7 @@ TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, 
 }
 
 std::pair<TextureHdl, TextureHdl> JsonLoader::load_displacement_map(const char* name) {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_displacement_map", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_displacement_map", ProfileLevel::HIGH);
 	// Make the path relative to the file
 	fs::path path(name);
 	if(!path.is_absolute())
@@ -136,7 +156,7 @@ std::pair<TextureHdl, TextureHdl> JsonLoader::load_displacement_map(const char* 
 }
 
 MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator matIter) {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_material", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_material", ProfileLevel::HIGH);
 	logPedantic("[JsonLoader::load_material] Loading material '", matIter->name.GetString(), "'");
 	using namespace rapidjson;
 	MaterialParams* mat = new MaterialParams{};
@@ -161,8 +181,8 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			}
 			m_state.objectNames.pop_back();
 		} else {
-			mat->outerMedium.absorption = Vec3{ 0.0f };
-			mat->outerMedium.refractionIndex = Vec2{ 1.0f, 0.0f };
+			mat->outerMedium.absorption = Vec3{ 0.f, 0.f, 0.f };
+			mat->outerMedium.refractionIndex = Vec2{ 1.f, 0.f };
 		}
 
 		// Read an optional alpha texture
@@ -283,9 +303,9 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 					mat->inner.emissive.radiance = load_texture(read<const char*>(m_state, radianceIter),
 																TextureSampling::SAMPLING_NEAREST, MipmapType::MIPMAP_NONE,
 																TextureFormat::FORMAT_RGBA32F,
-																[](uint32_t x, uint32_t y, uint32_t layer,
-																   TextureFormat format, Vec4 value,
-																   void* userParams) {
+																[](uint32_t /*x*/, uint32_t /*y*/, uint32_t /*layer*/,
+																   TextureFormat /*format*/, Vec4 value,
+																   void* /*userParams*/) {
 						const auto radiance = spectrum::compute_black_body_color(spectrum::Kelvin{ value.x });
 						return Vec4{ radiance.x, radiance.y, radiance.z, 0.f };
 					}, nullptr);
@@ -365,33 +385,31 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 }
 
 void JsonLoader::free_material(MaterialParams* mat) {
+	if(mat == nullptr)
+		return;
 	switch(mat->innerType) {
 		case MATERIAL_LAMBERT:
 		case MATERIAL_TORRANCE:
 		case MATERIAL_WALTER:
 		case MATERIAL_EMISSIVE:
 		case MATERIAL_ORENNAYAR:
-			delete mat;
-			return;
+			break;
 		case MATERIAL_BLEND:
-			if(mat->inner.blend.a.mat != nullptr)
-				free_material(mat->inner.blend.a.mat);
-			if(mat->inner.blend.b.mat != nullptr)
-				free_material(mat->inner.blend.b.mat);
-			return;
+			free_material(mat->inner.blend.a.mat);
+			free_material(mat->inner.blend.b.mat);
+			break;
 		case MATERIAL_FRESNEL:
-			if(mat->inner.fresnel.a != nullptr)
 			free_material(mat->inner.fresnel.a);
-			if(mat->inner.blend.a.mat != nullptr)
-				if(mat->inner.fresnel.b != nullptr)
 			free_material(mat->inner.fresnel.b);
-			return;
-		default: return;
+			break;
+		default: break;
 	}
+	delete mat;
 }
 
 bool JsonLoader::load_cameras(const ei::Box& aabb) {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_cameras", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_cameras", ProfileLevel::HIGH);
+	sprintf(m_loadingStage.data(), "Parsing cameras%c", '\0');
 	using namespace rapidjson;
 	const Value& cameras = m_cameras->value;
 	assertObject(m_state, cameras);
@@ -408,8 +426,10 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 		// Read common values
 		// Default camera planes depend on scene bounding box size
 		const float sceneDiag = ei::abs(ei::len(aabb.max - aabb.min));
-		const float near = read_opt<float>(m_state, camera, "near", DEFAULT_NEAR_PLANE * sceneDiag);
-		const float far = read_opt<float>(m_state, camera, "far", DEFAULT_FAR_PLANE * sceneDiag);
+		const float near = read_opt<float>(m_state, camera, "near",
+										   m_absoluteCamNearFar ? DEFAULT_NEAR_PLANE : (DEFAULT_NEAR_PLANE_FACTOR * sceneDiag));
+		const float far = read_opt<float>(m_state, camera, "far",
+										  m_absoluteCamNearFar ? DEFAULT_FAR_PLANE : (DEFAULT_FAR_PLANE_FACTOR * sceneDiag));
 		StringView type = read<const char*>(m_state, get(m_state, camera, "type"));
 		std::vector<ei::Vec3> camPath;
 		std::vector<ei::Vec3> camViewDir;
@@ -425,7 +445,7 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 		if(camUp.size() == 1u && (camPath.size() != 1u || camViewDir.size() != 1u))
 			camUp = std::vector<ei::Vec3>(camPath.size(), camUp.front());
 		if(camPath.size() == 1u && (camViewDir.size() != 1u || camUp.size() != 1u))
-			camPath = std::vector<ei::Vec3>(camViewDir.size(), camUp.front());
+			camPath = std::vector<ei::Vec3>(camViewDir.size(), camPath.front());
 
 		if(camPath.size() != camViewDir.size())
 			throw std::runtime_error("Mismatched camera path size (view direction)");
@@ -472,12 +492,14 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 }
 
 bool JsonLoader::load_lights() {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_lights", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_lights", ProfileLevel::HIGH);
+	sprintf(m_loadingStage.data(), "Parsing lights%c", '\0');
 	using namespace rapidjson;
 	const Value& lights = m_lights->value;
 	assertObject(m_state, lights);
 	m_state.current = ParserState::Level::LIGHTS;
 
+	m_lightMap = util::FixedHashMap<StringView, LightHdl>{ lights.MemberCount() };
 	for(auto lightIter = lights.MemberBegin(); lightIter != lights.MemberEnd(); ++lightIter) {
 		logPedantic("[JsonLoader::load_lights] Loading light '", lightIter->name.GetString(), "'");
 		if(m_abort)
@@ -490,38 +512,23 @@ bool JsonLoader::load_lights() {
 		StringView type = read<const char*>(m_state, get(m_state, light, "type"));
 		if(type.compare("point") == 0) {
 			// Point light
-			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<ei::Vec3> positions = read_opt_array_array<ei::Vec3>(m_state, light, "position");
 			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 			// For backwards compatibility, we try to read a normal array as fallback
 			std::vector<ei::Vec3> intensities;
-			try {
-				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
-					read(m_state, intensityIter, intensities);
-				} else if(auto fluxIter = get(m_state, light, "flux", false); fluxIter != light.MemberEnd()) {
-					read(m_state, fluxIter, intensities);
-					for(auto& flux : intensities)
-						flux /= (4.0f * ei::PI);
-				} else {
-					std::vector<float> temperatures;
-					read(m_state, get(m_state, light, "temperature"), temperatures);
-					intensities.reserve(temperatures.size());
-					for(const auto temp : temperatures) {
-						const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temp });
-						intensities.push_back(rgb);
-					}
-				}
-			} catch(const ParserException& pe) {
-				(void)pe;
-				if(m_state.expected == ParserState::Value::NONE)
-					m_state.objectNames.pop_back();
-				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
-					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, intensityIter) };
-				} else if(auto fluxIter = get(m_state, light, "flux", false); fluxIter != light.MemberEnd()) {
-					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, fluxIter) / (4.0f * ei::PI) };
-				} else {
-					const auto temperature = read<float>(m_state, get(m_state, light, "temperature"));
-					const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temperature });
-					intensities = std::vector<ei::Vec3>{ rgb };
+			if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
+				read(m_state, intensityIter, intensities);
+			} else if(auto fluxIter = get(m_state, light, "flux", false); fluxIter != light.MemberEnd()) {
+				read(m_state, fluxIter, intensities);
+				for(auto& flux : intensities)
+					flux /= (4.0f * ei::PI);
+			} else {
+				std::vector<float> temperatures;
+				read(m_state, get(m_state, light, "temperature"), temperatures);
+				intensities.reserve(temperatures.size());
+				for(const auto temp : temperatures) {
+					const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temp });
+					intensities.push_back(rgb);
 				}
 			}
 
@@ -546,83 +553,45 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add point light");
 		} else if(type.compare("spot") == 0) {
 			// Spot light
-			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
-			std::vector<ei::Vec3> directions = read_opt_array<ei::Vec3>(m_state, light, "direction");
+			std::vector<ei::Vec3> positions = read_opt_array_array<ei::Vec3>(m_state, light, "position");
+			std::vector<ei::Vec3> directions = read_opt_array_array<ei::Vec3>(m_state, light, "direction");
 			// For backwards compatibility, we try to read a normal array as fallback
 			std::vector<ei::Vec3> intensities;
-			try {
-				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
-					read(m_state, intensityIter, intensities);
-				} else {
-					std::vector<float> temperatures;
-					read(m_state, get(m_state, light, "temperature"), temperatures);
-					intensities.reserve(temperatures.size());
-					for(const auto temp : temperatures) {
-						const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temp });
-						intensities.push_back(rgb);
-					}
-				}
-			} catch(const ParserException& pe) {
-				(void)pe;
-				if(m_state.expected == ParserState::Value::NONE)
-					m_state.objectNames.pop_back();
-				if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
-					intensities = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, intensityIter) };
-				} else {
-					const auto temperature = read<float>(m_state, get(m_state, light, "temperature"));
-					const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temperature });
-					intensities = std::vector<ei::Vec3>{ rgb };
+			if(auto intensityIter = get(m_state, light, "intensity", false); intensityIter != light.MemberEnd()) {
+				read(m_state, intensityIter, intensities);
+			} else {
+				std::vector<float> temperatures;
+				read(m_state, get(m_state, light, "temperature"), temperatures);
+				intensities.reserve(temperatures.size());
+				for(const auto temp : temperatures) {
+					const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temp });
+					intensities.push_back(rgb);
 				}
 			}
-
+			
 			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
 			std::vector<float> angles;
 			std::vector<float> falloffStarts;
 			// For backwards compatibility, we try to read a normal array as fallback
-			try {
-				if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
-					read(m_state, angleIter, angles);
-				else
-					read(m_state, get(m_state, light, "width"), angles);
-			} catch(const ParserException& pe) {
-				(void)pe;
-				if(m_state.expected == ParserState::Value::NONE)
-					m_state.objectNames.pop_back();
-				if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
-					angles = std::vector<float>{ std::acos(read<float>(m_state, angleIter)) };
-				else
-					angles = std::vector<float>{ read<float>(m_state, get(m_state, light, "width")) };
-			}
+			if(auto angleIter = get(m_state, light, "cosWidth", false); angleIter != light.MemberEnd())
+				read(m_state, angleIter, angles);
+			else
+				read(m_state, get(m_state, light, "width"), angles);
+			
 			// This is a bit complex and may need refactoring; we have multiple scenarios to catch depending on what is
 			// and isn't given in the JSON but legal according to the file specs
-			try {
-				if(auto falloffIter = get(m_state, light, "cosFalloffStart", false); falloffIter != light.MemberEnd()) {
-					read(m_state, falloffIter, falloffStarts);
+			if(auto falloffIter = get(m_state, light, "cosFalloffStart", false); falloffIter != light.MemberEnd()) {
+				read(m_state, falloffIter, falloffStarts);
+			} else {
+				if(auto angleIter = get(m_state, light, "falloffStart", false); angleIter != light.MemberEnd()) {
+					read(m_state, angleIter, falloffStarts);
 				} else {
-					if(auto angleIter = get(m_state, light, "falloffStart", false); angleIter != light.MemberEnd()) {
-						read(m_state, angleIter, falloffStarts);
-					} else {
-						falloffStarts.reserve(angles.size());
-						for(const auto& angle : angles)
-							falloffStarts.push_back(Radians{ angle });
-					}
+					falloffStarts.reserve(angles.size());
+					for(const auto& angle : angles)
+						falloffStarts.push_back(Radians{ angle });
 				}
-			} catch(const ParserException& pe) {
-				(void)pe;
-				if(m_state.expected == ParserState::Value::NONE)
-					m_state.objectNames.pop_back();
-				if(auto falloffIter = get(m_state, light, "cosFalloffStart", false); falloffIter != light.MemberEnd())
-					falloffStarts = std::vector<float>{ std::acos(read<float>(m_state, falloffIter)) };
-				else
-					if(auto falloffIter = get(m_state, light, "falloffStart", false); falloffIter != light.MemberEnd()) {
-						falloffStarts = std::vector<float>{ read<float>(m_state, falloffIter) };
-					} else {
-						falloffStarts.reserve(angles.size());
-						for(const auto& angle : angles)
-							falloffStarts.push_back(angle);
-					}
 			}
-
+			
 			const std::size_t maxSize = std::max(positions.size(), std::max(intensities.size(),
 												std::max(scales.size(), std::max(directions.size(),
 														std::max(angles.size(), falloffStarts.size())))));
@@ -662,31 +631,18 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add spot light");
 		} else if(type.compare("directional") == 0) {
 			// Directional light
-			std::vector<ei::Vec3> directions = read_opt_array<ei::Vec3>(m_state, light, "direction");
+			std::vector<ei::Vec3> directions = read_opt_array_array<ei::Vec3>(m_state, light, "direction");
 			// For backwards compatibility, we try to read a normal array as fallback
 			std::vector<ei::Vec3> radiances;
-			try {
-				if(auto radianceIter = get(m_state, light, "radiance", false); radianceIter != light.MemberEnd()) {
-					read(m_state, radianceIter, radiances);
-				} else {
-					std::vector<float> temperatures;
-					read(m_state, get(m_state, light, "temperature"), temperatures);
-					radiances.reserve(temperatures.size());
-					for(const auto temp : temperatures) {
-						const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temp });
-						radiances.push_back(rgb);
-					}
-				}
-			} catch(const ParserException& pe) {
-				(void)pe;
-				if(m_state.expected == ParserState::Value::NONE)
-					m_state.objectNames.pop_back();
-				if(auto radianceIter = get(m_state, light, "radiance", false); radianceIter != light.MemberEnd()) {
-					radiances = std::vector<ei::Vec3>{ read<ei::Vec3>(m_state, radianceIter) };
-				} else {
-					const auto temperature = read<float>(m_state, get(m_state, light, "temperature"));
-					const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temperature });
-					radiances = std::vector<ei::Vec3>{ rgb };
+			if(auto radianceIter = get(m_state, light, "radiance", false); radianceIter != light.MemberEnd()) {
+				read(m_state, radianceIter, radiances);
+			} else {
+				std::vector<float> temperatures;
+				read(m_state, get(m_state, light, "temperature"), temperatures);
+				radiances.reserve(temperatures.size());
+				for(const auto temp : temperatures) {
+					const auto rgb = spectrum::compute_black_body_color(spectrum::Kelvin{ temp });
+					radiances.push_back(rgb);
 				}
 			}
 			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
@@ -756,7 +712,7 @@ bool JsonLoader::load_lights() {
 			else // TODO: Preetham?
 				throw std::runtime_error("Unknown sky model '" + std::string(modelName) + "'");
 
-			if(auto hdl = world_add_background_light(lightIter->name.GetString(), BackgroundType::BACKGROUND_SKY_HOSEK);
+			if(auto hdl = world_add_background_light(lightIter->name.GetString(), type);
 			   hdl.type == LightType::LIGHT_ENVMAP) {
 				world_set_sky_light_turbidity(hdl, turbidity);
 				world_set_sky_light_albedo(hdl, albedo);
@@ -767,9 +723,9 @@ bool JsonLoader::load_lights() {
 			} else throw std::runtime_error("Failed to add sky light");
 		} else if(type.compare("goniometric") == 0) {
 			// TODO: Goniometric light
-			std::vector<ei::Vec3> positions = read_opt_array<ei::Vec3>(m_state, light, "position");
+			std::vector<ei::Vec3> positions = read_opt_array_array<ei::Vec3>(m_state, light, "position");
 			std::vector<float> scales = read_opt_array<float>(m_state, light, "scale", 1.f);
-			TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")));
+			(void)load_texture(read<const char*>(m_state, get(m_state, light, "map")));
 			// TODO: incorporate scale
 
 			logWarning("[JsonLoader::load_lights] Scene file: Goniometric lights are not supported yet");
@@ -784,7 +740,8 @@ bool JsonLoader::load_lights() {
 }
 
 bool JsonLoader::load_materials() {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_materials", ProfileLevel::HIGH);
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_materials", ProfileLevel::HIGH);
+	sprintf(m_loadingStage.data(), "Parsing materials%c", '\0');
 	using namespace rapidjson;
 	const Value& materials = m_materials->value;
 	assertObject(m_state, materials);
@@ -807,13 +764,16 @@ bool JsonLoader::load_materials() {
 	return true;
 }
 
-bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_scenarios", ProfileLevel::HIGH);
+bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
+								const mufflon::util::FixedHashMap<StringView, binary::InstanceMapping>& instances) {
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_scenarios", ProfileLevel::HIGH);
+	sprintf(m_loadingStage.data(), "Parsing scenarios%c", '\0');
 	using namespace rapidjson;
 	const Value& scenarios = m_scenarios->value;
 	assertObject(m_state, scenarios);
 	m_state.current = ParserState::Level::SCENARIOS;
 
+	world_reserve_scenarios(static_cast<u32>(scenarios.MemberCount()));
 	for(auto scenarioIter = scenarios.MemberBegin(); scenarioIter != scenarios.MemberEnd(); ++scenarioIter) {
 		logPedantic("[JsonLoader::load_scenarios] Loading scenario '", scenarioIter->name.GetString(), "'");
 		if(m_abort)
@@ -869,6 +829,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 			if(m_abort)
 				return false;
 			m_state.objectNames.push_back(objectsIter->name.GetString());
+			scenario_reserve_custom_object_properties(scenarioHdl, objectsIter->value.MemberCount());
 			assertObject(m_state, objectsIter->value);
 			for(auto objIter = objectsIter->value.MemberBegin(); objIter != objectsIter->value.MemberEnd(); ++objIter) {
 				StringView objectName = objIter->name.GetString();
@@ -909,6 +870,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		if(auto instancesIter = get(m_state, scenario, "instanceProperties", false);
 		   instancesIter != scenario.MemberEnd()) {
 			m_state.objectNames.push_back(instancesIter->name.GetString());
+			scenario_reserve_custom_instance_properties(scenarioHdl, instancesIter->value.MemberCount());
 			assertObject(m_state, instancesIter->value);
 			for(auto instIter = instancesIter->value.MemberBegin(); instIter != instancesIter->value.MemberEnd(); ++instIter) {
 				StringView instName = instIter->name.GetString();
@@ -920,30 +882,29 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 				u32 frameStart, frameEnd;
 				world_get_frame_start(&frameStart);
 				world_get_frame_start(&frameEnd);
-				for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
-					InstanceHdl animInstHdl = world_get_instance(&instName[0u], frame);
-					if(animInstHdl == nullptr)
-						continue;
-					// Read LoD
-					if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
-						if(!scenario_set_instance_lod(scenarioHdl, animInstHdl, read<u32>(m_state, lodIter)))
-							throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
-					// Read masking information
-					if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
-					   && read<bool>(m_state, maskIter))
-						if(!scenario_mask_instance(scenarioHdl, animInstHdl))
-							throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
-				}
+				if(const auto instIter = instances.find(&instName[0u]); instIter != instances.end()) {
+					InstanceHdl instHdl = instIter->second.handle;
+					if(instHdl == nullptr)
+						throw std::runtime_error("Error retrieving instance handle from name");
+					for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
+						// Read LoD
+						if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
+							if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
+								throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
+						// Read masking information
+						if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
+						   && read<bool>(m_state, maskIter))
+							if(!scenario_mask_instance(scenarioHdl, instHdl))
+								throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
+					}
 
-				InstanceHdl instHdl = world_get_instance(&instName[0u], 0xFFFFFFFF);
-				if(instHdl != nullptr) {
 					// Read LoD
 					if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
 						if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
 							throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
 					// Read masking information
 					if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
-					   && read<bool>(m_state, maskIter))
+						&& read<bool>(m_state, maskIter))
 						if(!scenario_mask_instance(scenarioHdl, instHdl))
 							throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
 				}
@@ -956,6 +917,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		auto materialsIter = get(m_state, scenario, "materialAssignments");
 		m_state.objectNames.push_back(materialsIter->name.GetString());
 		assertObject(m_state, materialsIter->value);
+		scenario_reserve_material_slots(scenarioHdl, binMatNames.size());
 		for(const std::string& binName : binMatNames) {
 			if(m_abort)
 				return false;
@@ -977,7 +939,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames) {
 		m_state.objectNames.pop_back();
 
 		const char* sanityMsg = "";
-		if(!scenario_is_sane(scenarioHdl, &sanityMsg))
+		if(!world_finalize_scenario(scenarioHdl, &sanityMsg))
 			throw std::runtime_error("Scenario '" + std::string(scenarioIter->name.GetString())
 									 + "' did not pass sanity check: " + std::string(sanityMsg));
 		m_state.objectNames.pop_back();
@@ -1029,13 +991,14 @@ void JsonLoader::selective_replace_keys(const rapidjson::Value& objectToCopy, ra
 }
 
 
-bool JsonLoader::load_file() {
+bool JsonLoader::load_file(fs::path& binaryFile) {
 	using namespace rapidjson;
-	auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_file");
+	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_file");
 
 	this->clear_state();
 	logInfo("[JsonLoader::load_file] Parsing scene file '", m_filePath.string(), "'");
 
+	sprintf(m_loadingStage.data(), "Loading JSON%c", '\0');
 	// JSON text
 	m_jsonString = read_file(m_filePath);
 
@@ -1048,29 +1011,31 @@ bool JsonLoader::load_file() {
 	// Parse our file specification
 	assertObject(m_state, document);
 	// Version
+	bool hasWorldToInstTrans = true;
 	auto versionIter = get(m_state, document, "version", false);
 	if(versionIter == document.MemberEnd()) {
 		logWarning("[JsonLoader::load_file] Scene file: no version specified (current one assumed)");
 	} else {
-		m_version = read<const char*>(m_state, versionIter);
-		if(m_version.compare(FILE_VERSION) != 0 && m_version.compare("1.0") != 0
-		   && m_version.compare("1.1") != 0 && m_version.compare("1.2"))
+		m_version = FileVersion{ read<const char*>(m_state, versionIter) };
+		if(m_version > CURRENT_FILE_VERSION)
 			logWarning("[JsonLoader::load_file] Scene file: version mismatch (",
-					   m_version, "(file) vs ", FILE_VERSION, "(current))");
+					   m_version, "(file) vs ", CURRENT_FILE_VERSION, "(current))");
+		hasWorldToInstTrans = m_version >= INVERTEX_TRANSMAT_FILE_VERSION;
+		m_absoluteCamNearFar = m_version >= ABSOLUTE_CAM_NEAR_FAR_FILE_VERSION;
 		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");
 	}
 	// Binary file path
-	m_binaryFile = read<const char*>(m_state, get(m_state, document, "binary"));
-	if(m_binaryFile.empty())
+	binaryFile = read<const char*>(m_state, get(m_state, document, "binary"));
+	if(binaryFile.empty())
 		throw std::runtime_error("Scene file has an empty binary file path");
-	logInfo("[JsonLoader::load_file] Detected binary file path '", m_binaryFile.string(), "'");
+	logInfo("[JsonLoader::load_file] Detected binary file path '", binaryFile.string(), "'");
 	// Make the file path absolute
-	if(m_binaryFile.is_relative())
-		m_binaryFile = fs::canonical(m_filePath.parent_path() / m_binaryFile);
-	if(!fs::exists(m_binaryFile)) {
+	if(binaryFile.is_relative())
+		binaryFile = fs::canonical(m_filePath.parent_path() / binaryFile);
+	if(!fs::exists(binaryFile)) {
 		logError("[JsonLoader::load_file] Scene file: specifies a binary file that doesn't exist ('",
-				 m_binaryFile.string(), "'");
-		throw std::runtime_error("Binary file '" + m_binaryFile.string() + "' does not exist");
+				 binaryFile.string(), "'");
+		throw std::runtime_error("Binary file '" + binaryFile.string() + "' does not exist");
 	}
 	// Tessellation level
 	const float initTessLevel = read_opt<float>(m_state, document, "initTessellationLevel", 0u);
@@ -1091,15 +1056,17 @@ bool JsonLoader::load_file() {
 	logInfo("[JsonLoader::load_file] Detected default scenario '", m_defaultScenario, "'");
 	const Value& defScen = get(m_state, m_scenarios->value, &m_defaultScenario[0u])->value;
 	const u32 defaultGlobalLod = read_opt<u32>(m_state, defScen, "lod", 0u);
-	logInfo("[JsonLoader::load_file] Detected global LoD '", m_defaultScenario, "'");
+	logInfo("[JsonLoader::load_file] Detected global LoD '", defaultGlobalLod, "'");
 
+	sprintf(m_loadingStage.data(), "Parsing object properties%c", '\0');
 	// First parse binary file
-	std::unordered_map<StringView, u32> defaultObjectLods;
-	std::unordered_map<StringView, u32> defaultInstanceLods;
+	util::FixedHashMap<StringView, u32> defaultObjectLods;
+	util::FixedHashMap<StringView, binary::InstanceMapping> defaultInstanceLods;
 	auto objPropsIter = get(m_state, defScen, "objectProperties", false);
 	if(objPropsIter != defScen.MemberEnd()) {
 		m_state.objectNames.push_back(&m_defaultScenario[0u]);
 		m_state.objectNames.push_back("objectProperties");
+		defaultObjectLods = util::FixedHashMap<StringView, u32>{ objPropsIter->value.MemberCount() };
 		for(auto propIter = objPropsIter->value.MemberBegin(); propIter != objPropsIter->value.MemberEnd(); ++propIter) {
 			// Read the object name
 			StringView objectName = propIter->name.GetString();
@@ -1109,38 +1076,38 @@ bool JsonLoader::load_file() {
 			if(auto lodIter = get(m_state, object, "lod", false); lodIter != object.MemberEnd()) {
 				const u32 localLod = read<u32>(m_state, lodIter);
 				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod, "' for object '", objectName, "'");
-				defaultObjectLods.insert({ objectName, localLod });
+				defaultObjectLods.insert(objectName, localLod);
 			}
 		}
 		m_state.objectNames.pop_back();
 		m_state.objectNames.pop_back();
 	}
+	sprintf(m_loadingStage.data(), "Parsing instance properties%c", '\0');
 	auto instPropsIter = get(m_state, defScen, "instanceProperties", false);
 	if(instPropsIter != defScen.MemberEnd()) {
 		m_state.objectNames.push_back(&m_defaultScenario[0u]);
 		m_state.objectNames.push_back("instanceProperties");
+		defaultInstanceLods = util::FixedHashMap<StringView, binary::InstanceMapping>{ instPropsIter->value.MemberCount() };
 		for(auto propIter = instPropsIter->value.MemberBegin(); propIter != instPropsIter->value.MemberEnd(); ++propIter) {
 			// Read the instance name
 			StringView instanceName = propIter->name.GetString();
 			m_state.objectNames.push_back(&instanceName[0u]);
 			const Value& instance = propIter->value;
 			assertObject(m_state, instance);
-			auto lodIter = get(m_state, instance, "lod", false);
-			if(lodIter != instance.MemberEnd()) {
-				const u32 localLod = read<u32>(m_state, lodIter);
-				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod, "' for object '", instanceName, "'");
-				defaultInstanceLods.insert({ instanceName, localLod });
-			}
+			const u32 localLod = read_opt<u32>(m_state, instance, "lod", defaultGlobalLod);
+			defaultInstanceLods.insert(instanceName, {  localLod, nullptr });
+
+			if(localLod != defaultGlobalLod)
+				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod,
+							"' for object '", instanceName, "'");
 		}
 		m_state.objectNames.pop_back();
 		m_state.objectNames.pop_back();
 	}
-	bool deinstance = false;
-	if(auto deinstanceIter = get(m_state, document, "deinstance", false); deinstanceIter != document.MemberEnd()) {
-		deinstance = deinstanceIter->value.GetBool();
-	}
+	const bool deinstance = read_opt<bool>(m_state, document, "deinstance", false);
 	// Load the binary file before we load the rest of the JSON
-	if(!m_binLoader.load_file(m_binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods, deinstance))
+	if(!m_binLoader.load_file(binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods,
+							  deinstance, hasWorldToInstTrans, !m_absoluteCamNearFar))
 		return false;
 
 	try {
@@ -1158,11 +1125,12 @@ bool JsonLoader::load_file() {
 			return false;
 		// Before we load scenarios, perform a sanity check for the currently loaded world
 		const char* sanityMsg = "";
-		if(!world_is_sane(&sanityMsg))
+		sprintf(m_loadingStage.data(), "Checking world sanity%c", '\0');
+		if(!world_finalize(&sanityMsg))
 			throw std::runtime_error("World did not pass sanity check: " + std::string(sanityMsg));
 		// Scenarios
 		m_state.current = ParserState::Level::ROOT;
-		if(!load_scenarios(m_binLoader.get_material_names()))
+		if(!load_scenarios(m_binLoader.get_material_names(), defaultInstanceLods))
 			return false;
 		// Load the default scenario
 		m_state.reset();
@@ -1170,11 +1138,13 @@ bool JsonLoader::load_file() {
 		if(defScenHdl == nullptr)
 			throw std::runtime_error("Cannot find the default scenario '" + std::string(m_defaultScenario) + "'");
 
-		auto scope = Profiler::instance().start<CpuProfileState>("JsonLoader::load_file - load default scenario", ProfileLevel::LOW);
+		sprintf(m_loadingStage.data(), "Loading initial scenario%c", '\0');
+		auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_file - load default scenario", ProfileLevel::LOW);
 		if(!world_load_scenario(defScenHdl))
 			throw std::runtime_error("Cannot load the default scenario '" + std::string(m_defaultScenario) + "'");
 		// Check if we should tessellate initially, indicated by a non-zero max. level
 		if(initTessLevel > 0.f) {
+			sprintf(m_loadingStage.data(), "Performing initial tessellation%c", '\0');
 			world_set_tessellation_level(initTessLevel);
 			scene_request_retessellation();
 		}

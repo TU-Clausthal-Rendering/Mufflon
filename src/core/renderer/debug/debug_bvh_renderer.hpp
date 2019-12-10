@@ -22,7 +22,8 @@ namespace mufflon::renderer {
 
 	private:
 		void init();
-		void upload_box_array(const scene::AccelDescriptor& accel, gl::Buffer& dstBoxBuffer, gl::Buffer& dstLevelBuffer, int& boxCount, int& maxLevel);
+		void upload_box_array(const scene::AccelDescriptor& accel, const ei::Box& aabb,
+							  gl::Buffer& dstBoxBuffer, gl::Buffer& dstLevelBuffer, int& boxCount, int& maxLevel);
 
 		DebugBvhParameters m_params = {};
 
@@ -62,7 +63,7 @@ namespace mufflon::renderer {
 		int m_minLevel = 0;
 		int m_maxLevel = 100;
 
-		// init tracking
-		bool m_isInit = false;
+		// Init tracking
+		//bool m_isInit = false;
 	};
 }
