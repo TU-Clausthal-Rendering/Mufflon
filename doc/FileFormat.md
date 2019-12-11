@@ -18,7 +18,7 @@ In the case of multiple type choices, details on further mandatory properties wi
 Note that the number of scenarios is limited to 32.
 
     {
-        "version": "1.5",
+        "version": "1.6",
         "binary": "<file name relative to this json>",
         "defaultScenario": "<scenario name (from json.scenarios)>"  // OPTIONAL the scenario to load on startup.
                                                    // If none is given, the chosen scenario is unspecified
@@ -288,6 +288,7 @@ Binary data is stored in little endian (native on x86_64).
 The high level structure is
 
     <MATERIALS_HEADER>
+    <ANIMATION>
     <OBJECTS>
     <INSTANCES>
 
@@ -345,15 +346,15 @@ LODs contain the real geometry. It must have sorted geometry, because attributes
             u32                 // Number of spheres S
             u32                 // Number of vertices V
             u32                 // Number of edges E
-            u32                 // Number of vertex attributes
-            u32                 // Number of face attributes (same for triangles and quads)
-            u32                 // Number of sphere attributes
+            u32                 // Number of vertex attributes VA
+            u32                 // Number of face attributes (same for triangles and quads) FA
+            u32                 // Number of sphere attributes SA
             <VERTEXDATA>'
-            <ATTRIBUTES>'       // Optional Vertex attributes
+            VA * <ATTRIBUTE>'   // Optional Vertex attributes
             <TRIANGLES>'
             <QUADS>'
             (T+Q)*u16'          // Material indices (<MATID> from <MATERIALS_HEADER>, in order: first triangles, then quads)
-            <ATTRIBUTES>'       // Optional list of face attributes (in order: first triangles, then quads)
+            FA * <ATTRIBUTE>'   // Optional list of face attributes (in order: first triangles, then quads)
             <SPHERES>'
     <VERTEXDATA> = V*3*f32      // Positions (vec3, in meter [m])
                    V*3*f32 | V*u32  // Normals (vec3, normalized)
@@ -364,19 +365,19 @@ LODs contain the real geometry. It must have sorted geometry, because attributes
     <QUADS> = Q*4*u32           // Indices of vertices (0-based, per LOD)
     <SPHERES> = S*4*f32         // Position (3 f32) and radius (1 f32) interleaved in meter [m]
                 S*u16           // Material indices (<MATID> from <MATERIALS_HEADER>)
-                <ATTRIBUTES>
+                SA * <ATTRIBUTE>
 
 The custom attributes can add additional information to triangles, quads and spheres.
 There might be attributes outside this specification. Therefore the syntax is very general.
 However, there is a specification for a few predefined possible attributes (with [] below).
 
-    <ATTRIBUTES> = u32 'Attr'   // Type check for this section
-                   <STRING>     // Name (Custom)
-                   <STRING>     // Meta information (Custom)
-                   u32          // Meta information (Custom flags)
-                   u32 <TYPE>   // Type information
-                   u64          // Size in bytes
-                   <BYTES>      // Size many bytes
+    <ATTRIBUTE> = u32 'Attr'   // Type check for this section
+                  <STRING>     // Name (Custom)
+                  <STRING>     // Meta information (Custom)
+                  u32          // Meta information (Custom flags)
+                  u32 <TYPE>   // Type information
+                  u64          // Size in bytes
+                  <BYTES>      // Size many bytes
     <TYPE> = i8 0
            | u8 1
            | i16 2
@@ -396,21 +397,25 @@ However, there is a specification for a few predefined possible attributes (with
            | 2*f32 16
            | 3*f32 17
            | 4*f32 18
+           | 4*u32 19
 
-    [AdditionalUV2D] = "AdditionalUV2D"
-                       "{Light, Displacement}"
+    [AdditionalUV2D] = "<CustomName>"
+                       "AdditionalUV2D"
                        0
-                       #Bytes to be interpreted as 2*f32 per vertex/face
-    [Color8] = "Color8"
-               "{RGBA, sRGB_A}"
+                       # Bytes to be interpreted as 2*f32 per vertex/face
+    [Color] = "<CustomName>"
+               "Color"
                0
-               #Bytes to be interpreted as 8-bit RGBA normalized uint tuples (in total 32 bit per element)
-    [Color32] = "Color32"
-                "{RGBA, sRGB_A}"
-                0
-                #Bytes to be interpreted as 32-bit RGBA float tuples (in total 128 bit per element)
+               # Type information and bytes which specify the linear color
+    [AnimationWeight] = "AnimationWeights"
+                        ""
+                        0
+                        19
+                        #Each u32 is interpreted as 10:22 bits for weight and bone index
+                        # weight = (x >> 22) / 1023.0f
+                        # boneIdx = x & 0x003fffff
 
-Finally, there are the instances.
+Then, there are the instances.
 Objects which are not instanced explicitly will have one instance with the identity transformation.
 Instances are required to be stored in the order of animation keyframe: first those with 0xffffffff
 (ie. not animated), then the instances for the globally first animation frame, then the second (if present)
@@ -425,6 +430,13 @@ and so on.
                  u32            // <InstID> of the previous object in an animation sequence or 0xffffffff
                  12*f32         // 3x4 inverse transformation matrix (rotation, scaling, translation; from world to instance!)
 
+Additional to full mesh copies for animation, there is also support for bones.
+
+    <ANIMATION> = u32 'Bone'    // Bone animations
+                  u32           // Number of bones B
+                  u32           // Number of keyframes K
+                  K*<KEYFRAME>  // Bone data which gets associated with vertices through indexing
+    <KEYFRAME> = B*8*f32        // Dual quaternion q0+qε for the object space transformation rest pose to keyframe pose
 
 Normal Compression
 --
