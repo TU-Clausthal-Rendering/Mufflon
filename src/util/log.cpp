@@ -38,8 +38,6 @@ namespace mufflon {
 
 	namespace details {
 
-		static std::vector<MessageHandlerFunc> s_msgHandlers;
-
 		void defaultHandler(LogSeverity _severity, const std::string& _message)
 		{
 			switch(_severity)
@@ -63,13 +61,13 @@ namespace mufflon {
 			}
 		}
 
+		MessageHandlerFunc s_msgHandler = &defaultHandler;
+
 		bool s_initialized = false; // assert s_notInitialized == false because static memory is 0
 		void logMessage(LogSeverity _severity, const std::string& _msg)
 		{
 			if(!s_initialized)
 			{
-				if(s_msgHandlers.empty())
-					s_msgHandlers.push_back(defaultHandler);
 #if defined(_WINDOWS) || defined(_WIN64) || defined(_WIN32)
 				HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
 				SetConsoleMode(hStdout, ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT);
@@ -77,26 +75,15 @@ namespace mufflon {
 #endif
 				s_initialized = true;
 			}
-			if(s_msgHandlers.empty())
-				defaultHandler(_severity, _msg);
-			for(auto it : s_msgHandlers)
-			{
-				it(_severity, _msg);
-			}
+
+			s_msgHandler(_severity, _msg);
 		}
 
 	} // namespace details
 
-	void registerMessageHandler(MessageHandlerFunc _func)
+	void setMessageHandler(MessageHandlerFunc _func)
 	{
-		details::s_msgHandlers.push_back(_func);
-	}
-
-	void disableStdHandler()
-	{
-		for(size_t i = 0; i < details::s_msgHandlers.size(); ++i)
-			if(details::s_msgHandlers[i] == details::defaultHandler)
-				details::s_msgHandlers.erase(details::s_msgHandlers.begin() + i);
+		details::s_msgHandler = _func;
 	}
 
 } // namespace mufflon

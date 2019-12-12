@@ -58,6 +58,8 @@ namespace gui.Model
         {
             if (!Core.core_set_log_level(severity))
                 throw new Exception(Core.core_get_dll_error());
+            if (!Loader.loader_set_log_level(severity))
+                throw new Exception(Loader.loader_get_dll_error());
             Logger.LogLevel = LogLevel;
         }
 

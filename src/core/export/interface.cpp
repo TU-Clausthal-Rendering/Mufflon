@@ -3980,8 +3980,7 @@ size_t profiling_get_used_gpu_memory() {
 Boolean mufflon_set_logger(void(*logCallback)(const char*, int)) {
 	TRY
 	if(s_logCallback == nullptr) {
-		registerMessageHandler(delegateLog);
-		disableStdHandler();
+		setMessageHandler(delegateLog);
 
 		s_logCallback = logCallback;
 		// Give the new logger a status report and set the plugin loggers

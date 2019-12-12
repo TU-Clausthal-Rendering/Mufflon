@@ -34,8 +34,53 @@ namespace {
 std::string s_lastError;
 std::atomic<json::JsonLoader*> s_jsonLoader = nullptr;
 fs::path s_binPath;
+static void(*s_logCallback)(const char*, int);
+
+// Function delegating the logger output to the applications handle, if applicable
+inline void delegateLog(LogSeverity severity, const std::string& message) {
+	TRY
+		if(s_logCallback != nullptr)
+			s_logCallback(message.c_str(), static_cast<int>(severity));
+	if(severity == LogSeverity::ERROR || severity == LogSeverity::FATAL_ERROR) {
+		s_lastError = message;
+	}
+	CATCH_ALL(;)
+}
 
 } // namespace
+
+Boolean loader_set_logger(void(*logCallback)(const char*, int)) {
+	TRY
+	if(s_logCallback == nullptr) {
+		setMessageHandler(delegateLog);
+		s_logCallback = logCallback;
+	}
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean loader_set_log_level(LogLevel level) {
+	switch(level) {
+		case LogLevel::LOG_PEDANTIC:
+			mufflon::s_logLevel = LogSeverity::PEDANTIC;
+			return true;
+		case LogLevel::LOG_INFO:
+			mufflon::s_logLevel = LogSeverity::INFO;
+			return true;
+		case LogLevel::LOG_WARNING:
+			mufflon::s_logLevel = LogSeverity::WARNING;
+			return true;
+		case LogLevel::LOG_ERROR:
+			mufflon::s_logLevel = LogSeverity::ERROR;
+			return true;
+		case LogLevel::LOG_FATAL_ERROR:
+			mufflon::s_logLevel = LogSeverity::FATAL_ERROR;
+			return true;
+		default:
+			logError("[", FUNCTION_NAME, "] Invalid log level");
+			return false;
+	}
+}
 
 const char* loader_get_dll_error() {
 	TRY

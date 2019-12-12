@@ -26,11 +26,7 @@ typedef void (*MessageHandlerFunc)(LogSeverity _severity, const std::string& _me
 	
 /// Add a function which is called for each occuring message.
 /// \details All message handler functions are called in order of insertion.
-void registerMessageHandler(MessageHandlerFunc _func);
-	
-/// Remove the default output to std::cerr. If a message is send when no handler
-/// is registered, the default handler is enabled again.
-void disableStdHandler();
+void setMessageHandler(MessageHandlerFunc _func);
 	
 namespace details {
 
