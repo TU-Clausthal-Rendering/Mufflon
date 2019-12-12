@@ -9,6 +9,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release"
     "MinSizeRel" "RelWithDebInfo")
 endif()
+
 # Discourage in-source builds
 if("${PROJECT_SOURCE_DIR}" STREQUAL "${PROJECT_BINARY_DIR}")
    message(WARNING "In-source building is discouraged!")
@@ -53,15 +54,9 @@ if(MSVC)
 endif()
 
 # Ensure that our binaries get put in the proper directory
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/$<CONFIG>")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/$<CONFIG>")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/$<CONFIG>")
 
 # For Linux and MacOS systems we have to set the rpath of the resulting shared libs
 set(CMAKE_MACOSX_RPATH 1)
@@ -223,8 +218,8 @@ target_include_directories(core
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/cub
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/epsilon/include
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/glad
-		${CMAKE_CURRENT_SOURCE_DIR}/external/OpenMesh-8.0/$<CONFIG>/include
-		${CMAKE_CURRENT_SOURCE_DIR}/external/oidn-0.9/$<CONFIG>/include
+		${CMAKE_CURRENT_SOURCE_DIR}/external/OpenMesh-8.0/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/include
+		${CMAKE_CURRENT_SOURCE_DIR}/external/oidn-0.9/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/include
 )
 target_include_directories(gliloader
 	PRIVATE
@@ -242,7 +237,7 @@ target_include_directories(mffloader
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/chinoise/include
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/epsilon/include
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/miniz
-		${CMAKE_CURRENT_SOURCE_DIR}/external/rapidjson-1.1.0/$<CONFIG>/include
+		${CMAKE_CURRENT_SOURCE_DIR}/external/rapidjson-1.1.0/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/include
 		${CMAKE_CURRENT_SOURCE_DIR}/src/core/export
 )
 target_include_directories(pfmloader
@@ -342,89 +337,89 @@ set(MUFFLON_TBB_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/external/tbb-2019.9")
 if(MSVC)
 	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/bin/OpenMeshCored.dll")
 	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshCore.dll")
+	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshCore.dll")
+	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshCore.dll")
 	set_target_properties(openmesh_core PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/OpenMeshCored.lib")
 	set_target_properties(openmesh_core PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshCore.lib")
+	set_target_properties(openmesh_core PROPERTIES IMPORTED_IMPLIB_RELWITHDEBINFO "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshCore.lib")
+	set_target_properties(openmesh_core PROPERTIES IMPORTED_IMPLIB_MINSIZEREL "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshCore.lib")
 	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/bin/OpenMeshToolsd.dll")
 	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshTools.dll")
+	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshTools.dll")
+	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshTools.dll")
 	set_target_properties(openmesh_tools PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/OpenMeshToolsd.lib")
 	set_target_properties(openmesh_tools PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshTools.lib")
+	set_target_properties(openmesh_tools PROPERTIES IMPORTED_IMPLIB_RELWITHDEBINFO "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshTools.lib")
+	set_target_properties(openmesh_tools PROPERTIES IMPORTED_IMPLIB_MINSIZEREL "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshTools.lib")
 	install(FILES
-			"${MUFFLON_OPENMESH_DIRECTORY}/Debug/bin/OpenMeshCored.dll"
-			"${MUFFLON_OPENMESH_DIRECTORY}/Debug/bin/OpenMeshToolsd.dll"
+			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenMeshCore$<$<CONFIG:Debug>:d>.dll"
+			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenMeshTools$<$<CONFIG:Debug>:d>.dll"
 		DESTINATION "."
-		CONFIGURATIONS Debug
-	)
-	install(FILES
-			"${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshCore.dll"
-			"${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshTools.dll"
-		DESTINATION "."
-		CONFIGURATIONS Release
 	)
 	if(MUFFLON_ENABLE_OPEN_DENOISE)
 		set_target_properties(opendenoise PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/lib/OpenImageDenoise.lib")
 		set_target_properties(opendenoise PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/OpenImageDenoise.lib")
+		set_target_properties(opendenoise PROPERTIES IMPORTED_IMPLIB_RELWITHDEBINFO "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/OpenImageDenoise.lib")
+		set_target_properties(opendenoise PROPERTIES IMPORTED_IMPLIB_MINSIZEREL "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/OpenImageDenoise.lib")
 		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/bin/OpenImageDenoise.dll")
 		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/bin/OpenImageDenoise.dll")
+		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/bin/OpenImageDenoise.dll")
+		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/bin/OpenImageDenoise.dll")
 		set_target_properties(tbb PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_TBB_DIRECTORY}/Debug/lib/tbb.lib")
 		set_target_properties(tbb PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_TBB_DIRECTORY}/Release/lib/tbb.lib")
+		set_target_properties(tbb PROPERTIES IMPORTED_IMPLIB_RELWITHDEBINFO "${MUFFLON_TBB_DIRECTORY}/Release/lib/tbb.lib")
+		set_target_properties(tbb PROPERTIES IMPORTED_IMPLIB_MINSIZEREL "${MUFFLON_TBB_DIRECTORY}/Release/lib/tbb.lib")
 		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_TBB_DIRECTORY}/Debug/bin/tbb.dll")
 		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_TBB_DIRECTORY}/Release/bin/tbb.dll")
+		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_TBB_DIRECTORY}/Release/bin/tbb.dll")
+		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_TBB_DIRECTORY}/Release/bin/tbb.dll")
 		set_target_properties(tbbmalloc PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_TBB_DIRECTORY}/Debug/lib/tbbmalloc.lib")
 		set_target_properties(tbbmalloc PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_TBB_DIRECTORY}/Release/lib/tbbmalloc.lib")
+		set_target_properties(tbbmalloc PROPERTIES IMPORTED_IMPLIB_RELWITHDEBINFO "${MUFFLON_TBB_DIRECTORY}/Release/lib/tbbmalloc.lib")
+		set_target_properties(tbbmalloc PROPERTIES IMPORTED_IMPLIB_MINSIZEREL "${MUFFLON_TBB_DIRECTORY}/Release/lib/tbbmalloc.lib")
 		set_target_properties(tbbmalloc PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_TBB_DIRECTORY}/Debug/bin/tbbmalloc.dll")
 		set_target_properties(tbbmalloc PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_TBB_DIRECTORY}/Release/bin/tbbmalloc.dll")
+		set_target_properties(tbbmalloc PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_TBB_DIRECTORY}/Release/bin/tbbmalloc.dll")
+		set_target_properties(tbbmalloc PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_TBB_DIRECTORY}/Release/bin/tbbmalloc.dll")
 		install(FILES
-				"${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/bin/OpenImageDenoise.dll"
-				"${MUFFLON_TBB_DIRECTORY}/Debug/bin/tbb.dll"
-				"${MUFFLON_TBB_DIRECTORY}/Debug/bin/tbbmalloc.dll"
+				"${MUFFLON_OPENDENOISE_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenImageDenoise.dll"
+				"${MUFFLON_TBB_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/tbb.dll"
+				"${MUFFLON_TBB_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/tbbmalloc.dll"
 			DESTINATION "."
-			CONFIGURATIONS Debug
-		)
-		install(FILES
-				"${MUFFLON_OPENDENOISE_DIRECTORY}/Release/bin/OpenImageDenoise.dll"
-				"${MUFFLON_TBB_DIRECTORY}/Release/bin/tbb.dll"
-				"${MUFFLON_TBB_DIRECTORY}/Release/bin/tbbmalloc.dll"
-			DESTINATION "."
-			CONFIGURATIONS Release
 		)
 	endif()
 else(MSVC)
 	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/libOpenMeshCored.so.8.0")
 	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshCore.so.8.0")
+	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshCore.so.8.0")
+	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshCore.so.8.0")
 	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/libOpenMeshToolsd.so.8.0")
 	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshTools.so.8.0")
+	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshTools.so.8.0")
+	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshTools.so.8.0")
 	install(FILES
-			"${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/libOpenMeshCored.so.8.0"
-			"${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/libOpenMeshToolsd.so.8.0"
+			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libOpenMeshCore$<$<CONFIG:Debug>:d>.so.8.0"
+			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libOpenMeshTools$<$<CONFIG:Debug>:d>.so.8.0"
 		DESTINATION "."
-		CONFIGURATIONS Debug
-	)
-	install(FILES
-			"${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshCore.so.8.0"
-			"${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshTools.so.8.0"
-		DESTINATION "."
-		CONFIGURATIONS Release
 	)
 	if(MUFFLON_ENABLE_OPEN_DENOISE)
 		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/lib/libOpenImageDenoise.so.0")
 		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/libOpenImageDenoise.so.0")
+		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/libOpenImageDenoise.so.0")
+		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/libOpenImageDenoise.so.0")
 		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_TBB_DIRECTORY}/Debug/lib/libtbb.so.2")
-		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_TBB_DIRECTORY}/Release/lib/libtbb.so.2")
+		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_TBB_DIRECTORY}/Debug/Release/libtbb.so.2")
+		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_TBB_DIRECTORY}/Debug/Release/libtbb.so.2")
+		set_target_properties(tbb PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_TBB_DIRECTORY}/Debug/Release/libtbb.so.2")
 		set_target_properties(tbbmalloc PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_TBB_DIRECTORY}/Debug/lib/libtbbmalloc.so.2")
 		set_target_properties(tbbmalloc PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_TBB_DIRECTORY}/Release/lib/libtbbmalloc.so.2")
+		set_target_properties(tbbmalloc PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_TBB_DIRECTORY}/Release/lib/libtbbmalloc.so.2")
+		set_target_properties(tbbmalloc PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_TBB_DIRECTORY}/Release/lib/libtbbmalloc.so.2")
 		install(FILES
-				"${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/lib/libOpenImageDenoise.so.0"
-				"${MUFFLON_TBB_DIRECTORY}/Debug/lib/libtbb.so.2"
-				"${MUFFLON_TBB_DIRECTORY}/Debug/lib/libtbbmalloc.so.2"
+				"${MUFFLON_OPENDENOISE_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libOpenImageDenoise.so.0"
+				"${MUFFLON_TBB_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libtbb.so.2"
+				"${MUFFLON_TBB_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libtbbmalloc.so.2"
 			DESTINATION "."
-			CONFIGURATIONS Debug
-		)
-		install(FILES
-				"${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/libOpenImageDenoise.so.0"
-				"${MUFFLON_TBB_DIRECTORY}/Release/lib/libtbb.so.2"
-				"${MUFFLON_TBB_DIRECTORY}/Release/lib/libtbbmalloc.so.2"
-			DESTINATION "."
-			CONFIGURATIONS Release
 		)
 	endif()
 endif()
@@ -530,38 +525,10 @@ if(OpenMP_CXX_FOUND)
 endif()
 
 # Set output targets for plugins
-set_target_properties(gliloader PROPERTIES
-	ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/plugins"
-	ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug/plugins"
-	ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release/plugins"
-	LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/plugins"
-	LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug/plugins"
-	LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release/plugins"
-	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/plugins"
-	RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug/plugins"
-	RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release/plugins"
-)
-set_target_properties(pfmloader PROPERTIES
-	ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/plugins"
-	ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug/plugins"
-	ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release/plugins"
-	LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/plugins"
-	LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug/plugins"
-	LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release/plugins"
-	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/plugins"
-	RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug/plugins"
-	RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release/plugins"
-)
-set_target_properties(stbiloader PROPERTIES
-	ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/plugins"
-	ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug/plugins"
-	ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release/plugins"
-	LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/plugins"
-	LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug/plugins"
-	LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release/plugins"
-	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/plugins"
-	RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/build/Debug/plugins"
-	RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/build/Release/plugins"
+set_target_properties(gliloader pfmloader stbiloader PROPERTIES
+	ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/$<CONFIG>/plugins"
+	LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/$<CONFIG>/plugins"
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/$<CONFIG>/plugins"
 )
 
 # Add python bindings as custom target and install thempython bindings
@@ -591,33 +558,33 @@ endforeach()
 if(WIN32)
 	add_custom_command(TARGET core PRE_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"${MUFFLON_OPENMESH_DIRECTORY}/$<CONFIG>/bin/OpenMeshCore$<$<CONFIG:Debug>:d>.dll"
-			"${MUFFLON_OPENMESH_DIRECTORY}/$<CONFIG>/bin/OpenMeshTools$<$<CONFIG:Debug>:d>.dll"
-			"${MUFFLON_OPENDENOISE_DIRECTORY}/$<CONFIG>/bin/OpenImageDenoise.dll"
+			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenMeshCore$<$<CONFIG:Debug>:d>.dll"
+			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenMeshTools$<$<CONFIG:Debug>:d>.dll"
+			"${MUFFLON_OPENDENOISE_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenImageDenoise.dll"
 			"${CMAKE_BINARY_DIR}/build/$<CONFIG>"
 	)
 	if(MUFFLON_ENABLE_OPEN_DENOISE)
 		add_custom_command(TARGET core PRE_BUILD
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${MUFFLON_OPENDENOISE_DIRECTORY}/$<CONFIG>/bin/OpenImageDenoise.dll"
-				"${MUFFLON_TBB_DIRECTORY}/$<CONFIG>/bin/tbb.dll"
-				"${MUFFLON_TBB_DIRECTORY}/$<CONFIG>/bin/tbbmalloc.dll"
+				"${MUFFLON_OPENDENOISE_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenImageDenoise.dll"
+				"${MUFFLON_TBB_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/tbb.dll"
+				"${MUFFLON_TBB_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/tbbmalloc.dll"
 				"${CMAKE_BINARY_DIR}/build/$<CONFIG>"
 		)
 	endif()
 else()
 	add_custom_command(TARGET core PRE_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"${MUFFLON_OPENMESH_DIRECTORY}/$<CONFIG>/lib/libOpenMeshCore$<$<CONFIG:Debug>:d>.so.8.0"
-			"${MUFFLON_OPENMESH_DIRECTORY}/$<CONFIG>/lib/libOpenMeshTools$<$<CONFIG:Debug>:d>.so.8.0"
+			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libOpenMeshCore$<$<CONFIG:Debug>:d>.so.8.0"
+			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libOpenMeshTools$<$<CONFIG:Debug>:d>.so.8.0"
 			"${CMAKE_BINARY_DIR}/build/$<CONFIG>"
 	)
 	if(MUFFLON_ENABLE_OPEN_DENOISE)
 		add_custom_command(TARGET core PRE_BUILD
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
 				"${MUFFLON_OPENDENOISE_DIRECTORY}/$<CONFIG>/lib/libOpenImageDenoise.so.0"
-				"${MUFFLON_TBB_DIRECTORY}/$<CONFIG>/lib/libtbb.so.2"
-				"${MUFFLON_TBB_DIRECTORY}/$<CONFIG>/lib/libtbbmalloc.so.2"
+				"${MUFFLON_TBB_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libtbb.so.2"
+				"${MUFFLON_TBB_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libtbbmalloc.so.2"
 				"${CMAKE_BINARY_DIR}/build/$<CONFIG>"
 		)
 	endif()
