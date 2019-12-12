@@ -11,17 +11,9 @@
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <StackPanel Grid.Column="0"
-                    VerticalAlignment="Center"
-                    Orientation="Horizontal">
-            <TextBlock Text="Start: "/>
-            <TextBlock MinWidth="30"
-                       Text="{Binding Start, Mode=OneWay}"/>
-        </StackPanel>
-        <StackPanel Grid.Column="1"
                     VerticalAlignment="Center"
                     Orientation="Horizontal">
             <Slider Width="100"
@@ -35,12 +27,12 @@
                                  Text="{Binding Current, Mode=TwoWay}"
                                  Margin="{StaticResource LeftPropertyMargin}"/>
         </StackPanel>
-        <StackPanel Grid.Column="2"
+        <StackPanel Grid.Column="1"
                     VerticalAlignment="Center"
                     Orientation="Horizontal">
-            <TextBlock Text="End: "/>
+            <TextBlock Text="Count: "/>
             <TextBlock MinWidth="30"
-                       Text="{Binding End, Mode=OneWay}"/>
+                       Text="{Binding Count, Mode=OneWay}"/>
         </StackPanel>
     </Grid>
 </UserControl>

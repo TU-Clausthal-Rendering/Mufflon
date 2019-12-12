@@ -129,9 +129,9 @@ bool SceneExporter::save_cameras(rapidjson::Document& document) const {
 	cameras.SetObject();
 	size_t cameraCount = world_get_camera_count();
 
-	std::uint32_t frameStart, frameEnd;
-	if(!world_get_frame_start(&frameStart) || !world_get_frame_end(&frameEnd))
-		throw std::runtime_error("Failed to acquire animation start and end frames");
+	std::uint32_t frameCount;
+	if(!world_get_frame_count(&frameCount))
+		throw std::runtime_error("Failed to acquire animation frame count.");
 
 	for(size_t i = 0; i < cameraCount; i++) {
 		rapidjson::Value camera;
@@ -175,15 +175,15 @@ bool SceneExporter::save_cameras(rapidjson::Document& document) const {
 		// Export the paths (possibly animated)
 		bool animated = false;
 		std::vector<Vec3> positions, directions, ups;
-		for(std::uint32_t frame = frameStart; frame <= frameEnd; ++frame) {
+		for(std::uint32_t frame = 0; frame < frameCount; ++frame) {
 			Vec3 position;
-			world_get_camera_position(cameraHandle, &position, frame - frameStart);
+			world_get_camera_position(cameraHandle, &position, frame);
 
 			Vec3 viewDirection;
-			world_get_camera_direction(cameraHandle, &viewDirection, frame - frameStart);
+			world_get_camera_direction(cameraHandle, &viewDirection, frame);
 
 			Vec3 upDirection;
-			world_get_camera_direction(cameraHandle, &upDirection, frame - frameStart);
+			world_get_camera_direction(cameraHandle, &upDirection, frame);
 
 			// Check if there are differences
 			if(!animated && positions.size() > 1u && (positions.back() != position
@@ -196,20 +196,20 @@ bool SceneExporter::save_cameras(rapidjson::Document& document) const {
 		}
 
 		// If we're not animated only export one frame
-		for(std::uint32_t frame = frameStart; frame <= (animated ? frameEnd : frameStart); ++frame) {
+		for(std::uint32_t frame = 0; frame < (animated ? frameCount : 1); ++frame) {
 			rapidjson::Value positionPath;
 			positionPath.SetArray();
-			positionPath.PushBack(store_in_array(positions[frame - frameStart], document), document.GetAllocator());
+			positionPath.PushBack(store_in_array(positions[frame], document), document.GetAllocator());
 			camera.AddMember("path", positionPath, document.GetAllocator());
 
 			rapidjson::Value  viewDirectionPath;
 			viewDirectionPath.SetArray();
-			viewDirectionPath.PushBack(store_in_array(directions[frame - frameStart], document), document.GetAllocator());
+			viewDirectionPath.PushBack(store_in_array(directions[frame], document), document.GetAllocator());
 			camera.AddMember("viewDir", viewDirectionPath, document.GetAllocator());
 
 			rapidjson::Value upDirectionPath;
 			upDirectionPath.SetArray();
-			upDirectionPath.PushBack(store_in_array(ups[frame - frameStart], document), document.GetAllocator());
+			upDirectionPath.PushBack(store_in_array(ups[frame], document), document.GetAllocator());
 			camera.AddMember("up", upDirectionPath, document.GetAllocator());
 		}
 

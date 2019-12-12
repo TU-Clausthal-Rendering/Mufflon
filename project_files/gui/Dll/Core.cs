@@ -273,9 +273,7 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool world_get_frame_current(out uint frame);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_frame_start(out uint frame);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool world_get_frame_end(out uint frame);
+        internal static extern bool world_get_frame_count(out uint frame);
 
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl)]
         internal static extern bool scenario_set_camera(IntPtr scenario, IntPtr cam);

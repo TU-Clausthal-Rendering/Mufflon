@@ -295,7 +295,7 @@ The high level structure is
 The <MATERIALS_HEADER> maps integer indices to the "binary-names" which are used as a link in the JSON file:
 
     <MATERIALS_HEADER> = u32 'Mats' // Type check for this section
-                         u64        // absolute start position of next section (<OBJECTS>)
+                         u64        // absolute start position of next section (<OBJECTS> < v1.6 or <ANIMATION> >= 1.6)
                          u32        // Number of materials M
                          M*<STRING> // M strings, the index of the string in this array is the <MATID> (0-based)
 
@@ -329,7 +329,7 @@ Since the same pattern is used for LOD inside objects, their is a generic specif
     <OBJECT> = u32 'Obj_'       // Type check for this section
                <STRING>         // The name, used as <object name (from binary)> in the above JSON specification
                u32 <OFLAGS>     // Object specific flags
-               u32              // Keyframe of the object if animated or 0xffffffff
+               u32              // Keyframe of the object if animated or 0xffffffff (0-based)
                u32              // <OBJID> of the previous object in an animation sequence or 0xffffffff
                3*f32            // Bounding box min for the object (in object space)
                3*f32            // Bounding box max for the object (in object space)
@@ -426,13 +426,14 @@ and so on.
                   I*<INSTANCE>
     <INSTANCE> = <STRING>       // Name (Custom, unique) used as <instance name (from binary)> in the json
                  u32            // <OBJID> (0-based index of the object in the <OBJECTS> section)
-                 u32            // Keyframe of the instance if animated or 0xffffffff
+                 u32            // Keyframe of the instance if animated or 0xffffffff (0-based)
                  u32            // <InstID> of the previous object in an animation sequence or 0xffffffff
                  12*f32         // 3x4 inverse transformation matrix (rotation, scaling, translation; from world to instance!)
 
 Additional to full mesh copies for animation, there is also support for bones.
 
     <ANIMATION> = u32 'Bone'    // Bone animations
+                  u64           // Absolute start position of the next section (<OBJECTS>)
                   u32           // Number of bones B
                   u32           // Number of keyframes K
                   K*<KEYFRAME>  // Bone data which gets associated with vertices through indexing

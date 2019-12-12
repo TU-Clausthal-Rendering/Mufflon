@@ -59,6 +59,7 @@ private:
 	static constexpr mufflon::u32 INSTANCE_MAGIC = 'I' | ('n' << 8u) | ('s' << 16u) | ('t' << 24u);
 	static constexpr mufflon::u32 LOD_MAGIC = 'L' | ('O' << 8u) | ('D' << 16u) | ('_' << 24u);
 	static constexpr mufflon::u32 ATTRIBUTE_MAGIC = 'A' | ('t' << 8u) | ('t' << 16u) | ('r' << 24u);
+	static constexpr mufflon::u32 BONE_ANIMATION_MAGIC = 'B' | ('o' << 8u) | ('n' << 16u) | ('e' << 24u);
 
 	// RAII wrapper around C file descriptor
 	class FileDescriptor {
@@ -207,6 +208,7 @@ private:
 	void deinstance();
 	void read_object();
 	mufflon::u32 read_lod(const ObjectState& object, mufflon::u32 lod);
+	void read_bone_animation_data();
 
 	fs::path m_filePath;
 	// Parser state

@@ -26,7 +26,7 @@ void WorldContainer::clear_instance() {
 }
 
 bool WorldContainer::set_frame_current(const u32 frameCurrent) {
-	const u32 newFrame = std::min(m_frameEnd, std::max(m_frameStart, frameCurrent));
+	const u32 newFrame = ei::clamp(frameCurrent, 0u, m_frameCount-1);
 	if(newFrame != m_frameCurrent) {
 		m_frameCurrent = newFrame;
 		// Delete the current scene to make it clear to everyone that it needs to be refetched
@@ -138,6 +138,14 @@ void WorldContainer::reserve(const u32 scenarios) {
 	m_scenarios = util::FixedHashMap<StringView, Scenario>{ scenarios };
 }
 
+void WorldContainer::reserve_animation(const u32 numBones, const u32 frameCount) {
+	if(m_animationData.size() > 0u)
+		throw std::runtime_error("This method may only be called on a clean, non-animated world state!");
+	m_animationData.resize(numBones * frameCount);
+	m_numBones = numBones;
+	m_frameCount = ei::max(frameCount, m_frameCount);
+}
+
 ObjectHandle WorldContainer::create_object(const StringView name, ObjectFlags flags) {
 	const auto pooledName = m_namePool.insert(name);
 	if(m_objects.find(pooledName) != m_objects.cend())
@@ -146,6 +154,14 @@ ObjectHandle WorldContainer::create_object(const StringView name, ObjectFlags fl
 	hdl.set_name(pooledName);
 	hdl.set_flags(flags);
 	return &hdl;
+}
+
+void WorldContainer::set_bone(u32 boneIndex, u32 keyframe, const ei::DualQuaternion& transformation) {
+	if(boneIndex > m_numBones)
+		throw std::runtime_error(std::string("Cannot set bone ") + std::to_string(boneIndex) + ", only " + std::to_string(m_numBones) + " were reserved.");
+	if(keyframe > m_frameCount)
+		throw std::runtime_error(std::string("Keyframe index ") + std::to_string(keyframe) + " too large, only " + std::to_string(m_frameCount) + " were reserved.");
+	m_animationData[keyframe * m_numBones + boneIndex] = Bone{ transformation };
 }
 
 ObjectHandle WorldContainer::get_object(const StringView name) {
@@ -200,21 +216,14 @@ InstanceHandle WorldContainer::create_instance(ObjectHandle obj, const u32 anima
 		if(!m_frameInstanceIndices.empty())
 			throw std::runtime_error("Non-animated instances must be added before animated ones!");
 	} else {
-		// Check if it's the first instance ever and set start+end frames accordingly
-		if(m_frameInstanceIndices.size() == 0u) {
-			m_frameCurrent = animationFrame;
-			m_frameStart = animationFrame;
-			m_frameEnd = animationFrame;
-		} else {
-			m_frameStart = std::min(m_frameStart, animationFrame);
-			m_frameEnd = std::max(m_frameEnd, animationFrame);
-		}
-		const auto index = animationFrame - m_frameStart;
+		// For downward compatible reasons we have to count frames.
+		// If explicitly allocated it should never change.
+		m_frameCount = std::max(m_frameCount, animationFrame+1);
 		// Check for out-of-order insert
-		if(m_frameInstanceIndices.size() == index) {
+		if(m_frameInstanceIndices.size() == animationFrame) {
 			// New frame added
 			m_frameInstanceIndices.emplace_back(static_cast<u32>(m_instances.size()), 1u);
-		} else if(m_frameInstanceIndices.size() == (index + 1u)) {
+		} else if(m_frameInstanceIndices.size() == (animationFrame + 1u)) {
 			// Additional instance for current frame
 			++m_frameInstanceIndices.back().second;
 		} else {
@@ -351,7 +360,7 @@ CameraHandle WorldContainer::add_camera(const StringView name, std::unique_ptr<c
 		return nullptr;
 	iter.first->second->set_name(pooledName);
 	m_cameraHandles.push_back(iter.first);
-	m_frameEnd = std::max(m_frameEnd, m_frameStart + iter.first->second->get_path_segment_count() - 1u);
+	m_frameCount = std::max(m_frameCount, iter.first->second->get_path_segment_count());
 	return iter.first->second.get();
 }
 
@@ -385,40 +394,47 @@ CameraHandle WorldContainer::get_camera(std::size_t index) {
 	return m_cameraHandles[index]->second.get();
 }
 
+const Bone* WorldContainer::get_current_keyframe() const noexcept {
+	return m_animationData.data() + m_frameCurrent * m_numBones;
+}
+
+const Bone* WorldContainer::get_keyframe(u32 frame) const {
+	if(frame >= m_frameCount)
+		throw std::runtime_error("[WorldContainer::get_keyframe] invalid frame index!");
+	return m_animationData.data() + frame * m_numBones;
+}
+
 std::optional<u32> WorldContainer::add_light(std::string name, const lights::PointLight& light,
-											 const u32 count) {
+											 const u32 frameCount) {
 	if(m_pointLights.find(name) != nullptr) {
 		logError("[WorldContainer::add_light] Point light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	if(m_frameStart + count > m_frameEnd + 1u)
-		m_frameEnd = m_frameStart + count - 1u;
-	return m_pointLights.insert(std::move(name), std::vector<lights::PointLight>(count, light));
+	m_frameCount = ei::max(frameCount, m_frameCount);
+	return m_pointLights.insert(std::move(name), std::vector<lights::PointLight>(frameCount, light));
 }
 
 std::optional<u32> WorldContainer::add_light(std::string name,
 											 const lights::SpotLight& light,
-											 const u32 count) {
+											 const u32 frameCount) {
 	if(m_spotLights.find(name) != nullptr) {
 		logError("[WorldContainer::add_light] Spot light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	if(m_frameStart + count > m_frameEnd + 1u)
-		m_frameEnd = m_frameStart + count - 1u;
-	return m_spotLights.insert(std::move(name), std::vector<lights::SpotLight>(count, light));
+	m_frameCount = ei::max(frameCount, m_frameCount);
+	return m_spotLights.insert(std::move(name), std::vector<lights::SpotLight>(frameCount, light));
 
 }
 
 std::optional<u32> WorldContainer::add_light(std::string name,
 											 const lights::DirectionalLight& light,
-											 const u32 count) {
+											 const u32 frameCount) {
 	if(m_dirLights.find(name) != nullptr) {
 		logError("[WorldContainer::add_light] Directional light with name '", name, "' already exists");
 		return std::nullopt;
 	}
-	if(m_frameStart + count > m_frameEnd + 1u)
-		m_frameEnd = m_frameStart + count - 1u;
-	return m_dirLights.insert(std::move(name), std::vector<lights::DirectionalLight>(count, light));
+	m_frameCount = ei::max(frameCount, m_frameCount);
+	return m_dirLights.insert(std::move(name), std::vector<lights::DirectionalLight>(frameCount, light));
 }
 
 std::optional<u32> WorldContainer::add_light(std::string name,
@@ -635,11 +651,12 @@ bool WorldContainer::mark_light_dirty(u32 index, lights::LightType type) {
 	return false;
 }
 
-u32 WorldContainer::get_frame_start() const noexcept {
-	return m_frameStart;
+u32 WorldContainer::get_num_bones() const noexcept {
+	return m_numBones;
 }
-u32 WorldContainer::get_frame_end() const noexcept {
-	return m_frameEnd;
+
+u32 WorldContainer::get_frame_count() const noexcept {
+	return m_frameCount;
 }
 u32 WorldContainer::get_frame_current() const noexcept {
 	return m_frameCurrent;
@@ -716,10 +733,9 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		renderer->on_scenario_changing();
 	m_scenario = &scenario;
 
-	const auto frameIndex = m_frameCurrent - m_frameStart;
-	const bool hasAnimatedInsts = m_frameInstanceIndices.size() > frameIndex;
-	const u32 animatedInstCount = hasAnimatedInsts ? m_frameInstanceIndices[frameIndex].second : 0u;
-	const u32 animatedInstOffset = hasAnimatedInsts ? m_frameInstanceIndices[frameIndex].first : 0u;
+	const bool hasAnimatedInsts = m_frameInstanceIndices.size() > m_frameCurrent;
+	const u32 animatedInstCount = hasAnimatedInsts ? m_frameInstanceIndices[m_frameCurrent].second : 0u;
+	const u32 animatedInstOffset = hasAnimatedInsts ? m_frameInstanceIndices[m_frameCurrent].first : 0u;
 	const std::size_t regInstCount = m_frameInstanceIndices.empty() ? m_instances.size() : m_frameInstanceIndices.front().first;
 
 	// We need a dictionary of all instances for a given object participating in the scene
@@ -830,7 +846,7 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 	for(const auto& box : threadAabbs)
 		aabb = ei::Box{ aabb, box };
 
-	m_scene = std::make_unique<Scene>(scenario, m_frameCurrent - m_frameStart,
+	m_scene = std::make_unique<Scene>(scenario, m_frameCurrent,
 									  std::move(objInstRef), std::move(instanceHandles),
 									  m_worldToInstanceTrans, aabb);
 
@@ -996,7 +1012,7 @@ bool WorldContainer::load_scene_lights() {
 			mAssert(lightIndex < m_pointLights.size());
 			const auto& light = m_pointLights.get(lightIndex);
 			posLights.push_back(lights::PositionalLights{
-				light[std::min(m_frameCurrent - m_frameStart, static_cast<u32>(light.size()) - 1u)],
+				light[std::min(m_frameCurrent, static_cast<u32>(light.size()) - 1u)],
 				PrimitiveHandle{}
 			});
 		}
@@ -1004,14 +1020,14 @@ bool WorldContainer::load_scene_lights() {
 			mAssert(lightIndex < m_spotLights.size());
 			const auto& light = m_spotLights.get(lightIndex);
 			posLights.push_back(lights::PositionalLights{
-				light[std::min(m_frameCurrent - m_frameStart, static_cast<u32>(light.size()) - 1u)],
+				light[std::min(m_frameCurrent, static_cast<u32>(light.size()) - 1u)],
 				PrimitiveHandle{}
 			});
 		}
 		for(u32 lightIndex : m_scenario->get_dir_lights()) {
 			mAssert(lightIndex < m_dirLights.size());
 			const auto& light = m_dirLights.get(lightIndex);
-			dirLights.push_back(light[std::min(m_frameCurrent - m_frameStart, static_cast<u32>(light.size()) - 1u)]);
+			dirLights.push_back(light[std::min(m_frameCurrent, static_cast<u32>(light.size()) - 1u)]);
 		}
 
 		m_scene->set_lights(std::move(posLights), std::move(dirLights));

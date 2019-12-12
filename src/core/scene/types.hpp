@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "util/types.hpp"
+#include <ei/dualquaternion.hpp>
 
 namespace mufflon { namespace scene {
 
@@ -25,5 +26,8 @@ namespace mufflon { namespace scene {
 	constexpr float MAX_SCENE_SIZE = 1048576.0f;	// 2^20
 	constexpr float MAX_SCENE_SIZE_SQ = MAX_SCENE_SIZE * MAX_SCENE_SIZE;
 
+	struct Bone {
+		ei::DualQuaternion transformation;
+	};
 
 }} // namespace mufflon::scene

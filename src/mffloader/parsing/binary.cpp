@@ -724,6 +724,17 @@ void BinaryLoader::read_object() {
 		throw std::runtime_error("Failed to create object '" + std::string(m_objects.back().name));
 }
 
+void BinaryLoader::read_bone_animation_data() {
+	const u32 numBones = read<u32>();
+	const u32 frameCount = read<u32>();
+	world_reserve_animation(numBones, frameCount);
+	for(u32 f = 0u; f < frameCount; ++f)
+		for(u32 i = 0u; i < numBones; ++i) {
+			DualQuaternion t = read<DualQuaternion>();
+			world_set_bone(i, f, &t);
+		}
+}
+
 bool BinaryLoader::read_instances(const u32 globalLod,
 								  const util::FixedHashMap<StringView, u32>& objectLods,
 								  util::FixedHashMap<StringView, InstanceMapping>& instanceLods,
@@ -878,10 +889,16 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 		// Skip over the materials header
 		if(read<u32>() != MATERIALS_HEADER_MAGIC)
 			throw std::runtime_error("Invalid materials header magic constant");
-
-
 		const u64 objectStart = read<u64>();
 		m_fileStream.seekg(objectStart, std::ifstream::beg);
+
+		// Skip over animations header (if existing)
+		u32 headerMagic = read<u32>();
+		if(headerMagic == BONE_ANIMATION_MAGIC) {
+			const u64 objectStart = read<u64>();
+			m_fileStream.seekg(objectStart, std::ifstream::beg);
+			headerMagic = read<u32>();
+		}
 
 		// Parse the object header
 		if(read<u32>() != OBJECTS_HEADER_MAGIC)
@@ -955,7 +972,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		// Read the materials header
 		if(read<u32>() != MATERIALS_HEADER_MAGIC)
 			throw std::runtime_error("Invalid materials header magic constant");
-		const u64 objectStart = read<u64>();
+		const u64 nextStart = read<u64>();
 		const u32 numMaterials = read<u32>();
 		// Read the material names (and implicitly their indices)
 		m_materialNames.reserve(numMaterials);
@@ -965,10 +982,20 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		if(m_abort)
 			return false;
 
-		// Jump to the location of objects
-		m_fileStream.seekg(objectStart, std::ifstream::beg);
+		// Jump to the location of the next section
+		m_fileStream.seekg(nextStart, std::ifstream::beg);
+
+		// Parse bone data if excistent
+		u32 headerMagic = read<u32>();
+		if(headerMagic == BONE_ANIMATION_MAGIC) {
+			const u64 objectStart = read<u64>();
+			read_bone_animation_data();
+			m_fileStream.seekg(objectStart, std::ifstream::beg);
+			headerMagic = read<u32>();
+		}
+
 		// Parse the object header
-		if(read<u32>() != OBJECTS_HEADER_MAGIC)
+		if(headerMagic != OBJECTS_HEADER_MAGIC)
 			throw std::runtime_error("Invalid objects header magic constant");
 		const u64 instanceStart = read<u64>();
 		GlobalFlag compressionFlags = GlobalFlag{ { read<u32>() } };

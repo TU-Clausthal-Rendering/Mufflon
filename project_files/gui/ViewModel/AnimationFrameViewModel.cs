@@ -27,18 +27,14 @@ namespace gui.ViewModel
             }
         }
 
-        public uint Start { get => m_models.World == null ? 0 : m_models.World.AnimationFrameStart; }
-        public uint End { get => m_models.World == null ? 0 : m_models.World.AnimationFrameEnd; }
+        public uint Count { get => m_models.World == null ? 0 : m_models.World.AnimationFrameCount; }
 
         private void OnFrameChanged(object sender, PropertyChangedEventArgs args)
         {
             switch(args.PropertyName)
             {
-                case nameof(Models.World.AnimationFrameStart):
-                    OnPropertyChanged(nameof(Start));
-                    break;
-                case nameof(Models.World.AnimationFrameEnd):
-                    OnPropertyChanged(nameof(End));
+                case nameof(Models.World.AnimationFrameCount):
+                    OnPropertyChanged(nameof(Count));
                     break;
                 case nameof(Models.World.AnimationFrameCurrent):
                     OnPropertyChanged(nameof(Current));
@@ -52,8 +48,7 @@ namespace gui.ViewModel
             if(args.PropertyName == nameof(Models.World) && m_models.World != null)
             {
                 m_models.World.PropertyChanged += OnFrameChanged;
-                OnPropertyChanged(nameof(Start));
-                OnPropertyChanged(nameof(End));
+                OnPropertyChanged(nameof(Count));
                 OnPropertyChanged(nameof(Current));
             }
         }

@@ -57,6 +57,8 @@ public:
 	void reserve(const u32 objects, const u32 instances);
 	// Reserves scenarios. Must have no prior scenarios added
 	void reserve(const u32 scenarios);
+	// Reserves animation data. Must have no prior bones added.
+	void reserve_animation(const u32 numBones, const u32 frameCount);
 	// Performs sanity check and marks the end of a loading/modifying process
 	Sanity finalize_world() const;
 	// Performs a sanity check for a given scenario (respects object masking etc.)
@@ -96,11 +98,13 @@ public:
 	 */
 	materials::MediumHandle add_medium(const materials::Medium& medium);
 	CameraHandle add_camera(const StringView name, std::unique_ptr<cameras::Camera> camera);
-	std::optional<u32> add_light(std::string name, const lights::PointLight& light, const u32 count);
-	std::optional<u32> add_light(std::string name, const lights::SpotLight& light, const u32 count);
-	std::optional<u32> add_light(std::string name, const lights::DirectionalLight& light, const u32 count);
+	std::optional<u32> add_light(std::string name, const lights::PointLight& light, const u32 frameCount);
+	std::optional<u32> add_light(std::string name, const lights::SpotLight& light, const u32 frameCount);
+	std::optional<u32> add_light(std::string name, const lights::DirectionalLight& light, const u32 frameCount);
 	std::optional<u32> add_light(std::string name, lights::BackgroundType type);
 	TextureHandle add_texture(std::unique_ptr<textures::Texture> texture);
+	// Set the transformation of a bone where 'keyframe' is the 0-indexed frame.
+	void set_bone(u32 boneIndex, u32 keyframe, const ei::DualQuaternion& transformation);
 
 
 	// --------------------------------------------------------------------------------
@@ -122,6 +126,8 @@ public:
 	const materials::Medium& get_medium(materials::MediumHandle hdl) const;
 	CameraHandle get_camera(StringView name);
 	CameraHandle get_camera(std::size_t index);
+	const Bone* get_current_keyframe() const noexcept;
+	const Bone* get_keyframe(u32 frame) const;
 	lights::PointLight* get_point_light(u32 index, const u32 frame);
 	lights::SpotLight* get_spot_light(u32 index, const u32 frame);
 	lights::DirectionalLight* get_dir_light(u32 index, const u32 frame);
@@ -143,8 +149,8 @@ public:
 	std::size_t get_point_light_segment_count(u32 index);
 	std::size_t get_spot_light_segment_count(u32 index);
 	std::size_t get_dir_light_segment_count(u32 index);
-	u32 get_frame_start() const noexcept;
-	u32 get_frame_end() const noexcept;
+	u32 get_num_bones() const noexcept;
+	u32 get_frame_count() const noexcept;
 	u32 get_frame_current() const noexcept;
 	float get_tessellation_level() const noexcept { return m_tessLevel; }
 
@@ -242,9 +248,11 @@ private:
 	bool m_sceneValid = false;
 
 	// Current animation frame and range
-	u32 m_frameStart = 0u;
-	u32 m_frameEnd = 0u;
+	u32 m_frameCount = 0u;
 	u32 m_frameCurrent = 0u;
+	// All keyframes of all bones (order: k * numBones + b)
+	std::vector<Bone> m_animationData;
+	u32 m_numBones = 0u;	// Number of bones per keyframe
 
 	// Current tessellation level (levels per pixel)
 	float m_tessLevel = 0u;

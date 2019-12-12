@@ -879,14 +879,13 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 				assertObject(m_state, instance);
 
 				// Set masking for both animated and non-animated instances
-				u32 frameStart, frameEnd;
-				world_get_frame_start(&frameStart);
-				world_get_frame_start(&frameEnd);
+				u32 frameCount;
+				world_get_frame_count(&frameCount);
 				if(const auto instIter = instances.find(&instName[0u]); instIter != instances.end()) {
 					InstanceHdl instHdl = instIter->second.handle;
 					if(instHdl == nullptr)
 						throw std::runtime_error("Error retrieving instance handle from name");
-					for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
+					for(u32 frame = 0; frame < frameCount; ++frame) {
 						// Read LoD
 						if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
 							if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
