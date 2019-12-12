@@ -23,6 +23,7 @@ Note that the number of scenarios is limited to 32.
         "defaultScenario": "<scenario name (from json.scenarios)>"  // OPTIONAL the scenario to load on startup.
                                                    // If none is given, the chosen scenario is unspecified
         "deinstance": bool                         // OPTIONAL deinstance the instances
+        "noDefaultInstances": bool                 // OPTIONAL ignore objects without instance (DEFAULT: false)
         "initTessellationLevel": float,            // OPTIONAL specifies the initial tessellation level in levels per pixel
         "cameras": {
             "<name1>": {
