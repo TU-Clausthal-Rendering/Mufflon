@@ -1105,9 +1105,10 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 		m_state.objectNames.pop_back();
 	}
 	const bool deinstance = read_opt<bool>(m_state, document, "deinstance", false);
+	const bool noDefaultInstances = read_opt<bool>(m_state, document, "noDefaultInstances", false);
 	// Load the binary file before we load the rest of the JSON
 	if(!m_binLoader.load_file(binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods,
-							  deinstance, hasWorldToInstTrans, !m_absoluteCamNearFar))
+							  deinstance, hasWorldToInstTrans, !m_absoluteCamNearFar, noDefaultInstances))
 		return false;
 
 	try {

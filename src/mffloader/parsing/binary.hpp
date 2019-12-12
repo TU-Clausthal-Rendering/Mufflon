@@ -36,7 +36,7 @@ public:
 				   const mufflon::util::FixedHashMap<mufflon::StringView, mufflon::u32>& objectLods,
 				   mufflon::util::FixedHashMap<mufflon::StringView, InstanceMapping>& instanceLods,
 				   const bool deinstance, const bool loadWorldToInstTrans,
-				   const bool keepTrackOfAabb);
+				   const bool keepTrackOfAabb, const bool noDefaultInstances);
 
 	void load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod);
 
@@ -202,7 +202,8 @@ private:
 
 	bool read_instances(const mufflon::u32 globalLod,
 						const mufflon::util::FixedHashMap<mufflon::StringView, mufflon::u32>& objectLods,
-						mufflon::util::FixedHashMap<mufflon::StringView, InstanceMapping>& instanceLods);
+						mufflon::util::FixedHashMap<mufflon::StringView, InstanceMapping>& instanceLods,
+						const bool noDefaultInstances);
 	void deinstance();
 	void read_object();
 	mufflon::u32 read_lod(const ObjectState& object, mufflon::u32 lod);

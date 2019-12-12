@@ -726,7 +726,8 @@ void BinaryLoader::read_object() {
 
 bool BinaryLoader::read_instances(const u32 globalLod,
 								  const util::FixedHashMap<StringView, u32>& objectLods,
-								  util::FixedHashMap<StringView, InstanceMapping>& instanceLods) {
+								  util::FixedHashMap<StringView, InstanceMapping>& instanceLods,
+								  const bool noDefaultInstances) {
 	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_instances");
 	sprintf(m_loadingStage.data(), "Loading instances%c", '\0');
 	std::vector<uint8_t> hasInstance(m_objects.size(), false);
@@ -785,51 +786,53 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 	}
 
 	logInfo("[BinaryLoader::read_instances] Loaded ", numInstances, " instances");
-	sprintf(m_loadingStage.data(), "Creating default instances%c", '\0');
-	// Create identity instances for objects not having one yet
-	const auto objectCount = hasInstance.size();
-	const u32 objDispInterval = std::max(1u, static_cast<u32>(objectCount) / 10u);
-	u32 defaultCreatedInstances = 0u;
-	for(u32 i = 0u; i < static_cast<u32>(objectCount); ++i) {
-		if(m_abort)
-			return false;
-		// Only set the string every x objects to avoid overhead
-		if(i % objDispInterval == 0)
-			sprintf(m_loadingStage.data(), "Checking default instance for object %u / %zu%c", i, objectCount, '\0');
-		if(!hasInstance[i]) {
-			StringView objName = m_objects[i].name;
-			logPedantic("[BinaryLoader::read_instances] Creating default instance for object '",
-						objName, "\'");
-			// Add default instance
-			m_nameBuffer.clear();
-			m_nameBuffer.append(objName.data(), objName.size());
-			m_nameBuffer.append("###defaultInstance");
-			// Determine what level-of-detail should be applied for this instance
-			u32 lod = globalLod;
-			if(auto iter = objectLods.find(objName); iter != objectLods.end())
-				lod = iter->second;
-			InstanceHdl instHdl = world_create_instance(m_objects[i].objHdl, 0xFFFFFFFF);
-			if(instHdl == nullptr)
-				throw std::runtime_error("Failed to create instance for object ID "
-										 + std::to_string(i));
-
-			// We now have a valid instance: time to check if we have the required LoD
-			if(!object_has_lod(m_objects[i].objHdl, lod)) {
-				// We don't -> gotta load it
-				read_lod(m_objects[i], lod);
-			}
-
-			if(m_keepTrackOfAabb) {
-				ei::Box instanceAabb;
-				if(!instance_get_bounding_box(instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
-					throw std::runtime_error("Failed to get bounding box for instance of object ID "
+	if(!noDefaultInstances) {
+		sprintf(m_loadingStage.data(), "Creating default instances%c", '\0');
+		// Create identity instances for objects not having one yet
+		const auto objectCount = hasInstance.size();
+		const u32 objDispInterval = std::max(1u, static_cast<u32>(objectCount) / 10u);
+		u32 defaultCreatedInstances = 0u;
+		for(u32 i = 0u; i < static_cast<u32>(objectCount); ++i) {
+			if(m_abort)
+				return false;
+			// Only set the string every x objects to avoid overhead
+			if(i % objDispInterval == 0)
+				sprintf(m_loadingStage.data(), "Checking default instance for object %u / %zu%c", i, objectCount, '\0');
+			if(!hasInstance[i]) {
+				StringView objName = m_objects[i].name;
+				logPedantic("[BinaryLoader::read_instances] Creating default instance for object '",
+							objName, "\'");
+				// Add default instance
+				m_nameBuffer.clear();
+				m_nameBuffer.append(objName.data(), objName.size());
+				m_nameBuffer.append("###defaultInstance");
+				// Determine what level-of-detail should be applied for this instance
+				u32 lod = globalLod;
+				if(auto iter = objectLods.find(objName); iter != objectLods.end())
+					lod = iter->second;
+				InstanceHdl instHdl = world_create_instance(m_objects[i].objHdl, 0xFFFFFFFF);
+				if(instHdl == nullptr)
+					throw std::runtime_error("Failed to create instance for object ID "
 											 + std::to_string(i));
-				m_aabb = ei::Box(m_aabb, instanceAabb);
+
+				// We now have a valid instance: time to check if we have the required LoD
+				if(!object_has_lod(m_objects[i].objHdl, lod)) {
+					// We don't -> gotta load it
+					read_lod(m_objects[i], lod);
+				}
+
+				if(m_keepTrackOfAabb) {
+					ei::Box instanceAabb;
+					if(!instance_get_bounding_box(instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
+						throw std::runtime_error("Failed to get bounding box for instance of object ID "
+												 + std::to_string(i));
+					m_aabb = ei::Box(m_aabb, instanceAabb);
+				}
+				++defaultCreatedInstances;
 			}
-			++defaultCreatedInstances;
 		}
+		logInfo("[BinaryLoader::read_instances] Created ", defaultCreatedInstances, " default instances");
 	}
-	logInfo("[BinaryLoader::read_instances] Created ", defaultCreatedInstances, " default instances");
 	
 	return true;
 }
@@ -924,7 +927,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 							 const util::FixedHashMap<StringView, mufflon::u32>& objectLods,
 							 util::FixedHashMap<StringView, InstanceMapping>& instanceLods,
 							 const bool deinstance, const bool loadWorldToInstTrans,
-							 const bool keepTrackOfAabb) {
+							 const bool keepTrackOfAabb, const bool noDefaultInstances) {
 	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::load_file");
 	m_loadWorldToInstTrans = loadWorldToInstTrans;
 	m_keepTrackOfAabb = keepTrackOfAabb;
@@ -1013,7 +1016,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 		m_fileStream.seekg(instanceStart, std::ios_base::beg);
 		if(read<u32>() != INSTANCE_MAGIC)
 			throw std::runtime_error("Invalid instance magic constant");
-		if(!read_instances(globalLod, objectLods, instanceLods))
+		if(!read_instances(globalLod, objectLods, instanceLods, noDefaultInstances))
 			return false;
 		if(deinstance)
 			this->deinstance();
