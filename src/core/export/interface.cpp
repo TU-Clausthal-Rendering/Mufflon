@@ -971,7 +971,7 @@ Boolean spheres_get_bounding_box(LodHdl lvlDtl, Vec3* min, Vec3* max) {
 Boolean object_has_lod(ConstObjectHdl obj, LodLevel level) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
-	return static_cast<const Object*>(obj)->has_lod_available(level);
+	return static_cast<const Object*>(obj)->has_original_lod_available(level);
 	CATCH_ALL(false)
 }
 

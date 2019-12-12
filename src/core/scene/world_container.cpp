@@ -73,9 +73,9 @@ WorldContainer::Sanity WorldContainer::finalize_scenario(ConstScenarioHandle hdl
 
 	for(auto& obj : m_objects) {
 		for(u32 l = 0u; l < static_cast<u32>(obj.second.get_lod_slot_count()); ++l) {
-			if(!obj.second.has_lod_available(l))
+			if(!obj.second.has_original_lod_available(l))
 				continue;
-			auto& lod = obj.second.get_lod(l);
+			auto& lod = obj.second.get_original_lod(l);
 			lod.update_flags(*hdl, uniqueMatIndices);
 		}
 	}
@@ -89,8 +89,8 @@ WorldContainer::Sanity WorldContainer::finalize_scenario(ConstScenarioHandle hdl
 		hasObjects = true;
 		const Object& object = instance.get_object();
 		const u32 lodLevel = hdl->get_effective_lod(&instance);
-		if(object.has_lod_available(lodLevel)) {
-			const Lod& lod = object.get_lod(lodLevel);
+		if(object.has_original_lod_available(lodLevel)) {
+			const Lod& lod = object.get_original_lod(lodLevel);
 			if(lod.is_emissive(*hdl)) {
 				hasEmitters = true;
 				break;
@@ -175,8 +175,8 @@ void WorldContainer::apply_transformation(InstanceHandle hdl) {
 		hdl->set_object(*objectHandle);
 	}
 	for(size_t i = 0; i < objectHandle->get_lod_slot_count(); i++) {
-		if(objectHandle->has_lod_available(u32(i))) {
-			Lod& lod = objectHandle->get_lod(u32(i));
+		if(objectHandle->has_original_lod_available(u32(i))) {
+			Lod& lod = objectHandle->get_original_lod(u32(i));
 			auto& polygons = lod.get_geometry<geometry::Polygons>();
 			polygons.transform(transMat);
 			auto& spheres = lod.get_geometry<geometry::Spheres>();
@@ -692,21 +692,21 @@ void WorldContainer::unref_texture(TextureHandle hdl) {
 }
 
 bool WorldContainer::load_lod(Object& obj, const u32 lodIndex) {
-	if(!obj.has_lod_available(lodIndex)) {
+	if(!obj.has_original_lod_available(lodIndex)) {
 		if(!m_load_lod(&obj, lodIndex))
 			return false;
 		// Update the flags for this LoD
 		std::unordered_set<MaterialIndex> uniqueMatIndices;
 		uniqueMatIndices.reserve(m_materials.size());
 		for(const auto& scenario : m_scenarios)
-			obj.get_lod(lodIndex).update_flags(scenario.second, uniqueMatIndices);
+			obj.get_original_lod(lodIndex).update_flags(scenario.second, uniqueMatIndices);
 	}
 	return true;
 }
 
 bool WorldContainer::unload_lod(Object& obj, const u32 lodIndex) {
-	if(obj.has_lod_available(lodIndex))
-		obj.remove_lod(lodIndex);
+	//if(obj.has_lod_available(lodIndex))
+	//	obj.remove_lod(lodIndex);
 	return true;
 }
 
@@ -917,7 +917,7 @@ bool WorldContainer::load_scene_lights() {
 			const auto endIndex = obj.second.offset + obj.second.count;
 			for(std::size_t idx = obj.second.offset; idx < endIndex; ++idx) {
 				InstanceHandle inst = instances[idx];
-				mAssertMsg(obj.first->has_lod_available(m_scenario->get_effective_lod(inst)), "Instance references LoD that doesn't exist");
+				mAssertMsg(obj.first->has_lod(m_scenario->get_effective_lod(inst)), "Instance references LoD that doesn't exist");
 				Lod& lod = obj.first->get_lod(m_scenario->get_effective_lod(inst));
 				if(!lod.is_emissive(*m_scenario))
 					continue;

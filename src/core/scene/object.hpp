@@ -1,9 +1,11 @@
 #pragma once
 
 #include "lod.hpp"
+#include "util/eviction.hpp"
 #include <memory>
 #include "util/flag.hpp"
 #include "util/string_view.hpp"
+#include <optional>
 #include <vector>
 
 namespace mufflon::scene {
@@ -54,19 +56,50 @@ public:
 		return m_flags;
 	}
 
-	bool has_lod_available(u32 level) const noexcept {
-		return level < m_lods.size() && m_lods[level] != nullptr;
+	bool has_original_lod_available(u32 level) const noexcept {
+		return level < m_lods.size() && m_lods[level].original.is_admitted();
+	}
+	bool has_reduced_lod_available(u32 level) const noexcept {
+		return level < m_lods.size() && m_lods[level].reduced.is_admitted();
 	}
 
-	Lod& get_lod(u32 level) {
-		if(!has_lod_available(level))
+	Lod& get_original_lod(u32 level) {
+		if(!has_original_lod_available(level))
 			throw std::runtime_error("Requested LOD not available. Call has_lod_available before using get_lod().");
-		return *m_lods[level];
+		return *m_lods[level].original;
+	}
+	const Lod& get_original_lod(u32 level) const {
+		if(!has_original_lod_available(level))
+			throw std::runtime_error("Requested LOD not available. Call has_lod_available before using get_lod().");
+		return *m_lods[level].original;
+	}
+	Lod& get_reduced_lod(u32 level) {
+		if(!has_reduced_lod_available(level))
+			throw std::runtime_error("Requested LOD not available. Call has_lod_available before using get_lod().");
+		return *m_lods[level].reduced;
+	}
+	const Lod& get_reduced_lod(u32 level) const {
+		if(!has_reduced_lod_available(level))
+			throw std::runtime_error("Requested LOD not available. Call has_lod_available before using get_lod().");
+		return *m_lods[level].reduced;
+	}
+
+	// This is a potentially expensive operation as it may require a disk read!
+	Lod& get_or_fetch_original_lod(u32 level);
+
+	// Gets the 'applicable' LoD, ie. reduced if present, else original if present
+	bool has_lod(u32 level) const noexcept {
+		return level < m_lods.size() && m_lods[level].has_data();
+	}
+	Lod& get_lod(u32 level) {
+		if(!has_lod(level))
+			throw std::runtime_error("Requested LOD not available. Call has_lod_available before using get_lod().");
+		return m_lods[level].get_highest_priority_data();
 	}
 	const Lod& get_lod(u32 level) const {
-		if(!has_lod_available(level))
+		if(!has_lod(level))
 			throw std::runtime_error("Requested LOD not available. Call has_lod_available before using get_lod().");
-		return *m_lods[level];
+		return m_lods[level].get_highest_priority_data();
 	}
 
 	// Returns the number of LoD slots
@@ -77,8 +110,11 @@ public:
 	void copy_lods_from(Object& object) {
 		m_lods.clear();
 		for(auto& lod : object.m_lods) {
-			m_lods.emplace_back(std::make_unique<Lod>(*lod));
-			m_lods.back()->set_parent(this);
+			m_lods.emplace_back();
+			if(m_lods.back().original.is_admitted())
+				m_lods.back().original->set_parent(this);
+			if(m_lods.back().reduced.is_admitted())
+				m_lods.back().reduced->set_parent(this);
 		}
 	}
 
@@ -86,21 +122,33 @@ public:
 	Lod& add_lod(u32 level) {
 		if(m_lods.size() <= level)
 			m_lods.resize(level + 1u);
-		m_lods[level] = std::make_unique<Lod>(this);
-		return *m_lods[level];
+		return m_lods[level].original.admit(this);
 	}
 
-	Lod& add_lod(u32 level, Lod& make_copy) {
+	Lod& add_reduced_lod(u32 level) {
 		if(m_lods.size() <= level)
 			m_lods.resize(level + 1u);
-		m_lods[level] = std::make_unique<Lod>(make_copy);
-		return *m_lods[level];
+		if(!m_lods[level].original.is_admitted())
+			throw std::runtime_error("Original LoD to base reduced one off is not present");
+		return m_lods[level].reduced.admit(*m_lods[level].original);
 	}
 
 	// Removes a LoD
 	void remove_lod(std::size_t level) {
+		if(level < m_lods.size()) {
+			m_lods[level].original.evict();
+			m_lods[level].reduced.evict();
+		}
+	}
+
+	// Unloads the original LoD
+	void remove_original_lod(std::size_t level) {
 		if(level < m_lods.size())
-			m_lods[level].reset();
+			m_lods[level].original.evict();
+	}
+	void remove_reduced_lod(std::size_t level) {
+		if(level < m_lods.size())
+			m_lods[level].reduced.evict();
 	}
 
 	u32 get_object_id() const noexcept {
@@ -127,8 +175,35 @@ public:
 		return m_instanceCounter;
 	}
 private:
+	struct LodData {
+		util::Evictable<Lod> original{};
+		util::Evictable<Lod> reduced{};
+
+		bool has_data() const noexcept {
+			return original.is_admitted() || reduced.is_admitted();
+		}
+
+		// Returns the highest-priority existing LoD
+		Lod& get_highest_priority_data() {
+			if(reduced.is_admitted())
+				return *reduced;
+			else if(original.is_admitted())
+				return *original;
+			else
+				throw std::runtime_error("Requested LOD not available. Call has_lod_available before using get_lod().");
+		}
+		const Lod& get_highest_priority_data() const {
+			if(reduced.is_admitted())
+				return *reduced;
+			else if(original.is_admitted())
+				return *original;
+			else
+				throw std::runtime_error("Requested LOD not available. Call has_lod_available before using get_lod().");
+		}
+	};
+
 	StringView m_name;
-	std::vector<std::unique_ptr<Lod>> m_lods;
+	std::vector<LodData> m_lods;
 	const u32 m_objectId;
 
 	ObjectFlags m_flags;

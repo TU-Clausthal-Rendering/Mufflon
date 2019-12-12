@@ -198,8 +198,10 @@ void CpuShadowSilhouettesBPM::initialize_decimaters() {
 		}
 
 		// TODO: this only works if instances don't specify LoD levels
-		auto& lod = obj.first->get_lod(lowestLevel);
-		auto& newLod = lod.create_reduced_version();
+		if(!obj.first->has_reduced_lod_available(lowestLevel))
+			obj.first->add_reduced_lod(lowestLevel);
+		auto& lod = obj.first->get_or_fetch_original_lod(lowestLevel);
+		auto& newLod = obj.first->get_reduced_lod(lowestLevel);
 		const auto& polygons = newLod.template get_geometry<scene::geometry::Polygons>();
 
 		std::size_t collapses = 0u;
@@ -213,13 +215,6 @@ void CpuShadowSilhouettesBPM::initialize_decimaters() {
 																			 m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 		m_importanceSums[i].shadowImportance.store(0.f);
 		m_importanceSums[i].shadowSilhouetteImportance.store(0.f);
-
-		// Make sure that all LoDs reference the correct reduced version
-		for(u32 j = 0u; j < obj.second.count; ++j) {
-			const auto idx = obj.second.offset + j;
-			scene::ConstInstanceHandle instance = instances[obj.second.offset + j];
-			obj.first->get_lod(scenario.get_effective_lod(instance)).reference_reduced_version(lod);
-		}
 	}
 
 	logInfo("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - timeBegin).count(), "ms");

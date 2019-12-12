@@ -11,10 +11,8 @@ Instance::Instance(Object& obj, u32 index) :
 }
 
 ei::Box Instance::get_bounding_box(u32 lod, const ei::Mat3x4& transformation) const noexcept {
-	Lod* lodPtr = &m_objRef->get_lod(lod);
-	if(Lod* reduced = lodPtr->get_reduced_version(); reduced != nullptr)
-		lodPtr = reduced;
-	return transform(lodPtr->get_bounding_box(), transformation);
+	Lod& lodRef = m_objRef->get_lod(lod);
+	return transform(lodRef.get_bounding_box(), transformation);
 }
 
 void Instance::set_object(Object& object) noexcept

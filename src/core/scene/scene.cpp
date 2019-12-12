@@ -217,17 +217,14 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 				// Now we can do the per-LoD things like displacement mapping and fetching descriptors
 				if(prevLevel != std::numeric_limits<u32>::max())
 					lodDescs[currLodIndex - 1u].next = i;
-				Lod* lod = &obj.first->get_lod(i);
-				mAssert(lod != nullptr);
-				if(Lod* reduced = lod->get_reduced_version(); reduced != nullptr)
-					lod = reduced;
+				Lod& lod = obj.first->get_lod(i);
 
 				// Determine if it's worth it to use a parallel build
-				lodDescs[currLodIndex] = lod->template get_descriptor<dev>(objLevelParallelism);
+				lodDescs[currLodIndex] = lod.template get_descriptor<dev>(objLevelParallelism);
 				lodDescs[currLodIndex].previous = prevLevel;
-				lodAabbs[currLodIndex] = lod->get_bounding_box();
+				lodAabbs[currLodIndex] = lod.get_bounding_box();
 				if(!sameAttribs)
-					lod->update_attribute_descriptor(lodDescs[currLodIndex], vertexAttribs, faceAttribs, sphereAttribs);
+					lod.update_attribute_descriptor(lodDescs[currLodIndex], vertexAttribs, faceAttribs, sphereAttribs);
 				++currLodIndex;
 			}
 			if(!currUsedLods.empty())
@@ -509,7 +506,7 @@ bool Scene::retessellate(const float tessLevel) {
 void Scene::compute_curvature() {
 	for(auto& obj : m_objects) {
 		for(u32 level = 0; level < obj.first->get_lod_slot_count(); ++level) {
-			if(obj.first->has_lod_available(level)) {
+			if(obj.first->has_original_lod_available(level)) {
 				Lod& lod = obj.first->get_lod(level);
 				geometry::Polygons& polygons = lod.get_geometry<geometry::Polygons>();
 				polygons.compute_curvature();
@@ -521,7 +518,7 @@ void Scene::compute_curvature() {
 void Scene::remove_curvature() {
 	for(auto& obj : m_objects) {
 		for(u32 level = 0; level < obj.first->get_lod_slot_count(); ++level) {
-			if(obj.first->has_lod_available(level)) {
+			if(obj.first->has_original_lod_available(level)) {
 				Lod& lod = obj.first->get_lod(level);
 				geometry::Polygons& polygons = lod.get_geometry<geometry::Polygons>();
 				try {
