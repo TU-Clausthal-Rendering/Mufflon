@@ -223,13 +223,13 @@ void BinaryLoader::read_compressed_attribute(const unsigned char*& data) {
 void BinaryLoader::read_uncompressed_vertex_attributes(const ObjectState& object, const LodState& lod) {
 	if(lod.numVertices == 0 || lod.numVertAttribs == 0)
 		return;
-	m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
 	BulkLoader attrBulk{ BulkType::BULK_FILE, { m_fileDescs[0u].get() } };
 
 	if(read<u32>() != ATTRIBUTE_MAGIC)
 		throw std::runtime_error("Invalid attribute magic constant (object '" + std::string(object.name) + "'");
 	for(u32 i = 0u; i < lod.numVertAttribs; ++i) {
 		read_uncompressed_attribute();
+		m_fileDescs[0u].seek(m_fileStream.tellg() - m_fileStart, std::ios_base::beg);
 		auto attrHdl = polygon_request_vertex_attribute(lod.lodHdl, m_attribStateBuffer.name.c_str(),
 														m_attribStateBuffer.type);
 		if(attrHdl.name == nullptr)

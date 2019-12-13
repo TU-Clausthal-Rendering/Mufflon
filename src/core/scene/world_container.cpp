@@ -850,6 +850,10 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 									  std::move(objInstRef), std::move(instanceHandles),
 									  m_worldToInstanceTrans, aabb);
 
+	// Apply bone animation
+	// TODO: this invalidates the bounding box! Bounding box should be computed somewhere later.
+	m_scene->reanimate(m_frameCurrent, get_current_keyframe());
+
 	// Check if the resulting scene has issues with size
 	if(ei::len(m_scene->get_bounding_box().min) >= SUGGESTED_MAX_SCENE_SIZE
 	   || ei::len(m_scene->get_bounding_box().max) >= SUGGESTED_MAX_SCENE_SIZE)

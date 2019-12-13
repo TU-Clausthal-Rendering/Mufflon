@@ -502,6 +502,34 @@ bool Scene::retessellate(const float tessLevel) {
 	return needLighttreeRebuild;
 }
 
+void Scene::reanimate(u32 frame, const Bone* bones) {
+	std::unordered_map<u32, std::vector<InstanceHandle>> lodMapping;
+	for(auto& obj : m_objects) {
+		lodMapping.clear();
+
+		// First gather the instance-LoD-mapping
+		const auto endIndex = obj.second.offset + obj.second.count;
+		for(std::size_t i = obj.second.offset; i < endIndex; ++i) {
+			const auto inst = m_instances[i];
+			const u32 instanceLod = m_scenario.get_effective_lod(inst);
+			lodMapping[instanceLod].push_back(inst);
+		}
+
+		for(const auto& mapping : lodMapping) {
+			Lod* lod = &obj.first->get_lod(mapping.first);
+			// Reload original if an animation, different from the current one,
+			// was applied before.
+			if(lod->was_animated() && lod->get_frame() != frame) {
+				obj.first->remove_lod(mapping.first);
+				if(!WorldContainer::instance().load_lod(*obj.first, mapping.first))
+					throw std::runtime_error("Failed to re-load LoD for animation.");
+				lod = &obj.first->get_lod(mapping.first);
+			}
+			lod->apply_animation(frame, bones);
+		}
+	}
+}
+
 
 void Scene::compute_curvature() {
 	for(auto& obj : m_objects) {

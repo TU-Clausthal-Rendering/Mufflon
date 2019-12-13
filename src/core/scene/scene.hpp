@@ -114,6 +114,8 @@ public:
 	// Discards any already applied tessellation/displacement and re-tessellates/-displaces
 	// with the current tessellation level
 	bool retessellate(const float tessLevel);
+	// Yeah, its alive ;-)
+	void reanimate(u32 frame, const Bone* bones);
 
 	// Overwrite which camera is used of the scene
 	void set_camera(ConstCameraHandle camera) noexcept {

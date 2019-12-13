@@ -131,6 +131,13 @@ public:
 	// Apply bone animation transformations if this object has animation weights
 	void apply_animation(u32 frame, const Bone* bones);
 
+	bool was_animated() const noexcept {
+		return m_appliedFrame != ~0u;
+	}
+	u32 get_frame() const noexcept {
+		return m_appliedFrame;
+	}
+
 private:
 	// Geometry data
 	GeometryTuple m_geometry;

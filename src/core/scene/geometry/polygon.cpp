@@ -422,7 +422,8 @@ bool Polygons::apply_animation(u32 frame, const Bone* bones) {
 		for(int i = 0; i < 4; ++i) {
 			float weight = (codedWeights[i] >> 22) / 1023.0f;
 			u32 idx = codedWeights[i] & 0x003fffff;
-			q += bones[idx].transformation * weight;
+			if(idx != 0)
+				q += bones[idx].transformation * weight;
 		}
 		q = ei::normalize(q);
 		positions[vertex.idx()] = ei::transform(positions[vertex.idx()], q);
