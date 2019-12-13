@@ -408,6 +408,30 @@ void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& s
 			" -> ", m_triangles, "/", m_quads, ")");
 }
 
+bool Polygons::apply_animation(u32 frame, const Bone* bones) {
+	auto weightsHdl = find_vertex_attribute("AnimationWeights", AttributeType::UVEC4);
+	if(!weightsHdl) return false;
+	auto weights = acquire_const<Device::CPU, ei::UVec4>(*weightsHdl);
+	auto normals = acquire<Device::CPU, ei::Vec3>(get_normals_hdl());
+	auto positions = acquire<Device::CPU, ei::Vec3>(get_points_hdl());
+
+	for(auto vertex : m_meshData->vertices()) {
+		// Decode weight and bone index and sum all the dual quaternions
+		ei::UVec4 codedWeights = weights[vertex.idx()];
+		ei::DualQuaternion q { ei::qqidentity() };
+		for(int i = 0; i < 4; ++i) {
+			float weight = (codedWeights[i] >> 22) / 1023.0f;
+			u32 idx = codedWeights[i] & 0x003fffff;
+			q += bones[idx].transformation * weight;
+		}
+		q = ei::normalize(q);
+		positions[vertex.idx()] = ei::transform(positions[vertex.idx()], q);
+		normals[vertex.idx()] = ei::transformDir(normals[vertex.idx()], q);
+	}
+	this->mark_changed(Device::CPU);
+	return true;
+}
+
 // Creates a decimater 
 OpenMesh::Decimater::DecimaterT<PolygonMeshType> Polygons::create_decimater() {
 	return OpenMesh::Decimater::DecimaterT<PolygonMeshType>(*m_meshData);

@@ -179,6 +179,7 @@ public:
 	void displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario);
 	void tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
 					const bool usePhong);
+	bool apply_animation(u32 frame, const Bone* bones);
 
 private:
 	template < Device dev >

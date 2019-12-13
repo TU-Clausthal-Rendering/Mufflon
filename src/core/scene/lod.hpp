@@ -33,7 +33,8 @@ public:
 		m_geometry{},
 		m_accelStruct{},
 		m_parent{ parent },
-		m_flags{ 0 }
+		m_flags{ 0 },
+		m_appliedFrame{ ~0u }
 	{}
 	// Warning: implicit sync!
 	Lod(Lod&) = default;
@@ -127,6 +128,8 @@ public:
 	// Tessellates the LoD. If scenario is not null, the tessellation is adaptive
 	void tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
 					const bool usePhong);
+	// Apply bone animation transformations if this object has animation weights
+	void apply_animation(u32 frame, const Bone* bones);
 
 private:
 	// Geometry data
@@ -135,6 +138,7 @@ private:
 	accel_struct::LBVHBuilder m_accelStruct;
 	const Object* m_parent;
 	u64 m_flags;	// Stores flags (2 bits per-scenario)
+	u32 m_appliedFrame;
 };
 
 }} // mufflon::scene

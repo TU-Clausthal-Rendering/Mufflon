@@ -275,6 +275,9 @@ public:
 					const bool usePhong);
 	// Implements displacement mapping for the mesh
 	void displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario);
+	// Apply bone animation transformations if this mesh has animation weights
+	// Returns wether there was an animation or not (in which case nothing was done).
+	bool apply_animation(u32 frame, const Bone* bones);
 
 	// Creates a decimater 
 	OpenMesh::Decimater::DecimaterT<PolygonMeshType> create_decimater();

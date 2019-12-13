@@ -203,6 +203,11 @@ void Spheres::tessellate(tessellation::TessLevelOracle& /*oracle*/, const Scenar
 	// There is no tessellation we can/have to perform for a perfect sphere (yet)
 }
 
+bool Spheres::apply_animation(u32 /*frame*/, const Bone* /*bones*/) {
+	// No bone animation for spheres
+	return false;
+}
+
 template SpheresDescriptor<Device::CPU> Spheres::get_descriptor<Device::CPU>();
 template SpheresDescriptor<Device::CUDA> Spheres::get_descriptor<Device::CUDA>();
 template SpheresDescriptor<Device::OPENGL> Spheres::get_descriptor<Device::OPENGL>();
