@@ -157,9 +157,14 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 
 		// Create the object and instance descriptors
 		// This keeps track of instances for a given LoD
-
 		std::vector<std::vector<u32>> usedLods(get_max_thread_num());
-		//std::vector<std::unordered_map<u32, u32>> usedLods(get_max_thread_num());
+		// We also have to determine the bounding box
+		std::vector<ei::Box> threadAabbs(get_max_thread_num(), []() {
+			ei::Box aabb{};
+			aabb.min = ei::Vec3{ std::numeric_limits<float>::max() };
+			aabb.max = ei::Vec3{ -std::numeric_limits<float>::max() };
+			return aabb;
+		}());
 
 		// Preallocate the CPU-side arrays so we can multi-thread
 		const auto totalInstanceCount = m_worldToInstanceTransformation.size();
@@ -219,6 +224,16 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 					lodDescs[currLodIndex - 1u].next = i;
 				Lod* lod = &obj.first->get_lod(i);
 
+				// Reanimate the LoD if necessary
+				if(lod->has_bone_animation()) {
+					if(lod->was_animated() && lod->get_frame() != m_frame) {
+						obj.first->remove_lod(i);
+						if(!WorldContainer::instance().load_lod(*obj.first, i))
+							throw std::runtime_error("Failed to re-load LoD for animation.");
+						lod = &obj.first->get_lod(i);
+					}
+					lod->apply_animation(m_frame, m_bones);
+				}
 				// Determine if it's worth it to use a parallel build
 				lodDescs[currLodIndex] = lod->template get_descriptor<dev>(objLevelParallelism);
 				lodDescs[currLodIndex].previous = prevLevel;
@@ -238,8 +253,27 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 
 				const auto instanceIndex = inst->get_index();
 				lodIndices[instanceIndex] = threadLodIndex + index;
+				// Expand the scene AABB as well
+				const auto& worldToInst = m_worldToInstanceTransformation[instanceIndex];
+				const auto instToWorld = InstanceData<Device::CPU>::compute_instance_to_world_transformation(worldToInst);
+				threadAabbs[get_current_thread_idx()] = ei::Box{
+					threadAabbs[get_current_thread_idx()],
+					inst->get_bounding_box(instanceLod, instToWorld)
+				};
 			}
 		}
+
+		// Invalidate previous and merge new bounding boxes
+		m_boundingBox.min = ei::Vec3{ std::numeric_limits<float>::max() };
+		m_boundingBox.max = ei::Vec3{ -std::numeric_limits<float>::max() };
+		for(const auto& box : threadAabbs)
+			m_boundingBox = ei::Box{ m_boundingBox, box };
+		// Check if the resulting scene has issues with size
+		if(ei::len(m_boundingBox.min) >= SUGGESTED_MAX_SCENE_SIZE
+		   || ei::len(m_boundingBox.max) >= SUGGESTED_MAX_SCENE_SIZE)
+			logWarning("[Scene::get_descriptor] Scene size is larger than recommended "
+					   "(Furthest point of the bounding box should not be further than "
+					   "2^20m away)");
 
 		sceneDescriptor.validInstanceIndex = m_instances.front()->get_index();
 		const auto t1 = std::chrono::high_resolution_clock::now();
@@ -325,7 +359,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 	// Camera
 	if(m_cameraDescChanged.template get<ChangedFlag<dev>>().changed) {
 		get_camera()->get_parameter_pack(&sceneDescriptor.camera.get(), m_scenario.get_resolution(),
-										 std::min(get_camera()->get_path_segment_count() - 1u, m_animationPathIndex));
+										 std::min(get_camera()->get_path_segment_count() - 1u, m_frame));
 	}
 
 	// Light tree
@@ -452,7 +486,7 @@ bool Scene::retessellate(const float tessLevel) {
 				// Then we may adaptively tessellate
 
 				// TODO: more adequate tessellation level and more adequate tessellator
-				tessellation::CameraDistanceOracle tess(tessLevel, get_camera(), m_animationPathIndex,
+				tessellation::CameraDistanceOracle tess(tessLevel, get_camera(), m_frame,
 														m_scenario.get_resolution(), instTrans);
 				// Check if we need to load the LoD back from disk (and hope it got cached)
 				// TODO: would it be preferential to keep the untessellated LoD in memory as well?
@@ -483,7 +517,7 @@ bool Scene::retessellate(const float tessLevel) {
 						instTrans.clear();
 						/*for(InstanceHandle inst : mapping.second)
 							instTrans.push_back(inst->get_transformation_matrix());*/
-						tessellation::CameraDistanceOracle oracle{ objTessLevel, get_camera(), m_animationPathIndex,
+						tessellation::CameraDistanceOracle oracle{ objTessLevel, get_camera(), m_frame,
 																	  m_scenario.get_resolution(), instTrans };
 						lod->tessellate(oracle, &m_scenario, objTessInfo->usePhong);
 					} else {
@@ -501,35 +535,6 @@ bool Scene::retessellate(const float tessLevel) {
 
 	return needLighttreeRebuild;
 }
-
-void Scene::reanimate(u32 frame, const Bone* bones) {
-	std::unordered_map<u32, std::vector<InstanceHandle>> lodMapping;
-	for(auto& obj : m_objects) {
-		lodMapping.clear();
-
-		// First gather the instance-LoD-mapping
-		const auto endIndex = obj.second.offset + obj.second.count;
-		for(std::size_t i = obj.second.offset; i < endIndex; ++i) {
-			const auto inst = m_instances[i];
-			const u32 instanceLod = m_scenario.get_effective_lod(inst);
-			lodMapping[instanceLod].push_back(inst);
-		}
-
-		for(const auto& mapping : lodMapping) {
-			Lod* lod = &obj.first->get_lod(mapping.first);
-			// Reload original if an animation, different from the current one,
-			// was applied before.
-			if(lod->was_animated() && lod->get_frame() != frame) {
-				obj.first->remove_lod(mapping.first);
-				if(!WorldContainer::instance().load_lod(*obj.first, mapping.first))
-					throw std::runtime_error("Failed to re-load LoD for animation.");
-				lod = &obj.first->get_lod(mapping.first);
-			}
-			lod->apply_animation(frame, bones);
-		}
-	}
-}
-
 
 void Scene::compute_curvature() {
 	for(auto& obj : m_objects) {

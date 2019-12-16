@@ -128,6 +128,9 @@ public:
 	// Tessellates the LoD. If scenario is not null, the tessellation is adaptive
 	void tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
 					const bool usePhong);
+	bool has_bone_animation() const noexcept {
+		return m_geometry.template get<geometry::Polygons>().has_bone_animation();
+	}
 	// Apply bone animation transformations if this object has animation weights
 	void apply_animation(u32 frame, const Bone* bones);
 

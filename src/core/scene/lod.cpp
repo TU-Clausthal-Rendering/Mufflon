@@ -101,6 +101,7 @@ template void Lod::update_attribute_descriptor<Device::OPENGL>(LodDescriptor<Dev
 																const std::vector<AttributeIdentifier>&);
 
 void Lod::apply_animation(u32 frame, const Bone* bones) {
+	if(!has_bone_animation()) return;
 	if(m_appliedFrame == frame) return;
 	if(m_appliedFrame != ~0u)
 		logWarning("[Lod::apply_animation] There is a different animation frame applied. The new animation will be made on top of that.");

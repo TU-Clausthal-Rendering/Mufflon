@@ -409,11 +409,15 @@ void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& s
 }
 
 bool Polygons::apply_animation(u32 frame, const Bone* bones) {
-	auto weightsHdl = find_vertex_attribute("AnimationWeights", AttributeType::UVEC4);
-	if(!weightsHdl) return false;
-	auto weights = acquire_const<Device::CPU, ei::UVec4>(*weightsHdl);
+	if(!m_animationWeightHdl.has_value())
+		return false;
+	auto weights = acquire_const<Device::CPU, ei::UVec4>(*m_animationWeightHdl);
 	auto normals = acquire<Device::CPU, ei::Vec3>(get_normals_hdl());
 	auto positions = acquire<Device::CPU, ei::Vec3>(get_points_hdl());
+
+	// We also have to recalculate the bounding box
+	m_boundingBox.min = ei::Vec3{ std::numeric_limits<float>::max() };
+	m_boundingBox.max = ei::Vec3{ -std::numeric_limits<float>::max() };
 
 	for(auto vertex : m_meshData->vertices()) {
 		// Decode weight and bone index and sum all the dual quaternions
@@ -426,8 +430,10 @@ bool Polygons::apply_animation(u32 frame, const Bone* bones) {
 				q += bones[idx].transformation * weight;
 		}
 		q = ei::normalize(q);
-		positions[vertex.idx()] = ei::transform(positions[vertex.idx()], q);
+		const auto newPos = ei::transform(positions[vertex.idx()], q);
+		positions[vertex.idx()] = newPos;
 		normals[vertex.idx()] = ei::transformDir(normals[vertex.idx()], q);
+		m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ newPos } };
 	}
 	this->mark_changed(Device::CPU);
 	return true;
