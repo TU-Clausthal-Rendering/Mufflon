@@ -901,7 +901,7 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 		}
 
 		// Parse the object header
-		if(read<u32>() != OBJECTS_HEADER_MAGIC)
+		if(headerMagic != OBJECTS_HEADER_MAGIC)
 			throw std::runtime_error("Invalid objects header magic constant");
 		(void) read<u64>(); // Instance start
 		GlobalFlag compressionFlags = GlobalFlag{ { read<u32>() } };

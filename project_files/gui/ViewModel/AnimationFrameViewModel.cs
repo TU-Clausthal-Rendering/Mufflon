@@ -28,6 +28,7 @@ namespace gui.ViewModel
         }
 
         public uint Count { get => m_models.World == null ? 0 : m_models.World.AnimationFrameCount; }
+        public uint End { get => Count - 1u; }
 
         private void OnFrameChanged(object sender, PropertyChangedEventArgs args)
         {
@@ -35,6 +36,7 @@ namespace gui.ViewModel
             {
                 case nameof(Models.World.AnimationFrameCount):
                     OnPropertyChanged(nameof(Count));
+                    OnPropertyChanged(nameof(End));
                     break;
                 case nameof(Models.World.AnimationFrameCurrent):
                     OnPropertyChanged(nameof(Current));
@@ -49,6 +51,7 @@ namespace gui.ViewModel
             {
                 m_models.World.PropertyChanged += OnFrameChanged;
                 OnPropertyChanged(nameof(Count));
+                OnPropertyChanged(nameof(End));
                 OnPropertyChanged(nameof(Current));
             }
         }

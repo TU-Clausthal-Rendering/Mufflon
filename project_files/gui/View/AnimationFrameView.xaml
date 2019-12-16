@@ -17,8 +17,8 @@
                     VerticalAlignment="Center"
                     Orientation="Horizontal">
             <Slider Width="100"
-                    Minimum="{Binding Start, Mode=OneWay}"
-                    Maximum="{Binding End, Mode=OneWay}"
+                    Minimum="0"
+                    Maximum="{Binding End, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
                     Value="{Binding Current, Mode=TwoWay}"
                     TickPlacement="BottomRight"
                     TickFrequency="10"

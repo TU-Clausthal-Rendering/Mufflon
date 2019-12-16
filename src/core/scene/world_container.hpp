@@ -247,6 +247,8 @@ private:
 	std::unique_ptr<Scene> m_scene = nullptr;
 	bool m_sceneValid = false;
 
+	// This is only stored to error-check out-of-order animated instances
+	u32 m_firstKeyFrame = 0u;
 	// Current animation frame and range
 	u32 m_frameCount = 0u;
 	u32 m_frameCurrent = 0u;

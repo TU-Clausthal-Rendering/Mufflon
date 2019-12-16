@@ -71,7 +71,7 @@ class JsonLoader {
 public:
 
 	static constexpr ei::Mat2x2 TEST{ 0.f, 0.f, 0.f, 0.f };
-	static constexpr FileVersion CURRENT_FILE_VERSION{ 1u, 5u };
+	static constexpr FileVersion CURRENT_FILE_VERSION{ 1u, 6u };
 	static constexpr FileVersion INVERTEX_TRANSMAT_FILE_VERSION{ 1u, 4u };
 	static constexpr FileVersion ABSOLUTE_CAM_NEAR_FAR_FILE_VERSION{ 1u, 5u };
 

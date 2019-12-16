@@ -218,12 +218,15 @@ InstanceHandle WorldContainer::create_instance(ObjectHandle obj, const u32 anima
 	} else {
 		// For downward compatible reasons we have to count frames.
 		// If explicitly allocated it should never change.
-		m_frameCount = std::max(m_frameCount, animationFrame+1);
+		if(m_frameCount == 0u)
+			m_firstKeyFrame = animationFrame;
+		const auto animFrameIndex = animationFrame - m_firstKeyFrame;
+		m_frameCount = std::max(m_frameCount, animFrameIndex + 1u);
 		// Check for out-of-order insert
-		if(m_frameInstanceIndices.size() == animationFrame) {
+		if(m_frameInstanceIndices.size() == animFrameIndex) {
 			// New frame added
 			m_frameInstanceIndices.emplace_back(static_cast<u32>(m_instances.size()), 1u);
-		} else if(m_frameInstanceIndices.size() == (animationFrame + 1u)) {
+		} else if(m_frameInstanceIndices.size() == (animFrameIndex + 1u)) {
 			// Additional instance for current frame
 			++m_frameInstanceIndices.back().second;
 		} else {
