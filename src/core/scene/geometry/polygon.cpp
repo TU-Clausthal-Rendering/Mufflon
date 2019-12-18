@@ -422,14 +422,21 @@ bool Polygons::apply_animation(u32 frame, const Bone* bones) {
 	for(auto vertex : m_meshData->vertices()) {
 		// Decode weight and bone index and sum all the dual quaternions
 		ei::UVec4 codedWeights = weights[vertex.idx()];
-		ei::DualQuaternion q { ei::qqidentity() };
+		// We must NOT start at 0,0,0,1 for the real part
+		ei::DualQuaternion q{ 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+		bool transformed = false;
 		for(int i = 0; i < 4; ++i) {
 			float weight = (codedWeights[i] >> 22) / 1023.0f;
 			u32 idx = codedWeights[i] & 0x003fffff;
-			if(idx != 0)
+			if(idx != 0x003fffff) {
 				q += bones[idx].transformation * weight;
+				transformed = true;
+			}
 		}
-		q = ei::normalize(q);
+		if(transformed)
+			q = ei::normalize(q);
+		else
+			q = ei::qqidentity();
 		const auto newPos = ei::transform(positions[vertex.idx()], q);
 		positions[vertex.idx()] = newPos;
 		normals[vertex.idx()] = ei::transformDir(normals[vertex.idx()], q);

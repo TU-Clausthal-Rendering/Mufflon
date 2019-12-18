@@ -25,6 +25,44 @@
 
 namespace mufflon { namespace scene {
 
+Scene::Scene(const Scenario& scenario, const u32 frame,
+			 util::FixedHashMap<ObjectHandle, InstanceRef>&& objects,
+			 std::vector<InstanceHandle>&& instances,
+			 const std::vector<ei::Mat3x4>& worldToInstanceTransformation,
+			 const Bone* bones) :
+	m_scenario(scenario),
+	m_frame(frame),
+	m_objects{ std::move(objects) },
+	m_instances{ std::move(instances) },
+	m_worldToInstanceTransformation{ worldToInstanceTransformation },
+	m_bones{ bones },
+	m_boundingBox{}
+{
+	// Compute preliminary bounding box so we have something for the light tree
+	std::vector<ei::Box> threadAabbs(get_max_thread_num(), []() {
+		ei::Box aabb{};
+		aabb.min = ei::Vec3{ std::numeric_limits<float>::max() };
+		aabb.max = ei::Vec3{ -std::numeric_limits<float>::max() };
+		return aabb;
+	}());
+	const auto instanceCount = static_cast<i32>(m_instances.size());
+#pragma PARALLEL_FOR
+	for(i32 i = 0; i < instanceCount; ++i) {
+		const auto inst = m_instances[i];
+		const u32 instanceLod = m_scenario.get_effective_lod(inst);
+		const auto& worldToInst = m_worldToInstanceTransformation[i];
+		const auto instToWorld = InstanceData<Device::CPU>::compute_instance_to_world_transformation(worldToInst);
+		threadAabbs[get_current_thread_idx()] = ei::Box{
+			threadAabbs[get_current_thread_idx()],
+			inst->get_bounding_box(instanceLod, instToWorld)
+		};
+	}
+	m_boundingBox.min = ei::Vec3{ std::numeric_limits<float>::max() };
+	m_boundingBox.max = ei::Vec3{ -std::numeric_limits<float>::max() };
+	for(const auto& box : threadAabbs)
+		m_boundingBox = ei::Box{ m_boundingBox, box };
+}
+
 bool Scene::is_sane() const noexcept {
 	if(m_scenario.get_camera() == nullptr) {
 		logWarning("[Scene::is_sane] No camera given.");
@@ -413,6 +451,10 @@ void Scene::set_lights(std::vector<lights::PositionalLights>&& posLights,
 	}
 	const int* materials = as<int>(m_materials.template acquire_const<Device::CPU>());
 
+	// The flux computation of directional lights relies on the presence of a valid bounding box.
+	// Unfortunately, since we build the light tree before building a descriptor (and thus
+	// having an accurate bounding box), we have to make due with the approximate one
+	// computed in the constructor, which does not take into account animation.
 	m_lightTree.build(std::move(posLights), std::move(dirLights),
 					  m_boundingBox, materials);
 	m_lightTreeDescChanged.for_each([](auto &elem) { elem.changed = true; });

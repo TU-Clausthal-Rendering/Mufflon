@@ -39,18 +39,7 @@ public:
 		  util::FixedHashMap<ObjectHandle, InstanceRef>&& objects,
 		  std::vector<InstanceHandle>&& instances,
 		  const std::vector<ei::Mat3x4>& worldToInstanceTransformation,
-		  const Bone* bones) :
-		m_scenario(scenario),
-		m_frame(frame),
-		m_objects{ std::move(objects) },
-		m_instances{ std::move(instances) },
-		m_worldToInstanceTransformation{ worldToInstanceTransformation },
-		m_bones{ bones },
-		m_boundingBox{}
-	{
-		m_boundingBox.min = ei::Vec3{ std::numeric_limits<float>::max() };
-		m_boundingBox.max = ei::Vec3{ -std::numeric_limits<float>::max() };
-	}
+		  const Bone* bones);
 	Scene(const Scene&) = delete;
 	Scene(Scene&&) = delete;
 	Scene& operator=(const Scene&) = delete;
