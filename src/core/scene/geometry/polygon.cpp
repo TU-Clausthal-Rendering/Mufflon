@@ -391,8 +391,7 @@ void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& s
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
 	// This is necessary since we'd otherwise need to pass an accessor into the tessellater
-	OpenMesh::FPropHandleT<MaterialIndex> matIdxProp;
-	m_meshData->get_property_handle(matIdxProp, MAT_INDICES_NAME);
+	OpenMesh::FPropHandleT<MaterialIndex> matIdxProp{ static_cast<int>(m_matIndicesHdl.index) };
 	oracle.set_mat_properties(scenario, matIdxProp);
 	tessellation::DisplacementMapper tessellater(oracle);
 	tessellater.set_scenario(scenario);
