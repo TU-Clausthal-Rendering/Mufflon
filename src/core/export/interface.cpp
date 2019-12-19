@@ -342,13 +342,14 @@ VertexHdl polygon_add_vertex(LodHdl lvlDtl, Vec3 point, Vec3 normal, Vec2 uv) {
 FaceHdl polygon_add_triangle(LodHdl lvlDtl, UVec3 vertices) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
-
-	PolyFHdl hdl = static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().add(
+	Lod& lod = *static_cast<Lod*>(lvlDtl);
+	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
 		PolyVHdl{ static_cast<int>(vertices.y) },
 		PolyVHdl{ static_cast<int>(vertices.z) });
 	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon");
+		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon (object '",
+				 lod.get_parent()->get_name(), "')");
 		return FaceHdl{ INVALID_INDEX };
 	}
 	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
@@ -359,13 +360,15 @@ FaceHdl polygon_add_triangle_material(LodHdl lvlDtl, UVec3 vertices,
 										 MatIdx idx) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
-	PolyFHdl hdl = static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().add(
+	Lod& lod = *static_cast<Lod*>(lvlDtl);
+	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
 		PolyVHdl{ static_cast<int>(vertices.y) },
 		PolyVHdl{ static_cast<int>(vertices.z) },
 		MaterialIndex{ idx });
 	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon");
+		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon (object '",
+				 lod.get_parent()->get_name(), "')");
 		return FaceHdl{ INVALID_INDEX };
 	}
 	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
@@ -375,13 +378,15 @@ FaceHdl polygon_add_triangle_material(LodHdl lvlDtl, UVec3 vertices,
 FaceHdl polygon_add_quad(LodHdl lvlDtl, UVec4 vertices) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
-	PolyFHdl hdl = static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().add(
+	Lod& lod = *static_cast<Lod*>(lvlDtl);
+	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
 		PolyVHdl{ static_cast<int>(vertices.y) },
 		PolyVHdl{ static_cast<int>(vertices.z) },
 		PolyVHdl{ static_cast<int>(vertices.w) });
 	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon");
+		logError("[", FUNCTION_NAME, "] Error adding quad to polygon (object '",
+				 lod.get_parent()->get_name(), "')");
 		return FaceHdl{ INVALID_INDEX };
 	}
 	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
@@ -392,14 +397,16 @@ FaceHdl polygon_add_quad_material(LodHdl lvlDtl, UVec4 vertices,
 									 MatIdx idx) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
-	PolyFHdl hdl = static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().add(
+	Lod& lod = *static_cast<Lod*>(lvlDtl);
+	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
 		PolyVHdl{ static_cast<int>(vertices.y) },
 		PolyVHdl{ static_cast<int>(vertices.z) },
 		PolyVHdl{ static_cast<int>(vertices.w) },
 		MaterialIndex{ idx });
 	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon");
+		logError("[", FUNCTION_NAME, "] Error adding quad to polygon (object '",
+				 lod.get_parent()->get_name(), "')");
 		return FaceHdl{ INVALID_INDEX };
 	}
 	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };

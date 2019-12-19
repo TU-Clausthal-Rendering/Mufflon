@@ -110,9 +110,8 @@ public:
 		return aabb;
 	}
 
-	void set_parent(const Object* parent) noexcept {
-		m_parent = parent;
-	}
+	const Object* get_parent() const noexcept { return m_parent; }
+	void set_parent(const Object* parent) noexcept { m_parent = parent; }
 
 	// Checks if displacement mapping was applied to all of the LoD's geometry
 	bool was_displacement_mapping_applied() const noexcept {

@@ -332,11 +332,11 @@ public:
 
 	template < Device dev, class T >
 	ArrayDevHandle_t<dev, T> acquire(const VertexAttributeHandle& hdl) {
-		return m_vertexAttributes.acquire<dev, T>(hdl);
+		return m_vertexAttributes.template acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
 	ArrayDevHandle_t<dev, T> acquire(const FaceAttributeHandle& hdl) {
-		return m_faceAttributes.acquire<dev, T>(hdl);
+		return m_faceAttributes.template acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
 	ConstArrayDevHandle_t<dev, T> acquire_const(const VertexAttributeHandle& hdl) {
