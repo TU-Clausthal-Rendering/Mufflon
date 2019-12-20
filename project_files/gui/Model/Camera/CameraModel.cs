@@ -38,18 +38,16 @@ namespace gui.Model.Camera
         {
             Handle = handle;
             // We need to loop over all frames to get the camera positions for each one
-            uint frameStart, frameEnd;
-            if(!Core.world_get_frame_start(out frameStart))
-                throw new Exception(Core.core_get_dll_error());
-            if(!Core.world_get_frame_end(out frameEnd))
+            uint frameCount;
+            if(!Core.world_get_frame_count(out frameCount))
                 throw new Exception(Core.core_get_dll_error());
 
-            for (uint frame = frameStart; frame <= frameEnd; ++frame)
+            for (uint frame = 0; frame < frameCount; ++frame)
             {
                 Core.Vec3 position, direction, up;
-                if (!(Core.world_get_camera_position(handle, out position, frame - frameStart)
-                    && Core.world_get_camera_direction(handle, out direction, frame - frameStart)
-                    && Core.world_get_camera_up(handle, out up, frame - frameStart)))
+                if (!(Core.world_get_camera_position(handle, out position, frame)
+                    && Core.world_get_camera_direction(handle, out direction, frame)
+                    && Core.world_get_camera_up(handle, out up, frame)))
                     throw new Exception(Core.core_get_dll_error());
                 m_originalData.Add(new OriginalData {
                     position = Position,

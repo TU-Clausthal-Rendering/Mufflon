@@ -34,7 +34,8 @@ public:
 		m_geometry{},
 		m_accelStruct{},
 		m_parent{ parent },
-		m_flags{ 0 }
+		m_flags{ 0 },
+		m_appliedFrame{ ~0u }
 	{}
 	// Warning: implicit sync!
 	Lod(Lod&) = default;
@@ -110,9 +111,8 @@ public:
 		return aabb;
 	}
 
-	void set_parent(const Object* parent) noexcept {
-		m_parent = parent;
-	}
+	const Object* get_parent() const noexcept { return m_parent; }
+	void set_parent(const Object* parent) noexcept { m_parent = parent; }
 
 	// Checks if displacement mapping was applied to all of the LoD's geometry
 	bool was_displacement_mapping_applied() const noexcept {
@@ -128,6 +128,18 @@ public:
 	// Tessellates the LoD. If scenario is not null, the tessellation is adaptive
 	void tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
 					const bool usePhong);
+	bool has_bone_animation() const noexcept {
+		return m_geometry.template get<geometry::Polygons>().has_bone_animation();
+	}
+	// Apply bone animation transformations if this object has animation weights
+	void apply_animation(u32 frame, const Bone* bones);
+
+	bool was_animated() const noexcept {
+		return m_appliedFrame != ~0u;
+	}
+	u32 get_frame() const noexcept {
+		return m_appliedFrame;
+	}
 
 private:
 	// Geometry data
@@ -136,6 +148,7 @@ private:
 	accel_struct::LBVHBuilder m_accelStruct;
 	const Object* m_parent;
 	u64 m_flags;	// Stores flags (2 bits per-scenario)
+	u32 m_appliedFrame;
 };
 
 }} // mufflon::scene

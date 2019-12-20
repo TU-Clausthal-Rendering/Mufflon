@@ -99,4 +99,19 @@ template void Lod::update_attribute_descriptor<Device::OPENGL>(LodDescriptor<Dev
 																const std::vector<AttributeIdentifier>&,
 																const std::vector<AttributeIdentifier>&,
 																const std::vector<AttributeIdentifier>&);
+
+void Lod::apply_animation(u32 frame, const Bone* bones) {
+	if(!has_bone_animation()) return;
+	if(m_appliedFrame == frame) return;
+	if(m_appliedFrame != ~0u)
+		logWarning("[Lod::apply_animation] There is a different animation frame applied. The new animation will be made on top of that.");
+	bool hasChanged = false;
+	m_geometry.for_each([&hasChanged, frame, bones](auto& elem) {
+		hasChanged |= elem.apply_animation(frame, bones);
+	});
+	if(hasChanged)
+		m_accelStruct.mark_invalid();
+	m_appliedFrame = frame;
+}
+
 } // namespace mufflon::scene

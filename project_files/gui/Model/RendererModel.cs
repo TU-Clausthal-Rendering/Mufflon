@@ -190,9 +190,7 @@ namespace gui.Model
         // Controls whether the rendering sequence will switch to the next frame
         // upon completing the mandated number of iterations
         public bool RenderAnimation { get; set; } = false;
-        // Additionally, these control min./max. of the rendering and a callback that gets invoked upon frame completion
-        public int AnimationStart { get; set; } = -1;
-        public int AnimationEnd { get; set; } = -1;
+        public bool LoopAnimation { get; set; } = false;
         public FrameCompletionHandler AnimationFrameComplete { get; set; } = null;
         public AnimationCompletionHandler AnimationComplete { get; set; } = null;
 

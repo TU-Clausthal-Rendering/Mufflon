@@ -108,23 +108,25 @@ namespace gui.Controller.Renderer
                         if(m_incrementFrame)
                         {
                             m_incrementFrame = false;
-
-                            if (m_models.Renderer.AnimationStart < m_models.World.AnimationFrameStart)
+                            // If we're at the end of the animation sequence we either loop or stop
+                            if (m_models.World.AnimationFrameCurrent + 1u == m_models.World.AnimationFrameCount)
                             {
-                                if (m_models.World.AnimationFrameCurrent >= m_models.World.AnimationFrameEnd)
-                                    m_models.World.AnimationFrameCurrent = m_models.World.AnimationFrameStart;
-                                else
-                                    ++m_models.World.AnimationFrameCurrent;
-                            } else
-                            {
-                                if(m_models.World.AnimationFrameCurrent >= m_models.Renderer.AnimationEnd)
+                                if(m_models.Renderer.LoopAnimation)
                                 {
+                                    m_models.World.AnimationFrameCurrent = 0u;
+                                    m_iterationsPerformed = 0;
+                                } else
+                                {
+                                    // If we stop, m_iterationsPerformed is our break condition further below
                                     m_iterationsPerformed = m_models.Renderer.RemainingIterations;
                                     m_wasLastAnimFrame = true;
                                 }
-                                ++m_models.World.AnimationFrameCurrent;
                             }
-                            m_iterationsPerformed = 0;
+                            else
+                            {
+                                ++m_models.World.AnimationFrameCurrent;
+                                m_iterationsPerformed = 0;
+                            }
                         }
 
                         if (m_iterationsPerformed < m_models.Renderer.RemainingIterations || m_models.Renderer.RemainingIterations < 0)
@@ -143,8 +145,18 @@ namespace gui.Controller.Renderer
                             // Check if we're animating
                             if (m_models.Renderer.RenderAnimation)
                             {
+                                if(m_wasLastAnimFrame)
+                                {
+                                    m_wasLastAnimFrame = false;
+                                    System.Windows.Application.Current.Dispatcher.Invoke(new Action(() => m_models.Renderer.IsRendering = false));
+                                    m_models.Renderer.RenderLock.Reset();
+                                } else
+                                {
+                                    m_incrementFrame = true;
+                                }
+
                                 // Check if we need to reset the animation frame
-                                if (m_models.Renderer.AnimationStart < m_models.World.AnimationFrameStart)
+                                /*if (m_models.Renderer.AnimationStart < m_models.World.AnimationFrameStart)
                                 {
                                     m_incrementFrame = true;
                                 } else
@@ -159,7 +171,7 @@ namespace gui.Controller.Renderer
                                     {
                                         m_incrementFrame = true;
                                     }
-                                }
+                                }*/
                             } else
                             {
                                 // No more iterations left -> we're done

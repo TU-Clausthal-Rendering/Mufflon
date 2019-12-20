@@ -165,9 +165,9 @@ Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 	// Resize the attribute and set the vertex data
 	m_vertexAttributes.resize(m_vertexAttributes.get_attribute_elem_count() + 1u);
 
-	m_vertexAttributes.acquire<Device::CPU, OpenMesh::Vec3f>(m_pointsHdl)[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
-	m_vertexAttributes.acquire<Device::CPU, OpenMesh::Vec3f>(m_normalsHdl)[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
-	m_vertexAttributes.acquire<Device::CPU, OpenMesh::Vec2f>(m_uvsHdl)[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
+	m_vertexAttributes.template acquire<Device::CPU, OpenMesh::Vec3f>(m_pointsHdl)[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
+	m_vertexAttributes.template acquire<Device::CPU, OpenMesh::Vec3f>(m_normalsHdl)[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
+	m_vertexAttributes.template acquire<Device::CPU, OpenMesh::Vec2f>(m_uvsHdl)[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
 	m_vertexAttributes.mark_changed(Device::CPU);
 	// Expand the mesh's bounding box
 	m_boundingBox = ei::Box(m_boundingBox, ei::Box(point));
@@ -200,7 +200,7 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
 									   const VertexHandle& v2, MaterialIndex idx) {
 	TriangleHandle hdl = this->add(v0, v1, v2);
-	m_faceAttributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
+	m_faceAttributes.template acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
 	m_faceAttributes.mark_changed(Device::CPU);
 	return hdl;
 }
@@ -249,7 +249,7 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 								   const VertexHandle& v2, const VertexHandle& v3,
 								   MaterialIndex idx) {
 	QuadHandle hdl = this->add(v0, v1, v2, v3);
-	m_faceAttributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
+	m_faceAttributes.template acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
 	m_faceAttributes.mark_changed(Device::CPU);
 	return hdl;
 }
@@ -288,7 +288,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	std::size_t readNormals = m_vertexAttributes.restore(m_normalsHdl, normalStream, start, count);
 	std::size_t readUvs = m_vertexAttributes.restore(m_uvsHdl, uvStream, start, count);
 	// Expand the bounding box
-	const OpenMesh::Vec3f* points = m_vertexAttributes.acquire_const<Device::CPU, OpenMesh::Vec3f>(m_pointsHdl);
+	const OpenMesh::Vec3f* points = m_vertexAttributes.template acquire_const<Device::CPU, OpenMesh::Vec3f>(m_pointsHdl);
 	for(std::size_t i = start; i < start + readPoints; ++i) {
 		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(points[i]), m_boundingBox.max);
 		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(points[i]), m_boundingBox.min);
@@ -331,7 +331,7 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	std::size_t readPoints = m_vertexAttributes.restore(m_pointsHdl, pointStream, start, count);
 	std::size_t readUvs = m_vertexAttributes.restore(m_uvsHdl, uvStream, start, count);
 	// Expand the bounding box
-	const OpenMesh::Vec3f* points = m_vertexAttributes.acquire_const<Device::CPU, OpenMesh::Vec3f>(m_pointsHdl);
+	const OpenMesh::Vec3f* points = m_vertexAttributes.template acquire_const<Device::CPU, OpenMesh::Vec3f>(m_pointsHdl);
 	for(std::size_t i = start; i < start + readPoints; ++i) {
 		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(points[i]), m_boundingBox.max);
 		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(points[i]), m_boundingBox.min);
@@ -391,8 +391,7 @@ void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& s
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
 	// This is necessary since we'd otherwise need to pass an accessor into the tessellater
-	OpenMesh::FPropHandleT<MaterialIndex> matIdxProp;
-	m_meshData->get_property_handle(matIdxProp, MAT_INDICES_NAME);
+	OpenMesh::FPropHandleT<MaterialIndex> matIdxProp{ static_cast<int>(m_matIndicesHdl.index) };
 	oracle.set_mat_properties(scenario, matIdxProp);
 	tessellation::DisplacementMapper tessellater(oracle);
 	tessellater.set_scenario(scenario);
@@ -406,6 +405,44 @@ void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& s
 	m_wasDisplaced = true;
 	logInfo("Uniformly tessellated polygon mesh (", prevTri, "/", prevQuad,
 			" -> ", m_triangles, "/", m_quads, ")");
+}
+
+bool Polygons::apply_animation(u32 frame, const Bone* bones) {
+	if(!m_animationWeightHdl.has_value())
+		return false;
+	auto weights = acquire_const<Device::CPU, ei::UVec4>(*m_animationWeightHdl);
+	auto normals = acquire<Device::CPU, ei::Vec3>(get_normals_hdl());
+	auto positions = acquire<Device::CPU, ei::Vec3>(get_points_hdl());
+
+	// We also have to recalculate the bounding box
+	m_boundingBox.min = ei::Vec3{ std::numeric_limits<float>::max() };
+	m_boundingBox.max = ei::Vec3{ -std::numeric_limits<float>::max() };
+
+	for(auto vertex : m_meshData->vertices()) {
+		// Decode weight and bone index and sum all the dual quaternions
+		ei::UVec4 codedWeights = weights[vertex.idx()];
+		// We must NOT start at 0,0,0,1 for the real part
+		ei::DualQuaternion q{ 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+		bool transformed = false;
+		for(int i = 0; i < 4; ++i) {
+			float weight = (codedWeights[i] >> 22) / 1023.0f;
+			u32 idx = codedWeights[i] & 0x003fffff;
+			if(idx != 0x003fffff) {
+				q += bones[idx].transformation * weight;
+				transformed = true;
+			}
+		}
+		if(transformed)
+			q = ei::normalize(q);
+		else
+			q = ei::qqidentity();
+		const auto newPos = ei::transform(positions[vertex.idx()], q);
+		positions[vertex.idx()] = newPos;
+		normals[vertex.idx()] = ei::transformDir(normals[vertex.idx()], q);
+		m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ newPos } };
+	}
+	this->mark_changed(Device::CPU);
+	return true;
 }
 
 // Creates a decimater 
@@ -475,7 +512,7 @@ void Polygons::transform(const ei::Mat3x4& transMat) {
 	// Transform mesh
 	ei::Mat3x3 rotation(transMat);
 	ei::Vec3 translation(transMat[3], transMat[7], transMat[11]);
-	ei::Vec3* vertices = m_vertexAttributes.acquire<Device::CPU, ei::Vec3>(m_pointsHdl);
+	ei::Vec3* vertices = m_vertexAttributes.template acquire<Device::CPU, ei::Vec3>(m_pointsHdl);
 	for(size_t i = 0; i < this->get_vertex_count(); i++) {
 		vertices[i] = rotation * vertices[i];
 		vertices[i] += translation;
@@ -483,7 +520,7 @@ void Polygons::transform(const ei::Mat3x4& transMat) {
 		m_boundingBox.min = ei::min(vertices[i], m_boundingBox.min);
 	}
 	// Transform normals
-	ei::Vec3* normals = m_vertexAttributes.acquire<Device::CPU, ei::Vec3>(m_normalsHdl);
+	ei::Vec3* normals = m_vertexAttributes.template acquire<Device::CPU, ei::Vec3>(m_normalsHdl);
 	for(size_t i = 0; i < this->get_vertex_count(); i++) { // one normal per vertex
 		normals[i] = ei::normalize(rotation * normals[i]);
 	}
@@ -593,11 +630,11 @@ PolygonsDescriptor<dev> Polygons::get_descriptor() {
 		static_cast<u32>(this->get_quad_count()),
 		0u,
 		0u,
-		this->acquire_const<dev, ei::Vec3>(this->get_points_hdl()),
-		this->acquire_const<dev, ei::Vec3>(this->get_normals_hdl()),
-		this->acquire_const<dev, ei::Vec2>(this->get_uvs_hdl()),
-		this->acquire_const<dev, u16>(this->get_material_indices_hdl()),
-		this->get_index_buffer<dev>(),
+		this->template acquire_const<dev, ei::Vec3>(this->get_points_hdl()),
+		this->template acquire_const<dev, ei::Vec3>(this->get_normals_hdl()),
+		this->template acquire_const<dev, ei::Vec2>(this->get_uvs_hdl()),
+		this->template acquire_const<dev, u16>(this->get_material_indices_hdl()),
+		this->template get_index_buffer<dev>(),
 		//	m_attribBuffer.template get<AttribBuffer<dev>>().vertex,
 		ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{},
 		ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>>{}

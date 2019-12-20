@@ -63,23 +63,12 @@ namespace gui.Model.Scene
             set => Core.world_set_tessellation_level(value);
         }
 
-        public uint AnimationFrameStart
+        public uint AnimationFrameCount
         {
             get
             {
                 uint frame;
-                if (!Core.world_get_frame_start(out frame))
-                    throw new Exception(Core.core_get_dll_error());
-                return frame;
-            }
-        }
-
-        public uint AnimationFrameEnd
-        {
-            get
-            {
-                uint frame;
-                if (!Core.world_get_frame_end(out frame))
+                if (!Core.world_get_frame_count(out frame))
                     throw new Exception(Core.core_get_dll_error());
                 return frame;
             }
@@ -123,8 +112,7 @@ namespace gui.Model.Scene
             OnPropertyChanged(nameof(BoundingBox));
             OnPropertyChanged(nameof(IsSane));
             OnPropertyChanged(nameof(AnimationFrameCurrent));
-            OnPropertyChanged(nameof(AnimationFrameStart));
-            OnPropertyChanged(nameof(AnimationFrameEnd));
+            OnPropertyChanged(nameof(AnimationFrameCount));
         }
 
         public BoundingBox BoundingBox

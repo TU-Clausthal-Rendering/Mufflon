@@ -65,6 +65,11 @@ typedef struct {
 } AABB;
 
 typedef struct {
+	Vec4 q0;	// i, j, k, r
+	Vec4 qe;	// e(i, j, k, r)
+} DualQuaternion;
+
+typedef struct {
 	uint64_t cycles;
 	uint64_t microseconds;
 } ProcessTime;
@@ -178,6 +183,7 @@ typedef enum {
 	ATTRTYPE_FLOAT2,
 	ATTRTYPE_FLOAT3,
 	ATTRTYPE_FLOAT4,
+	ATTRTYPE_UVEC4,
 	ATTRTYPE_SPHERE,
 	ATTRTYPE_COUNT
 } GeomAttributeType;
@@ -409,7 +415,9 @@ CORE_API Boolean CDECL world_finalize(const char** msg);
 CORE_API Boolean CDECL world_finalize_scenario(ConstScenarioHdl, const char** msg);
 CORE_API void CDECL world_reserve_objects_instances(const uint32_t objects, const uint32_t instances);
 CORE_API void CDECL world_reserve_scenarios(const uint32_t scenarios);
+CORE_API void CDECL world_reserve_animation(const uint32_t numBones, const uint32_t frameCount);
 CORE_API ObjectHdl CDECL world_create_object(const char* name, ObjectFlags flags);
+CORE_API void CDECL world_set_bone(const uint32_t boneIndex, const uint32_t frame, const DualQuaternion* transformation);
 CORE_API ObjectHdl CDECL world_get_object(const char* name);
 CORE_API const char* CDECL world_get_object_name(ObjectHdl obj);
 CORE_API InstanceHdl CDECL world_create_instance(ObjectHdl obj, const uint32_t animationFrame);
@@ -462,8 +470,7 @@ CORE_API SceneHdl CDECL world_load_scenario(ScenarioHdl scenario);
 CORE_API SceneHdl CDECL world_get_current_scene();
 CORE_API Boolean CDECL world_set_frame_current(const uint32_t animationFrame);
 CORE_API Boolean CDECL world_get_frame_current(uint32_t* animationFrame);
-CORE_API Boolean CDECL world_get_frame_start(uint32_t* animationFrame);
-CORE_API Boolean CDECL world_get_frame_end(uint32_t* animationFrame);
+CORE_API Boolean CDECL world_get_frame_count(uint32_t* animationFrame);
 CORE_API void CDECL world_set_tessellation_level(const float maxTessLevel);
 CORE_API float CDECL world_get_tessellation_level();
 

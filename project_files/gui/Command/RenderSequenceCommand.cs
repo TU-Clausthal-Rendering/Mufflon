@@ -10,18 +10,18 @@ namespace gui.Command
     {
         private readonly Models m_models;
 
-        int m_start, m_end, m_initial;
+        int m_initialFrame;
+        bool m_loopAnimation;
         bool m_takeScreenshots;
 
-        public RenderSequenceCommand(Models models, int start, int end, int initial, bool takeScreenshots)
+        public RenderSequenceCommand(Models models, int initialFrame, bool loopAnimation, bool takeScreenshots)
         {
             m_models = models;
             m_models.PropertyChanged += ModelsOnPropertyChanged;
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
             m_models.Toolbar.PropertyChanged += IterationsOnPropertyChanged;
-            m_start = start;
-            m_end = end;
-            m_initial = initial;
+            m_initialFrame = initialFrame;
+            m_loopAnimation = loopAnimation;
             m_takeScreenshots = takeScreenshots;
         }
 
@@ -52,19 +52,9 @@ namespace gui.Command
         public void Execute(object parameter)
         {
             // Initiate a sequence rendering
-            if (m_initial >= 0)
-                m_models.World.AnimationFrameCurrent = (uint)Math.Max(m_models.World.AnimationFrameStart,
-                                                                      Math.Min(m_models.World.AnimationFrameEnd, m_initial));
-            if (m_start >= 0)
-                m_models.Renderer.AnimationStart = (int)Math.Max(m_models.World.AnimationFrameStart,
-                                                                  Math.Min(m_models.World.AnimationFrameEnd, m_start));
-            else
-                m_models.Renderer.AnimationStart = -1;
-            if (m_end >= 0)
-                m_models.Renderer.AnimationEnd = (int)Math.Max(m_models.World.AnimationFrameStart,
-                                                                  Math.Min(m_models.World.AnimationFrameEnd, m_end));
-            else
-                m_models.Renderer.AnimationEnd = -1;
+            if (m_initialFrame >= 0 && m_models.World.AnimationFrameCount != 0u)
+                m_models.World.AnimationFrameCurrent = (uint)Math.Min(m_initialFrame, m_models.World.AnimationFrameCount - 1u);
+            m_models.Renderer.LoopAnimation = m_loopAnimation;
 
             if(m_takeScreenshots)
             {

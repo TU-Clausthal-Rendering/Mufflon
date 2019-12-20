@@ -144,12 +144,12 @@ public:
 
 	template < Device dev, class T >
 	ArrayDevHandle_t<dev, T> acquire(const AttrHandle& handle) {
-		this->synchronize<dev>();
+		this->template synchronize<dev>();
 		return AcquireHelper<dev>::template acquire<T>(*this, handle);
 	}
 	template < Device dev, class T >
 	ConstArrayDevHandle_t<dev, T> acquire_const(const AttrHandle& handle) {
-		this->synchronize<dev>();
+		this->template synchronize<dev>();
 		return AcquireHelper<dev>::template acquire<T>(*this, handle);
 	}
 

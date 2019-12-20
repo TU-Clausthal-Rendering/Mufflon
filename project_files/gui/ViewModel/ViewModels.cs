@@ -82,7 +82,7 @@ namespace gui.ViewModel
             SelectRendererCommand = new SelectRendererCommand(m_models);
             OpenSettingsCommand = new OpenSettingsCommand(m_models);
             DenoiseImageCommand = new SaveDenoisedScreenshotCommand(m_models);
-            RenderAnimatedSequenceCommand = new RenderSequenceCommand(m_models, 0, int.MaxValue, 0, true);
+            RenderAnimatedSequenceCommand = new RenderSequenceCommand(m_models, 0, false, true);
 
             KeyGestures = new KeyGestureViewModel(models);
         }

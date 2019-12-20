@@ -151,6 +151,12 @@ public:
 	void reserve(std::size_t vertices, std::size_t edges, std::size_t tris, std::size_t quads);
 
 	VertexAttributeHandle add_vertex_attribute(StringView name, AttributeType type) {
+		// Special casing to accelerate animation query
+		if(name == StringView("AnimationWeights")) {
+			m_animationWeightHdl = m_vertexAttributes.add_attribute(AttributeIdentifier{ type, name });
+			return m_animationWeightHdl.value();
+		}
+
 		return m_vertexAttributes.add_attribute(AttributeIdentifier{ type, name });
 	}
 	FaceAttributeHandle add_face_attribute(StringView name, AttributeType type) {
@@ -276,6 +282,14 @@ public:
 					const bool usePhong);
 	// Implements displacement mapping for the mesh
 	void displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario);
+	// Checks if the polygon has a bone animation
+	bool has_bone_animation() const noexcept {
+		return m_animationWeightHdl.has_value();
+	}
+
+	// Apply bone animation transformations if this mesh has animation weights
+	// Returns wether there was an animation or not (in which case nothing was done).
+	bool apply_animation(u32 frame, const Bone* bones);
 
 	// Creates a decimater 
 	OpenMesh::Decimater::DecimaterT<PolygonMeshType> create_decimater();
@@ -319,11 +333,11 @@ public:
 
 	template < Device dev, class T >
 	ArrayDevHandle_t<dev, T> acquire(const VertexAttributeHandle& hdl) {
-		return m_vertexAttributes.acquire<dev, T>(hdl);
+		return m_vertexAttributes.template acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
 	ArrayDevHandle_t<dev, T> acquire(const FaceAttributeHandle& hdl) {
-		return m_faceAttributes.acquire<dev, T>(hdl);
+		return m_faceAttributes.template acquire<dev, T>(hdl);
 	}
 	template < Device dev, class T >
 	ConstArrayDevHandle_t<dev, T> acquire_const(const VertexAttributeHandle& hdl) {
@@ -470,6 +484,7 @@ private:
 	VertexAttributeHandle m_normalsHdl;
 	VertexAttributeHandle m_uvsHdl;
 	std::optional<VertexAttributeHandle> m_curvatureHdl;
+	std::optional<VertexAttributeHandle> m_animationWeightHdl;
 	FaceAttributeHandle m_matIndicesHdl;
 	// Vertex-index buffer, first for the triangles, then for quads
 	IndexBuffers m_indexBuffer;

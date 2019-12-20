@@ -35,18 +35,11 @@ public:
 		u32 count;
 	};
 
-	Scene(const Scenario& scenario, const u32 animationPathIndex,
+	Scene(const Scenario& scenario, const u32 frame,
 		  util::FixedHashMap<ObjectHandle, InstanceRef>&& objects,
 		  std::vector<InstanceHandle>&& instances,
 		  const std::vector<ei::Mat3x4>& worldToInstanceTransformation,
-		  const ei::Box& aabb) :
-		m_scenario(scenario),
-		m_animationPathIndex(animationPathIndex),
-		m_objects{ std::move(objects) },
-		m_instances{ std::move(instances) },
-		m_worldToInstanceTransformation{ worldToInstanceTransformation },
-		m_boundingBox{ aabb }
-	{}
+		  const Bone* bones);
 	Scene(const Scene&) = delete;
 	Scene(Scene&&) = delete;
 	Scene& operator=(const Scene&) = delete;
@@ -175,6 +168,8 @@ public:
 	void remove_curvature();
 
 private:
+	static constexpr float SUGGESTED_MAX_SCENE_SIZE = 1024.f*1024.f;
+
 	template < Device dev >
 	struct ChangedFlag {
 		bool changed = true;
@@ -191,7 +186,7 @@ private:
 	void update_camera_medium(SceneDescriptor<dev>& scene);
 
 	const Scenario& m_scenario;			// Reference to the scenario which is presented by this scene
-	const u32 m_animationPathIndex;		// Path index for camera animation
+	const u32 m_frame;					// Frame used for this scene (also path index for camera animation)
 
 	// List of instances and thus objects to-be-rendered
 	// We need this to ensure we only create one descriptor per object
@@ -199,6 +194,7 @@ private:
 	// List of instances; object list entries hold an index into this
 	std::vector<InstanceHandle> m_instances;
 	const std::vector<ei::Mat3x4>& m_worldToInstanceTransformation;
+	const Bone* m_bones = nullptr;
 
 	GenericResource m_media;			// Device copy of the media. It is not possible to access the world from a CUDA compiled file.
 	//ConstCameraHandle m_camera;		// The single, chosen camera for rendering this scene

@@ -342,13 +342,14 @@ VertexHdl polygon_add_vertex(LodHdl lvlDtl, Vec3 point, Vec3 normal, Vec2 uv) {
 FaceHdl polygon_add_triangle(LodHdl lvlDtl, UVec3 vertices) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
-
-	PolyFHdl hdl = static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().add(
+	Lod& lod = *static_cast<Lod*>(lvlDtl);
+	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
 		PolyVHdl{ static_cast<int>(vertices.y) },
 		PolyVHdl{ static_cast<int>(vertices.z) });
 	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon");
+		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon (object '",
+				 lod.get_parent()->get_name(), "')");
 		return FaceHdl{ INVALID_INDEX };
 	}
 	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
@@ -359,13 +360,15 @@ FaceHdl polygon_add_triangle_material(LodHdl lvlDtl, UVec3 vertices,
 										 MatIdx idx) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
-	PolyFHdl hdl = static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().add(
+	Lod& lod = *static_cast<Lod*>(lvlDtl);
+	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
 		PolyVHdl{ static_cast<int>(vertices.y) },
 		PolyVHdl{ static_cast<int>(vertices.z) },
 		MaterialIndex{ idx });
 	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon");
+		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon (object '",
+				 lod.get_parent()->get_name(), "')");
 		return FaceHdl{ INVALID_INDEX };
 	}
 	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
@@ -375,13 +378,15 @@ FaceHdl polygon_add_triangle_material(LodHdl lvlDtl, UVec3 vertices,
 FaceHdl polygon_add_quad(LodHdl lvlDtl, UVec4 vertices) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
-	PolyFHdl hdl = static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().add(
+	Lod& lod = *static_cast<Lod*>(lvlDtl);
+	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
 		PolyVHdl{ static_cast<int>(vertices.y) },
 		PolyVHdl{ static_cast<int>(vertices.z) },
 		PolyVHdl{ static_cast<int>(vertices.w) });
 	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon");
+		logError("[", FUNCTION_NAME, "] Error adding quad to polygon (object '",
+				 lod.get_parent()->get_name(), "')");
 		return FaceHdl{ INVALID_INDEX };
 	}
 	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
@@ -392,14 +397,16 @@ FaceHdl polygon_add_quad_material(LodHdl lvlDtl, UVec4 vertices,
 									 MatIdx idx) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
-	PolyFHdl hdl = static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().add(
+	Lod& lod = *static_cast<Lod*>(lvlDtl);
+	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
 		PolyVHdl{ static_cast<int>(vertices.x) },
 		PolyVHdl{ static_cast<int>(vertices.y) },
 		PolyVHdl{ static_cast<int>(vertices.z) },
 		PolyVHdl{ static_cast<int>(vertices.w) },
 		MaterialIndex{ idx });
 	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon");
+		logError("[", FUNCTION_NAME, "] Error adding quad to polygon (object '",
+				 lod.get_parent()->get_name(), "')");
 		return FaceHdl{ INVALID_INDEX };
 	}
 	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
@@ -1054,12 +1061,24 @@ void world_reserve_scenarios(const uint32_t scenarios) {
 	CATCH_ALL(;)
 }
 
+void world_reserve_animation(const uint32_t numBones, const uint32_t frameCount) {
+	TRY
+	s_world.reserve_animation(numBones, frameCount);
+	CATCH_ALL(;)
+}
+
 ObjectHdl world_create_object(const char* name, ::ObjectFlags flags) {
 	TRY
 	CHECK_NULLPTR(name, "object name", nullptr);
 	return static_cast<ObjectHdl>(s_world.create_object(name,
 			util::pun<scene::ObjectFlags>(flags)));
 	CATCH_ALL(nullptr)
+}
+
+void world_set_bone(const uint32_t boneIndex, const uint32_t frame, const DualQuaternion* transformation) {
+	TRY
+	s_world.set_bone(boneIndex, frame, util::pun<ei::DualQuaternion>(*transformation));
+	CATCH_ALL(;)
 }
 
 ObjectHdl world_get_object(const char* name) {
@@ -2039,7 +2058,7 @@ Boolean world_get_camera_current_position(ConstCameraHdl cam, Vec3* pos) {
 		CHECK_NULLPTR(cam, "camera handle", false);
 	if(pos != nullptr) {
 		const auto& camera = *static_cast<const cameras::Camera*>(cam);
-		*pos = util::pun<Vec3>(camera.get_position(std::min(s_world.get_frame_current() - s_world.get_frame_start(),
+		*pos = util::pun<Vec3>(camera.get_position(std::min(s_world.get_frame_current(),
 															camera.get_path_segment_count() - 1u)));
 	}
 	return true;
@@ -2062,7 +2081,7 @@ Boolean world_get_camera_current_direction(ConstCameraHdl cam, Vec3* dir) {
 		CHECK_NULLPTR(cam, "camera handle", false);
 	if(dir != nullptr) {
 		const auto& camera = *static_cast<const cameras::Camera*>(cam);
-		*dir = util::pun<Vec3>(camera.get_view_dir(std::min(s_world.get_frame_current() - s_world.get_frame_start(),
+		*dir = util::pun<Vec3>(camera.get_view_dir(std::min(s_world.get_frame_current(),
 															camera.get_path_segment_count() - 1u)));
 	}
 	return true;
@@ -2085,7 +2104,7 @@ Boolean world_get_camera_current_up(ConstCameraHdl cam, Vec3* up) {
 	CHECK_NULLPTR(cam, "camera handle", false);
 	if(up != nullptr) {
 		const auto& camera = *static_cast<const cameras::Camera*>(cam);
-		*up = util::pun<Vec3>(camera.get_up_dir(std::min(s_world.get_frame_current() - s_world.get_frame_start(),
+		*up = util::pun<Vec3>(camera.get_up_dir(std::min(s_world.get_frame_current(),
 															camera.get_path_segment_count() - 1u)));
 	}
 	return true;
@@ -2123,7 +2142,7 @@ Boolean world_set_camera_current_position(CameraHdl cam, Vec3 pos) {
 	TRY
 	CHECK_NULLPTR(cam, "camera handle", false);
 	auto& camera = *static_cast<cameras::Camera*>(cam);
-	camera.set_position(util::pun<scene::Point>(pos), std::min(s_world.get_frame_current() - s_world.get_frame_start(),
+	camera.set_position(util::pun<scene::Point>(pos), std::min(s_world.get_frame_current(),
 															   camera.get_path_segment_count() - 1u));
 	return true;
 	CATCH_ALL(false)
@@ -2146,7 +2165,7 @@ Boolean world_set_camera_current_direction(CameraHdl cam, Vec3 dir, Vec3 up) {
 		CHECK_NULLPTR(cam, "camera handle", false);
 	auto& camera = *static_cast<cameras::Camera*>(cam);
 	camera.set_view_dir(util::pun<scene::Direction>(dir), util::pun<scene::Direction>(up),
-						std::min(s_world.get_frame_current() - s_world.get_frame_start(),
+						std::min(s_world.get_frame_current(),
 								 camera.get_path_segment_count() - 1u));
 	// TODO: compute proper rotation
 	return true;
@@ -2338,18 +2357,10 @@ Boolean world_get_frame_current(uint32_t* animationFrame) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_frame_start(uint32_t* frameStart) {
+Boolean world_get_frame_count(uint32_t* frameCount) {
 	TRY
-	if(frameStart != nullptr)
-		*frameStart = s_world.get_frame_start();
-	return true;
-	CATCH_ALL(false)
-}
-
-Boolean world_get_frame_end(uint32_t* frameEnd) {
-	TRY
-	if(frameEnd != nullptr)
-		*frameEnd = s_world.get_frame_end();
+	if(frameCount != nullptr)
+		*frameCount = s_world.get_frame_count();
 	return true;
 	CATCH_ALL(false)
 }
@@ -2786,7 +2797,7 @@ Boolean scene_move_active_camera(float x, float y, float z) {
 		return false;
 	}
 	auto& camera = *s_world.get_current_scenario()->get_camera();
-	camera.move(x, y, z, std::min(camera.get_path_segment_count() - 1u, s_world.get_frame_current() - s_world.get_frame_start()));
+	camera.move(x, y, z, std::min(camera.get_path_segment_count() - 1u, s_world.get_frame_current()));
 	return true;
 	CATCH_ALL(false)
 }
@@ -2798,7 +2809,7 @@ Boolean scene_rotate_active_camera(float x, float y, float z) {
 		return false;
 	}
 	auto& camera = *s_world.get_current_scenario()->get_camera();
-	const u32 frame = std::min(camera.get_path_segment_count() - 1u, s_world.get_frame_current() - s_world.get_frame_start());
+	const u32 frame = std::min(camera.get_path_segment_count() - 1u, s_world.get_frame_current());
 	camera.rotate_up_down(x, frame);
 	camera.rotate_left_right(y, frame);
 	camera.roll(z, frame);

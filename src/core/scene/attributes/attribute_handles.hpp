@@ -33,6 +33,8 @@ enum class AttributeType : std::uint16_t {
 	FLOAT2,
 	FLOAT3,
 	FLOAT4,
+	UVEC4,
+	// Internal special flag
 	SPHERE
 };
 
@@ -103,11 +105,15 @@ template <>
 inline constexpr AttributeType get_attribute_type<ei::Vec3>() { return AttributeType::FLOAT3; }
 template <>
 inline constexpr AttributeType get_attribute_type<ei::Vec4>() { return AttributeType::FLOAT4; }
+template <>
+inline constexpr AttributeType get_attribute_type<ei::UVec4>() { return AttributeType::UVEC4; }
 // Special cases for points, normals, and UVs
 template <>
 inline constexpr AttributeType get_attribute_type<OpenMesh::Vec2f>() { return AttributeType::FLOAT2; }
 template <>
 inline constexpr AttributeType get_attribute_type<OpenMesh::Vec3f>() { return AttributeType::FLOAT3; }
+template <>
+inline constexpr AttributeType get_attribute_type<OpenMesh::Vec4ui>() { return AttributeType::UVEC4; }
 template <>
 inline constexpr AttributeType get_attribute_type<ei::Sphere>() { return AttributeType::SPHERE; }
 
@@ -188,6 +194,10 @@ inline constexpr AttributeType get_attribute_type<ei::Sphere>() { return Attribu
 		}	break;														\
 		case AttributeType::FLOAT4: {									\
 			using BaseType = OpenMesh::Vec4f;							\
+			expr;														\
+		}	break;														\
+		case AttributeType::UVEC4: {									\
+			using BaseType = OpenMesh::Vec4ui;							\
 			expr;														\
 		}	break;														\
 		case AttributeType::SPHERE: {									\

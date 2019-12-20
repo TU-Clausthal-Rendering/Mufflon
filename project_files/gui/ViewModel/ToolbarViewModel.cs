@@ -26,7 +26,7 @@ namespace gui.ViewModel
             EnterFreeFlightMode = new EnterFreeFlightMode(models);
             OneIterationCommand = new PerformIterationsCommand(m_models, 1u);
             NIterationsCommand = new PerformNIterationsCommand(m_models);
-            ContinuousSequenceRenderCommand = new RenderSequenceCommand(m_models, -1, -1, -1, false);
+            ContinuousSequenceRenderCommand = new RenderSequenceCommand(m_models, -1, true, false);
 
             m_models.Renderer.PropertyChanged += RendererOnPropertyChanged;
             m_models.Settings.PropertyChanged += SettingsOnPropertyChanged;

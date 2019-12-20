@@ -69,7 +69,7 @@ Spheres::SphereHandle Spheres::add(const Point& point, float radius) {
 	std::size_t newIndex = m_attributes.get_attribute_elem_count();
 	SphereHandle hdl(newIndex);
 	m_attributes.resize(newIndex + 1u);
-	ei::Sphere* spheres = m_attributes.acquire<Device::CPU, ei::Sphere>(m_spheresHdl);
+	ei::Sphere* spheres = m_attributes.template acquire<Device::CPU, ei::Sphere>(m_spheresHdl);
 	spheres[newIndex].center = point;
 	spheres[newIndex].radius = radius;
 	m_attributes.mark_changed(Device::CPU);
@@ -80,7 +80,7 @@ Spheres::SphereHandle Spheres::add(const Point& point, float radius) {
 
 Spheres::SphereHandle Spheres::add(const Point& point, float radius, MaterialIndex idx) {
 	SphereHandle hdl = this->add(point, radius);
-	m_attributes.acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl] = idx;
+	m_attributes.template acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl] = idx;
 	m_attributes.mark_changed(Device::CPU);
 	return hdl;
 }
@@ -91,7 +91,7 @@ Spheres::BulkReturn Spheres::add_bulk(std::size_t count, util::IByteReader& radP
 	m_attributes.reserve(start + count);
 	std::size_t readRadPos = m_attributes.restore(m_spheresHdl, radPosStream, start, count);
 	// Expand bounding box
-	const ei::Sphere* radPos = m_attributes.acquire_const<Device::CPU, ei::Sphere>(m_spheresHdl);
+	const ei::Sphere* radPos = m_attributes.template acquire_const<Device::CPU, ei::Sphere>(m_spheresHdl);
 	for(std::size_t i = start; i < start + readRadPos; ++i)
 		m_boundingBox = ei::Box{ m_boundingBox, ei::Box{radPos[i]} };
 	return { hdl, readRadPos };
@@ -132,7 +132,7 @@ void Spheres::transform(const ei::Mat3x4& transMat) {
 		-std::numeric_limits<float>::max()
 	};
 	// Transform mesh
-	ei::Sphere* spheres = m_attributes.acquire<Device::CPU, ei::Sphere>(m_spheresHdl);
+	ei::Sphere* spheres = m_attributes.template acquire<Device::CPU, ei::Sphere>(m_spheresHdl);
 	const float scale = ei::len(ei::Vec3(transMat, 0u, 0u));
 	for (size_t i = 0; i < this->get_sphere_count(); i++) {
 		mAssertMsg(scale == ei::len(ei::Vec3(transMat, 0u, 1u))
@@ -201,6 +201,11 @@ void Spheres::displace(tessellation::TessLevelOracle& oracle, const Scenario& sc
 void Spheres::tessellate(tessellation::TessLevelOracle& /*oracle*/, const Scenario* /*scenario*/,
 						 const bool /*usePhong*/) {
 	// There is no tessellation we can/have to perform for a perfect sphere (yet)
+}
+
+bool Spheres::apply_animation(u32 /*frame*/, const Bone* /*bones*/) {
+	// No bone animation for spheres
+	return false;
 }
 
 template SpheresDescriptor<Device::CPU> Spheres::get_descriptor<Device::CPU>();
