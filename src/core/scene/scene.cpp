@@ -260,7 +260,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 				// Now we can do the per-LoD things like displacement mapping and fetching descriptors
 				if(prevLevel != std::numeric_limits<u32>::max())
 					lodDescs[currLodIndex - 1u].next = i;
-				Lod& lod = obj.first->get_lod(i);
+				Lod* lod = &obj.first->get_lod(i);
 
 				// Reanimate the LoD if necessary
 				if(lod->has_bone_animation()) {
@@ -273,11 +273,11 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 					lod->apply_animation(m_frame, m_bones);
 				}
 				// Determine if it's worth it to use a parallel build
-				lodDescs[currLodIndex] = lod.template get_descriptor<dev>(objLevelParallelism);
+				lodDescs[currLodIndex] = lod->template get_descriptor<dev>(objLevelParallelism);
 				lodDescs[currLodIndex].previous = prevLevel;
-				lodAabbs[currLodIndex] = lod.get_bounding_box();
+				lodAabbs[currLodIndex] = lod->get_bounding_box();
 				if(!sameAttribs)
-					lod.update_attribute_descriptor(lodDescs[currLodIndex], vertexAttribs, faceAttribs, sphereAttribs);
+					lod->update_attribute_descriptor(lodDescs[currLodIndex], vertexAttribs, faceAttribs, sphereAttribs);
 				++currLodIndex;
 			}
 			if(!currUsedLods.empty())

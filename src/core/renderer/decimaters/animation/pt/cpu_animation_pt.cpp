@@ -107,16 +107,15 @@ void CpuShadowSilhouettesPT::iterate() {
 		const auto cycles = CpuProfileState::get_cpu_cycle();
 
 		const auto currAnimationFrame = scene::WorldContainer::instance().get_frame_current();
-		const auto startAnimationFrame = scene::WorldContainer::instance().get_frame_start();
-		const auto endAnimationFrame = scene::WorldContainer::instance().get_frame_end();
+		const auto endAnimationFrame = scene::WorldContainer::instance().get_frame_count();
 		//const auto frameIndex = std::min<u32>(m_params.slidingWindowSize, currAnimationFrame - startAnimationFrame);
 		//const auto windowSize = std::min<u32>(std::min(endAnimationFrame - currAnimationFrame, frameIndex + 1u), m_params.slidingWindowSize);
 		
 		// TODO: put this in a more conventient place / discard it from profiling
 		// Gather all the importance we need
-		const auto upperFrameLimit = std::min(endAnimationFrame, currAnimationFrame + m_params.slidingWindowHalfWidth) - startAnimationFrame;
+		const auto upperFrameLimit = std::min(endAnimationFrame, currAnimationFrame + m_params.slidingWindowHalfWidth);
 		// Loop until we gathered importance for all necessary frames (half-width + 1 at the beginning, 1 normally, none towards the end)
-		while(m_perFrameData.size() <= upperFrameLimit) {
+		while(m_perFrameData.size() < upperFrameLimit) {
 			logInfo("Acquiring importance for frame ", m_perFrameData.size());
 			// TODO: free data that is no longer needed
 			m_perFrameData.push_back({
@@ -272,20 +271,18 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 
 	// Compute the total expected vertex count over all meshes
 	const auto currAnimationFrame = scene::WorldContainer::instance().get_frame_current();
-	const auto startAnimationFrame = scene::WorldContainer::instance().get_frame_start();
-	const auto endAnimationFrame = scene::WorldContainer::instance().get_frame_end();
-	const auto start = std::max(startAnimationFrame, std::max<u32>(currAnimationFrame, m_params.slidingWindowHalfWidth) - m_params.slidingWindowHalfWidth);
+	const auto endAnimationFrame = scene::WorldContainer::instance().get_frame_count();
 	const auto end = std::min(currAnimationFrame + m_params.slidingWindowHalfWidth, endAnimationFrame);
 	double expectedVertexCount = 0.0;
 
 	m_remainingVertexFactor.resize(m_decimaters.size(), 0.f);
 	switch(m_params.vertexDistMethod) {
 		case PVertexDistMethod::Values::AVERAGE: {
-			for(u32 frame = start; frame <= end; ++frame) {
+			for(u32 frame = 0; frame < end; ++frame) {
 				for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 					auto& decimater = m_decimaters[i];
 					if(decimater->get_original_vertex_count() > m_params.threshold) {
-						m_remainingVertexFactor[i] += (decimater->get_importance_sum(frame - start));
+						m_remainingVertexFactor[i] += (decimater->get_importance_sum(frame));
 						expectedVertexCount += (1.f - m_params.reduction) * decimater->get_original_vertex_count();
 					} else {
 						m_remainingVertexFactor[i] += 1.f;
@@ -295,17 +292,17 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 			}
 			// Compute average per frame
 			for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
-				m_remainingVertexFactor[i] /= static_cast<float>(end - start + 1u);
+				m_remainingVertexFactor[i] /= static_cast<float>(end);
 
-			expectedVertexCount /= static_cast<float>(end - start + 1u);
+			expectedVertexCount /= static_cast<float>(end);
 		}	break;
 		case PVertexDistMethod::Values::MAX: {
-			for(u32 frame = start; frame <= end; ++frame) {
+			for(u32 frame = 0; frame < end; ++frame) {
 				for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 					auto& decimater = m_decimaters[i];
 					if(decimater->get_original_vertex_count() > m_params.threshold) {
 						m_remainingVertexFactor[i] = std::max(m_remainingVertexFactor[i],
-							(decimater->get_importance_sum(frame - start)));
+							(decimater->get_importance_sum(frame)));
 						expectedVertexCount += (1.f - m_params.reduction) * decimater->get_original_vertex_count();
 					} else {
 						m_remainingVertexFactor[i] = 1.f;
@@ -314,12 +311,12 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 				}
 			}
 
-			expectedVertexCount /= static_cast<float>(end - start + 1u);
+			expectedVertexCount /= static_cast<float>(end);
 		}	break;
 		default: throw std::runtime_error("Invalid vertex budget method");
 	}
 
-
+	
 	// Determine the reduction parameters for each mesh
 	constexpr u32 MAX_ITERATION_COUNT = 10u;
 	for(u32 iteration = 0u; iteration < MAX_ITERATION_COUNT; ++iteration) {
