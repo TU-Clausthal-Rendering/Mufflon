@@ -14,7 +14,7 @@ namespace mufflon::renderer {
 class GlForward final : public GlRendererBase<ForwardTargets> {
 public:
 	// Initialize all resources required by this renderer
-	GlForward();
+	GlForward(void* mufflonInstanceHdl);
 	~GlForward() override = default;
 
 	void iterate() final;
@@ -28,6 +28,7 @@ public:
 private:
 	void init();
 
+	void* m_mufflonInstanceHdl;
 	ForwardParameters m_params = {};
 
 	gl::Program m_triangleProgram;

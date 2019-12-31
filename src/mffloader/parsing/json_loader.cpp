@@ -131,9 +131,9 @@ TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, 
 	path = fs::canonical(path);
 	TextureHdl tex;
 	if(targetFormat.has_value())
-		tex = world_add_texture_converted(path.string().c_str(), sampling, targetFormat.value(), mipmapType, callback, userParams);
+		tex = world_add_texture_converted(m_mffInstHdl, path.string().c_str(), sampling, targetFormat.value(), mipmapType, callback, userParams);
 	else
-		tex = world_add_texture(path.string().c_str(), sampling, mipmapType, callback, userParams);
+		tex = world_add_texture(m_mffInstHdl, path.string().c_str(), sampling, mipmapType, callback, userParams);
 	if(tex == nullptr)
 		throw std::runtime_error("Failed to load texture '" + std::string(name) + "'");
 	return tex;
@@ -150,7 +150,7 @@ std::pair<TextureHdl, TextureHdl> JsonLoader::load_displacement_map(const char* 
 	path = fs::canonical(path);
 	TextureHdl tex = nullptr;
 	TextureHdl texMips = nullptr;
-	if(!world_add_displacement_map(path.string().c_str(), &tex, &texMips) || tex == nullptr || texMips == nullptr)
+	if(!world_add_displacement_map(m_mffInstHdl, path.string().c_str(), &tex, &texMips) || tex == nullptr || texMips == nullptr)
 		throw std::runtime_error("Failed to add displacement map '" + std::string(name) + "'");
 	return { tex, texMips };
 }
@@ -195,7 +195,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			auto albedoIter = get(m_state, material, "albedo");
 			if(albedoIter->value.IsArray()) {
 				ei::Vec3 albedo = read<ei::Vec3>(m_state, albedoIter);
-				mat->inner.lambert.albedo = world_add_texture_value(reinterpret_cast<float*>(&albedo), 3, TextureSampling::SAMPLING_NEAREST);
+				mat->inner.lambert.albedo = world_add_texture_value(m_mffInstHdl, reinterpret_cast<float*>(&albedo), 3, TextureSampling::SAMPLING_NEAREST);
 			} else if(albedoIter->value.IsString()) {
 				mat->inner.lambert.albedo = load_texture(read<const char*>(m_state, albedoIter), TextureSampling::SAMPLING_LINEAR);
 			} else
@@ -223,10 +223,10 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			auto roughnessIter = get(m_state, material, "roughness");
 			if(roughnessIter->value.IsArray()) {
 				ei::Vec2 xy = read<ei::Vec2>(m_state, roughnessIter);
-				mat->inner.torrance.roughness = world_add_texture_value(reinterpret_cast<float*>(&xy), 2, TextureSampling::SAMPLING_NEAREST);
+				mat->inner.torrance.roughness = world_add_texture_value(m_mffInstHdl, reinterpret_cast<float*>(&xy), 2, TextureSampling::SAMPLING_NEAREST);
 			} else if(roughnessIter->value.IsNumber()) {
 				float alpha = read<float>(m_state, roughnessIter);
-				mat->inner.torrance.roughness = world_add_texture_value(&alpha, 1, TextureSampling::SAMPLING_NEAREST);
+				mat->inner.torrance.roughness = world_add_texture_value(m_mffInstHdl, &alpha, 1, TextureSampling::SAMPLING_NEAREST);
 			} else if(roughnessIter->value.IsString()) {
 				mat->inner.torrance.roughness = load_texture(read<const char*>(m_state, roughnessIter));
 			} else
@@ -234,7 +234,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			auto albedoIter = get(m_state, material, "albedo");
 			if(albedoIter->value.IsArray()) {
 				ei::Vec3 albedo = read<ei::Vec3>(m_state, albedoIter);
-				mat->inner.torrance.albedo = world_add_texture_value(reinterpret_cast<float*>(&albedo), 3, TextureSampling::SAMPLING_NEAREST);
+				mat->inner.torrance.albedo = world_add_texture_value(m_mffInstHdl, reinterpret_cast<float*>(&albedo), 3, TextureSampling::SAMPLING_NEAREST);
 			} else if(albedoIter->value.IsString()) {
 				mat->inner.torrance.albedo = load_texture(read<const char*>(m_state, albedoIter));
 			} else
@@ -266,12 +266,12 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			mat->inner.walter.absorption = util::pun<Vec3>(read<ei::Vec3>(m_state, get(m_state, material, "absorption")));
 			if(roughnessIter->value.IsNumber()) {
 				float alpha = read<float>(m_state, roughnessIter);
-				mat->inner.walter.roughness = world_add_texture_value(&alpha, 1, TextureSampling::SAMPLING_NEAREST);
+				mat->inner.walter.roughness = world_add_texture_value(m_mffInstHdl, &alpha, 1, TextureSampling::SAMPLING_NEAREST);
 			} else if(roughnessIter->value.IsString()) {
 				mat->inner.walter.roughness = load_texture(read<const char*>(m_state, roughnessIter));
 			} else if(roughnessIter->value.IsArray()) {
 				ei::Vec2 xy = read<ei::Vec2>(m_state, roughnessIter);
-				mat->inner.walter.roughness = world_add_texture_value(reinterpret_cast<float*>(&xy), 2, TextureSampling::SAMPLING_NEAREST);
+				mat->inner.walter.roughness = world_add_texture_value(m_mffInstHdl, reinterpret_cast<float*>(&xy), 2, TextureSampling::SAMPLING_NEAREST);
 			} else
 				throw std::runtime_error("Invalid type for roughness");
 
@@ -288,7 +288,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			if(auto radianceIter = get(m_state, material, "radiance", false); radianceIter != material.MemberEnd()) {
 				if(radianceIter->value.IsArray()) {
 					ei::Vec3 rgb = read<ei::Vec3>(m_state, radianceIter);
-					mat->inner.emissive.radiance = world_add_texture_value(reinterpret_cast<const float*>(&rgb), 3, TextureSampling::SAMPLING_NEAREST);
+					mat->inner.emissive.radiance = world_add_texture_value(m_mffInstHdl, reinterpret_cast<const float*>(&rgb), 3, TextureSampling::SAMPLING_NEAREST);
 				} else if(radianceIter->value.IsString()) {
 					mat->inner.emissive.radiance = load_texture(read<const char*>(m_state, radianceIter));
 				} else
@@ -298,7 +298,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 				if(temperatureIter->value.IsNumber()) {
 					const float temperature = read<float>(m_state, temperatureIter);
 					const auto radiance = spectrum::compute_black_body_color(spectrum::Kelvin{ temperature });
-					mat->inner.emissive.radiance = world_add_texture_value(reinterpret_cast<const float*>(&radiance), 3, TextureSampling::SAMPLING_NEAREST);
+					mat->inner.emissive.radiance = world_add_texture_value(m_mffInstHdl, reinterpret_cast<const float*>(&radiance), 3, TextureSampling::SAMPLING_NEAREST);
 				} else if(temperatureIter->value.IsString()) {
 					mat->inner.emissive.radiance = load_texture(read<const char*>(m_state, radianceIter),
 																TextureSampling::SAMPLING_NEAREST, MipmapType::MIPMAP_NONE,
@@ -320,7 +320,7 @@ MaterialParams* JsonLoader::load_material(rapidjson::Value::ConstMemberIterator 
 			auto albedoIter = get(m_state, material, "albedo");
 			if(albedoIter->value.IsArray()) {
 				ei::Vec3 rgb = read<ei::Vec3>(m_state, albedoIter);
-				mat->inner.orennayar.albedo = world_add_texture_value(reinterpret_cast<const float*>(&rgb), 3, TextureSampling::SAMPLING_NEAREST);
+				mat->inner.orennayar.albedo = world_add_texture_value(m_mffInstHdl, reinterpret_cast<const float*>(&rgb), 3, TextureSampling::SAMPLING_NEAREST);
 			} else if(albedoIter->value.IsString()) {
 				mat->inner.orennayar.albedo = load_texture(read<const char*>(m_state, albedoIter));
 			} else
@@ -464,7 +464,7 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 		if(type.compare("pinhole") == 0) {
 			// Pinhole camera
 			const float fovDegree = read_opt<float>(m_state, camera, "fov", 25.f);
-			if(world_add_pinhole_camera(cameraIter->name.GetString(), reinterpret_cast<const Vec3*>(camPath.data()),
+			if(world_add_pinhole_camera(m_mffInstHdl, cameraIter->name.GetString(), reinterpret_cast<const Vec3*>(camPath.data()),
 										reinterpret_cast<const Vec3*>(camViewDir.data()), reinterpret_cast<const Vec3*>(camUp.data()),
 										static_cast<uint32_t>(camPath.size()), near, far, static_cast<Radians>(Degrees(fovDegree))) == nullptr)
 				throw std::runtime_error("Failed to add pinhole camera");
@@ -473,7 +473,7 @@ bool JsonLoader::load_cameras(const ei::Box& aabb) {
 			const float focusDistance = read<float>(m_state, get(m_state, camera, "focusDistance"));
 			const float sensorHeight = read_opt<float>(m_state, camera, "chipHeight", 24.f) / 1000.f;
 			const float lensRadius = (focalLength / (2.f * read_opt<float>(m_state, camera, "aperture", focalLength)));
-			if(world_add_focus_camera(cameraIter->name.GetString(), reinterpret_cast<const Vec3*>(camPath.data()),
+			if(world_add_focus_camera(m_mffInstHdl, cameraIter->name.GetString(), reinterpret_cast<const Vec3*>(camPath.data()),
 									  reinterpret_cast<const Vec3*>(camViewDir.data()), reinterpret_cast<const Vec3*>(camUp.data()),
 									  static_cast<uint32_t>(camPath.size()), near, far, focalLength, focusDistance,
 									  lensRadius, sensorHeight) == nullptr)
@@ -544,10 +544,10 @@ bool JsonLoader::load_lights() {
 			if(positions.size() != scales.size())
 				throw std::runtime_error("Mismatched light path size (scales)");
 
-			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_POINT, static_cast<uint32_t>(positions.size())); hdl.type == LIGHT_POINT) {
+			if(auto hdl = world_add_light(m_mffInstHdl, lightIter->name.GetString(), LIGHT_POINT, static_cast<uint32_t>(positions.size())); hdl.type == LIGHT_POINT) {
 				for(u32 i = 0u; i < static_cast<uint32_t>(positions.size()); ++i) {
-					world_set_point_light_position(hdl, util::pun<Vec3>(positions[i]), i);
-					world_set_point_light_intensity(hdl, util::pun<Vec3>(intensities[i] * scales[i]), i);
+					world_set_point_light_position(m_mffInstHdl, hdl, util::pun<Vec3>(positions[i]), i);
+					world_set_point_light_intensity(m_mffInstHdl, hdl, util::pun<Vec3>(intensities[i] * scales[i]), i);
 				}
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add point light");
@@ -618,14 +618,14 @@ bool JsonLoader::load_lights() {
 			if(positions.size() != falloffStarts.size())
 				throw std::runtime_error("Mismatched light path size (falloffStarts)");
 
-			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_SPOT,
+			if(auto hdl = world_add_light(m_mffInstHdl, lightIter->name.GetString(), LIGHT_SPOT,
 										  static_cast<u32>(positions.size())); hdl.type == LIGHT_SPOT) {
 				for(u32 i = 0u; i < static_cast<uint32_t>(positions.size()); ++i) {
-					world_set_spot_light_position(hdl, util::pun<Vec3>(positions[i]), i);
-					world_set_spot_light_intensity(hdl, util::pun<Vec3>(intensities[i] * scales[i]), i);
-					world_set_spot_light_direction(hdl, util::pun<Vec3>(directions[i]), i);
-					world_set_spot_light_angle(hdl, angles[i], i);
-					world_set_spot_light_falloff(hdl, falloffStarts[i], i);
+					world_set_spot_light_position(m_mffInstHdl, hdl, util::pun<Vec3>(positions[i]), i);
+					world_set_spot_light_intensity(m_mffInstHdl, hdl, util::pun<Vec3>(intensities[i] * scales[i]), i);
+					world_set_spot_light_direction(m_mffInstHdl, hdl, util::pun<Vec3>(directions[i]), i);
+					world_set_spot_light_angle(m_mffInstHdl, hdl, angles[i], i);
+					world_set_spot_light_falloff(m_mffInstHdl, hdl, falloffStarts[i], i);
 				}
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add spot light");
@@ -659,11 +659,11 @@ bool JsonLoader::load_lights() {
 			if(directions.size() != scales.size())
 				throw std::runtime_error("Mismatched light path size (scales)");
 
-			if(auto hdl = world_add_light(lightIter->name.GetString(), LIGHT_DIRECTIONAL,
+			if(auto hdl = world_add_light(m_mffInstHdl, lightIter->name.GetString(), LIGHT_DIRECTIONAL,
 										  static_cast<u32>(directions.size())); hdl.type == LIGHT_DIRECTIONAL) {
 				for(u32 i = 0u; i < static_cast<uint32_t>(directions.size()); ++i) {
-					world_set_dir_light_direction(hdl, util::pun<Vec3>(directions[i]), i);
-					world_set_dir_light_irradiance(hdl, util::pun<Vec3>(radiances[i] * scales[i]), i);
+					world_set_dir_light_direction(m_mffInstHdl, hdl, util::pun<Vec3>(directions[i]), i);
+					world_set_dir_light_irradiance(m_mffInstHdl, hdl, util::pun<Vec3>(radiances[i] * scales[i]), i);
 				}
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add directional light");
@@ -679,16 +679,16 @@ bool JsonLoader::load_lights() {
 			// Check if we have a proper envmap or a simple monochrome background
 			if(const auto mapIter = get(m_state, light, "map", false); mapIter != light.MemberEnd()) {
 				TextureHdl texture = load_texture(read<const char*>(m_state, get(m_state, light, "map")), TextureSampling::SAMPLING_NEAREST);
-				if(auto hdl = world_add_background_light(lightIter->name.GetString(), BackgroundType::BACKGROUND_ENVMAP);
+				if(auto hdl = world_add_background_light(m_mffInstHdl, lightIter->name.GetString(), BackgroundType::BACKGROUND_ENVMAP);
 				   hdl.type == LightType::LIGHT_ENVMAP) {
-					world_set_env_light_map(hdl, texture);
-					world_set_env_light_scale(hdl, util::pun<Vec3>(color));
+					world_set_env_light_map(m_mffInstHdl, hdl, texture);
+					world_set_env_light_scale(m_mffInstHdl, hdl, util::pun<Vec3>(color));
 					m_lightMap.emplace(lightIter->name.GetString(), hdl);
 				} else throw std::runtime_error("Failed to add environment light");
 			} else {
-				if(auto hdl = world_add_background_light(lightIter->name.GetString(), BackgroundType::BACKGROUND_MONOCHROME);
+				if(auto hdl = world_add_background_light(m_mffInstHdl, lightIter->name.GetString(), BackgroundType::BACKGROUND_MONOCHROME);
 				   hdl.type == LightType::LIGHT_ENVMAP) {
-					world_set_env_light_color(hdl, util::pun<Vec3>(color));
+					world_set_env_light_color(m_mffInstHdl, hdl, util::pun<Vec3>(color));
 					m_lightMap.emplace(lightIter->name.GetString(), hdl);
 				} else throw std::runtime_error("Failed to add monochromatic environment light");
 			}
@@ -712,13 +712,13 @@ bool JsonLoader::load_lights() {
 			else // TODO: Preetham?
 				throw std::runtime_error("Unknown sky model '" + std::string(modelName) + "'");
 
-			if(auto hdl = world_add_background_light(lightIter->name.GetString(), type);
+			if(auto hdl = world_add_background_light(m_mffInstHdl, lightIter->name.GetString(), type);
 			   hdl.type == LightType::LIGHT_ENVMAP) {
-				world_set_sky_light_turbidity(hdl, turbidity);
-				world_set_sky_light_albedo(hdl, albedo);
-				world_set_sky_light_solar_radius(hdl, solarRadius);
-				world_set_sky_light_sun_direction(hdl, util::pun<Vec3>(sunDir));
-				world_set_env_light_scale(hdl, util::pun<Vec3>(scale));
+				world_set_sky_light_turbidity(m_mffInstHdl, hdl, turbidity);
+				world_set_sky_light_albedo(m_mffInstHdl, hdl, albedo);
+				world_set_sky_light_solar_radius(m_mffInstHdl, hdl, solarRadius);
+				world_set_sky_light_sun_direction(m_mffInstHdl, hdl, util::pun<Vec3>(sunDir));
+				world_set_env_light_scale(m_mffInstHdl, hdl, util::pun<Vec3>(scale));
 				m_lightMap.emplace(lightIter->name.GetString(), hdl);
 			} else throw std::runtime_error("Failed to add sky light");
 		} else if(type.compare("goniometric") == 0) {
@@ -752,7 +752,7 @@ bool JsonLoader::load_materials() {
 			return false;
 		MaterialParams* mat = load_material(matIter);
 		if(mat != nullptr) {
-			auto hdl = world_add_material(matIter->name.GetString(), mat);
+			auto hdl = world_add_material(m_mffInstHdl, matIter->name.GetString(), mat);
 			free_material(mat);
 			if(hdl == nullptr)
 				throw std::runtime_error("Failed to add material to world");
@@ -773,7 +773,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 	assertObject(m_state, scenarios);
 	m_state.current = ParserState::Level::SCENARIOS;
 
-	world_reserve_scenarios(static_cast<u32>(scenarios.MemberCount()));
+	world_reserve_scenarios(m_mffInstHdl, static_cast<u32>(scenarios.MemberCount()));
 	for(auto scenarioIter = scenarios.MemberBegin(); scenarioIter != scenarios.MemberEnd(); ++scenarioIter) {
 		logPedantic("[JsonLoader::load_scenarios] Loading scenario '", scenarioIter->name.GetString(), "'");
 		if(m_abort)
@@ -788,14 +788,14 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 		auto lightIter = get(m_state, scenario, "lights", false);
 		u32 lod = read_opt<u32>(m_state, scenario, "lod", 0u);
 
-		CameraHdl camHdl = world_get_camera(camera);
+		CameraHdl camHdl = world_get_camera(m_mffInstHdl, camera);
 		if(camHdl == nullptr)
 			throw std::runtime_error("Camera '" + std::string(camera) + "' does not exist");
-		ScenarioHdl scenarioHdl = world_create_scenario(scenarioIter->name.GetString());
+		ScenarioHdl scenarioHdl = world_create_scenario(m_mffInstHdl, scenarioIter->name.GetString());
 		if(scenarioHdl == nullptr)
 			throw std::runtime_error("Failed to create scenario");
 
-		if(!scenario_set_camera(scenarioHdl, camHdl))
+		if(!scenario_set_camera(m_mffInstHdl, scenarioHdl, camHdl))
 			throw std::runtime_error("Failed to set camera '" + std::string(camera) + "'");
 		if(!scenario_set_resolution(scenarioHdl, resolution.x, resolution.y))
 			throw std::runtime_error("Failed to set resolution '" + std::to_string(resolution.x) + "x"
@@ -816,7 +816,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 				if(nameIter == m_lightMap.cend()) {
 					logWarning("[JsonLoader::load_scenarios] Unknown light source '", lightName, "' will be ignored");
 				} else {
-					if(!scenario_add_light(scenarioHdl, nameIter->second))
+					if(!scenario_add_light(m_mffInstHdl, scenarioHdl, nameIter->second))
 						throw std::runtime_error("Failed to add light '" + std::string(lightName) + "'");
 				}
 			}
@@ -836,7 +836,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 				m_state.objectNames.push_back(&objectName[0u]);
 				const Value& object = objIter->value;
 				assertObject(m_state, object);
-				ObjectHdl objHdl = world_get_object(&objectName[0u]);
+				ObjectHdl objHdl = world_get_object(m_mffInstHdl, &objectName[0u]);
 				if(objHdl == nullptr)
 					throw std::runtime_error("Failed to find object '" + std::string(objectName) + "'");
 				// Check for LoD and masked
@@ -880,7 +880,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 
 				// Set masking for both animated and non-animated instances
 				u32 frameCount;
-				world_get_frame_count(&frameCount);
+				world_get_frame_count(m_mffInstHdl, &frameCount);
 				if(const auto instIter = instances.find(&instName[0u]); instIter != instances.end()) {
 					InstanceHdl instHdl = instIter->second.handle;
 					if(instHdl == nullptr)
@@ -938,7 +938,7 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 		m_state.objectNames.pop_back();
 
 		const char* sanityMsg = "";
-		if(!world_finalize_scenario(scenarioHdl, &sanityMsg))
+		if(!world_finalize_scenario(m_mffInstHdl, scenarioHdl, &sanityMsg))
 			throw std::runtime_error("Scenario '" + std::string(scenarioIter->name.GetString())
 									 + "' did not pass sanity check: " + std::string(sanityMsg));
 		m_state.objectNames.pop_back();
@@ -1126,7 +1126,7 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 		// Before we load scenarios, perform a sanity check for the currently loaded world
 		const char* sanityMsg = "";
 		sprintf(m_loadingStage.data(), "Checking world sanity%c", '\0');
-		if(!world_finalize(&sanityMsg))
+		if(!world_finalize(m_mffInstHdl, &sanityMsg))
 			throw std::runtime_error("World did not pass sanity check: " + std::string(sanityMsg));
 		// Scenarios
 		m_state.current = ParserState::Level::ROOT;
@@ -1134,19 +1134,19 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 			return false;
 		// Load the default scenario
 		m_state.reset();
-		ScenarioHdl defScenHdl = world_find_scenario(&m_defaultScenario[0u]);
+		ScenarioHdl defScenHdl = world_find_scenario(m_mffInstHdl, &m_defaultScenario[0u]);
 		if(defScenHdl == nullptr)
 			throw std::runtime_error("Cannot find the default scenario '" + std::string(m_defaultScenario) + "'");
 
 		sprintf(m_loadingStage.data(), "Loading initial scenario%c", '\0');
 		auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_file - load default scenario", ProfileLevel::LOW);
-		if(!world_load_scenario(defScenHdl))
+		if(!world_load_scenario(m_mffInstHdl, defScenHdl))
 			throw std::runtime_error("Cannot load the default scenario '" + std::string(m_defaultScenario) + "'");
 		// Check if we should tessellate initially, indicated by a non-zero max. level
 		if(initTessLevel > 0.f) {
 			sprintf(m_loadingStage.data(), "Performing initial tessellation%c", '\0');
-			world_set_tessellation_level(initTessLevel);
-			scene_request_retessellation();
+			world_set_tessellation_level(m_mffInstHdl, initTessLevel);
+			scene_request_retessellation(m_mffInstHdl);
 		}
 	} catch(const std::runtime_error& e) {
 		throw std::runtime_error(m_state.get_parser_level() + ": " + e.what());

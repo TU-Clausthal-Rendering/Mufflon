@@ -19,6 +19,13 @@
 #define FUNCTION_NAME __func__
 
 #define TRY try {
+#define CHECK_NULLPTR(x, name, retval)											\
+	do {																		\
+		if((x) == nullptr) {													\
+			logError("[", FUNCTION_NAME, "] Invalid " #name " (nullptr)");		\
+			return retval;														\
+		}																		\
+	} while(0)
 #define CATCH_ALL(retval)														\
 	} catch(const std::exception& e) {											\
 		logError("[", FUNCTION_NAME, "] Exception caught: ", e.what());			\
@@ -29,23 +36,15 @@
 using namespace mufflon;
 using namespace mff_loader;
 
+struct MufflonLoaderInstance {
+	MufflonInstanceHdl mffInst;
+	std::atomic<json::JsonLoader*> jsonLoader = nullptr;
+	fs::path binPath{};
+};
+
 namespace {
 
 std::string s_lastError;
-std::atomic<json::JsonLoader*> s_jsonLoader = nullptr;
-fs::path s_binPath;
-static void(*s_logCallback)(const char*, int);
-
-// Function delegating the logger output to the applications handle, if applicable
-inline void delegateLog(LogSeverity severity, const std::string& message) {
-	TRY
-		if(s_logCallback != nullptr)
-			s_logCallback(message.c_str(), static_cast<int>(severity));
-	if(severity == LogSeverity::ERROR || severity == LogSeverity::FATAL_ERROR) {
-		s_lastError = message;
-	}
-	CATCH_ALL(;)
-}
 
 } // namespace
 
@@ -100,8 +99,19 @@ const char* loader_get_dll_error() {
 	CATCH_ALL(nullptr)
 }
 
-LoaderStatus loader_load_json(const char* path) {
+MufflonLoaderInstanceHdl loader_initialize(MufflonInstanceHdl mffInstHdl) {
+	return new MufflonLoaderInstance{ mffInstHdl, nullptr, fs::path{} };
+}
+
+void loader_destroy(MufflonLoaderInstanceHdl mffLoaderInstHdl) {
+	if(mffLoaderInstHdl != nullptr)
+		delete mffLoaderInstHdl;
+}
+
+LoaderStatus loader_load_json(MufflonLoaderInstanceHdl hdl, const char* path) {
 	TRY
+	CHECK_NULLPTR(hdl, "loader instance handle", LoaderStatus::LOADER_ERROR);
+	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
 	fs::path filePath(path);
 
 	// Perform some error checking
@@ -118,25 +128,27 @@ LoaderStatus loader_load_json(const char* path) {
 
 	try {
 		// Clear the world
-		world_clear_all();
-		json::JsonLoader loader{ filePath };
-		core_set_lod_loader(loader_load_lod);
-		s_jsonLoader.store(&loader);
-		if(!loader.load_file(s_binPath))
+		world_clear_all(mffLoaderInst.mffInst);
+		json::JsonLoader loader{ mffLoaderInst.mffInst, filePath };
+		mufflon_set_lod_loader(mffLoaderInst.mffInst, loader_load_lod, hdl);
+		mffLoaderInst.jsonLoader.store(&loader);
+		if(!loader.load_file(mffLoaderInst.binPath))
 			return LoaderStatus::LOADER_ABORT;
 	} catch(const std::exception& e) {
 		logError("[", FUNCTION_NAME, "] ", e.what());
-		s_jsonLoader.store(nullptr);
+		mffLoaderInst.jsonLoader.store(nullptr);
 		return LoaderStatus::LOADER_ERROR;
 	}
 
-	s_jsonLoader.store(nullptr);
+	mffLoaderInst.jsonLoader.store(nullptr);
 	return LoaderStatus::LOADER_SUCCESS;
 	CATCH_ALL(LoaderStatus::LOADER_ERROR)
 }
 
-LoaderStatus loader_save_scene(const char* path) {
+LoaderStatus loader_save_scene(MufflonLoaderInstanceHdl hdl, const char* path) {
 	TRY
+	CHECK_NULLPTR(hdl, "loader instance handle", LoaderStatus::LOADER_ERROR);
+	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
 	fs::path filePath(path);
 
 	// Perform some error checking
@@ -153,7 +165,7 @@ LoaderStatus loader_save_scene(const char* path) {
 		}
 	}
 	try {
-	exprt::SceneExporter exporter{ filePath, s_binPath };
+	exprt::SceneExporter exporter{ mffLoaderInst.mffInst, filePath, mffLoaderInst.binPath };
 		if (!exporter.save_scene())
 			return LoaderStatus::LOADER_ERROR;
 	}
@@ -166,8 +178,10 @@ LoaderStatus loader_save_scene(const char* path) {
 	CATCH_ALL(LoaderStatus::LOADER_ERROR)
 }
 
-Boolean loader_load_lod(ObjectHdl obj, u32 lod) {
+Boolean loader_load_lod(MufflonLoaderInstanceHdl hdl, ObjectHdl obj, u32 lod) {
 	TRY
+	CHECK_NULLPTR(hdl, "loader instance handle", false);
+	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
 	if(obj == nullptr) {
 		logError("[", FUNCTION_NAME, "] Invalid object handle");
 		return false;
@@ -176,25 +190,33 @@ Boolean loader_load_lod(ObjectHdl obj, u32 lod) {
 	if(!object_get_id(obj, &objId))
 		return false;
 	std::string status;
-	binary::BinaryLoader loader{ status };
-	loader.load_lod(s_binPath, objId, lod);
+	binary::BinaryLoader loader{ mffLoaderInst.mffInst, status };
+	loader.load_lod(mffLoaderInst.binPath, objId, lod);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean loader_abort() {
-	if(json::JsonLoader* loader = s_jsonLoader.load(); loader != nullptr) {
+Boolean loader_abort(MufflonLoaderInstanceHdl hdl) {
+	TRY
+	CHECK_NULLPTR(hdl, "loader instance handle", false);
+	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
+	if(json::JsonLoader* loader = mffLoaderInst.jsonLoader.load(); loader != nullptr) {
 		loader->abort_load();
 		return true;
 	}
 	logError("[", FUNCTION_NAME, "] No loader running that could be aborted");
 	return false;
+	CATCH_ALL(false)
 }
 
-const char* loader_get_loading_status() {
-	if(json::JsonLoader* loader = s_jsonLoader.load(); loader != nullptr)
+const char* loader_get_loading_status(MufflonLoaderInstanceHdl hdl) {
+	TRY
+	CHECK_NULLPTR(hdl, "loader instance handle", nullptr);
+	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
+	if(json::JsonLoader* loader = mffLoaderInst.jsonLoader.load(); loader != nullptr)
 		return loader->get_loading_stage().c_str();
 	return "";
+	CATCH_ALL(nullptr)
 }
 
 void loader_profiling_enable() {

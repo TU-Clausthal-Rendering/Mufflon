@@ -25,11 +25,12 @@
 
 namespace mufflon { namespace scene {
 
-Scene::Scene(const Scenario& scenario, const u32 frame,
+Scene::Scene(WorldContainer& world, const Scenario& scenario, const u32 frame,
 			 util::FixedHashMap<ObjectHandle, InstanceRef>&& objects,
 			 std::vector<InstanceHandle>&& instances,
 			 const std::vector<ei::Mat3x4>& worldToInstanceTransformation,
 			 const Bone* bones) :
+	m_world{ world },
 	m_scenario(scenario),
 	m_frame(frame),
 	m_objects{ std::move(objects) },
@@ -266,7 +267,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 				if(lod->has_bone_animation()) {
 					if(lod->was_animated() && lod->get_frame() != m_frame) {
 						obj.first->remove_lod(i);
-						if(!WorldContainer::instance().load_lod(*obj.first, i))
+						if(!m_world.load_lod(*obj.first, i))
 							throw std::runtime_error("Failed to re-load LoD for animation.");
 						lod = &obj.first->get_lod(i);
 					}
@@ -534,7 +535,7 @@ bool Scene::retessellate(const float tessLevel) {
 				// TODO: would it be preferential to keep the untessellated LoD in memory as well?
 				if(lod->was_displacement_mapping_applied()) {
 					obj.first->remove_lod(mapping.first);
-					if(!WorldContainer::instance().load_lod(*obj.first, mapping.first))
+					if(!m_world.load_lod(*obj.first, mapping.first))
 						throw std::runtime_error("Failed to re-load LoD for displacement map tessellation");
 					lod = &obj.first->get_lod(mapping.first);
 				}
@@ -548,7 +549,7 @@ bool Scene::retessellate(const float tessLevel) {
 					// Reload the LoD if it has been modified previously
 					if(lod->was_displacement_mapping_applied()) {
 						obj.first->remove_lod(mapping.first);
-						if(!WorldContainer::instance().load_lod(*obj.first, mapping.first))
+						if(!m_world.load_lod(*obj.first, mapping.first))
 							throw std::runtime_error("Failed to re-load LoD for displacement map tessellation");
 						lod = &obj.first->get_lod(mapping.first);
 					}

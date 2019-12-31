@@ -22,7 +22,8 @@ struct InstanceMapping {
 
 class BinaryLoader {
 public:
-	BinaryLoader(std::string& stage) :
+	BinaryLoader(MufflonInstanceHdl mffInstHdl, std::string& stage) :
+		m_mffInstHdl{ mffInstHdl },
 		m_loadingStage{ stage }
 	{}
 
@@ -210,6 +211,7 @@ private:
 	mufflon::u32 read_lod(const ObjectState& object, mufflon::u32 lod);
 	void read_bone_animation_data();
 
+	MufflonInstanceHdl m_mffInstHdl;
 	fs::path m_filePath;
 	// Parser state
 	std::ifstream m_fileStream;

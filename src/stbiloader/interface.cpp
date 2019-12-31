@@ -130,6 +130,12 @@ Boolean load_texture(const char* path, TextureData* texData) {
 		if(texData->data)
 			delete[] texData->data;
 		return false;
+	} catch(...) {
+		logError("[", FUNCTION_NAME, "] Texture load for '",
+				 path, "' caught unknown exception");
+		if(texData->data)
+			delete[] texData->data;
+		return false;
 	}
 }
 Boolean store_texture(const char* path, const TextureData* texData) {

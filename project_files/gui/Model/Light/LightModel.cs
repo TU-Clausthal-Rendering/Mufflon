@@ -22,7 +22,7 @@ namespace gui.Model.Light
             Goniometric
         }
 
-        protected LightModel(IntPtr handle)
+        protected LightModel(UInt32 handle)
         {
             Handle = handle;
         }
@@ -33,7 +33,7 @@ namespace gui.Model.Light
 
         public abstract float Scale { get; set; }
 
-        public IntPtr Handle { get; }
+        public UInt32 Handle { get; }
 
         public virtual uint PathSegments { get => 0u; }
 
@@ -44,7 +44,7 @@ namespace gui.Model.Light
         /// <returns></returns>
         public abstract LightViewModel CreateViewModel(Models models);
 
-        public static LightModel MakeFromHandle(IntPtr handle, LightType type)
+        public static LightModel MakeFromHandle(UInt32 handle, LightType type)
         {
             switch (type)
             {

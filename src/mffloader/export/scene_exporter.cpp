@@ -127,16 +127,16 @@ bool SceneExporter::save_scene() const {
 bool SceneExporter::save_cameras(rapidjson::Document& document) const {
 	rapidjson::Value cameras;
 	cameras.SetObject();
-	size_t cameraCount = world_get_camera_count();
+	size_t cameraCount = world_get_camera_count(m_mffInstHdl);
 
 	std::uint32_t frameCount;
-	if(!world_get_frame_count(&frameCount))
+	if(!world_get_frame_count(m_mffInstHdl, &frameCount))
 		throw std::runtime_error("Failed to acquire animation frame count.");
 
 	for(size_t i = 0; i < cameraCount; i++) {
 		rapidjson::Value camera;
 		camera.SetObject();
-		CameraHdl cameraHandle = world_get_camera_by_index(i);
+		CameraHdl cameraHandle = world_get_camera_by_index(m_mffInstHdl, i);
 		CameraType cameraType = world_get_camera_type(cameraHandle);
 
 		switch(cameraType) {
@@ -225,7 +225,7 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const {
 	rapidjson::Value lights;
 	lights.SetObject();
 
-	size_t pointLightCount = world_get_point_light_count();
+	size_t pointLightCount = world_get_point_light_count(m_mffInstHdl);
 
 	for(size_t i = 0; i < pointLightCount; i++) {
 		rapidjson::Value light;
@@ -237,21 +237,21 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const {
 
 		// TODO: animation
 		Vec3 position;
-		world_get_point_light_position(lightHandle, &position, 0u);
+		world_get_point_light_position(m_mffInstHdl, lightHandle, &position, 0u);
 		light.AddMember("position", store_in_array(position, document), document.GetAllocator());
 
 		Vec3 intensity;
-		world_get_point_light_intensity(lightHandle, &intensity, 0u);
+		world_get_point_light_intensity(m_mffInstHdl, lightHandle, &intensity, 0u);
 		light.AddMember("intensity", store_in_array(intensity, document), document.GetAllocator());
 
 		light.AddMember("scale", 1.0f, document.GetAllocator());
 
 		rapidjson::Value lightName;
-		lightName.SetString(rapidjson::StringRef(world_get_light_name(lightHandle)));
+		lightName.SetString(rapidjson::StringRef(world_get_light_name(m_mffInstHdl, lightHandle)));
 		lights.AddMember(lightName, light, document.GetAllocator());
 	}
 
-	size_t dirLightCount = world_get_dir_light_count();
+	size_t dirLightCount = world_get_dir_light_count(m_mffInstHdl);
 
 	for(size_t i = 0; i < dirLightCount; i++) {
 		rapidjson::Value light;
@@ -263,21 +263,21 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const {
 
 		// TODO: animation
 		Vec3 direction;
-		world_get_dir_light_direction(lightHandle, &direction, 0u);
+		world_get_dir_light_direction(m_mffInstHdl, lightHandle, &direction, 0u);
 		light.AddMember("direction", store_in_array(direction, document), document.GetAllocator());
 
 		Vec3 radiance;
-		world_get_dir_light_irradiance(lightHandle, &radiance, 0u);
+		world_get_dir_light_irradiance(m_mffInstHdl, lightHandle, &radiance, 0u);
 		light.AddMember("radiance", store_in_array(radiance, document), document.GetAllocator());
 
 		light.AddMember("scale", 1.0f, document.GetAllocator());
 
 		rapidjson::Value lightName;
-		lightName.SetString(rapidjson::StringRef(world_get_light_name(lightHandle)));
+		lightName.SetString(rapidjson::StringRef(world_get_light_name(m_mffInstHdl, lightHandle)));
 		lights.AddMember(lightName, light, document.GetAllocator());
 	}
 
-	size_t spotLightCount = world_get_spot_light_count();
+	size_t spotLightCount = world_get_spot_light_count(m_mffInstHdl);
 
 	for(size_t i = 0; i < spotLightCount; i++) {
 		rapidjson::Value light;
@@ -289,33 +289,33 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const {
 
 		// TODO: animation
 		Vec3 position;
-		world_get_spot_light_position(lightHandle, &position, 0u);
+		world_get_spot_light_position(m_mffInstHdl, lightHandle, &position, 0u);
 		light.AddMember("position", store_in_array(position, document), document.GetAllocator());
 
 		Vec3 direction;
-		world_get_spot_light_direction(lightHandle, &direction, 0u);
+		world_get_spot_light_direction(m_mffInstHdl, lightHandle, &direction, 0u);
 		light.AddMember("direction", store_in_array(direction, document), document.GetAllocator());
 
 		Vec3 intensity;
-		world_get_spot_light_intensity(lightHandle, &intensity, 0u);
+		world_get_spot_light_intensity(m_mffInstHdl, lightHandle, &intensity, 0u);
 		light.AddMember("intensity", store_in_array(intensity, document), document.GetAllocator());
 
 		light.AddMember("scale", 1.0f, document.GetAllocator());
 
 		float width;
-		world_get_spot_light_angle(lightHandle, &width, 0u);
+		world_get_spot_light_angle(m_mffInstHdl, lightHandle, &width, 0u);
 		light.AddMember("width", width, document.GetAllocator());
 
 		float falloffStart;
-		world_get_spot_light_falloff(lightHandle, &falloffStart, 0u);
+		world_get_spot_light_falloff(m_mffInstHdl, lightHandle, &falloffStart, 0u);
 		light.AddMember("falloffStart", falloffStart, document.GetAllocator());
 
 		rapidjson::Value lightName;
-		lightName.SetString(rapidjson::StringRef(world_get_light_name(lightHandle)));
+		lightName.SetString(rapidjson::StringRef(world_get_light_name(m_mffInstHdl, lightHandle)));
 		lights.AddMember(lightName, light, document.GetAllocator());
 	}
 
-	size_t envLightCount = world_get_env_light_count();
+	size_t envLightCount = world_get_env_light_count(m_mffInstHdl);
 
 	for(size_t i = 0; i < envLightCount; i++) {
 		rapidjson::Value light;
@@ -325,16 +325,16 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const {
 
 		light.AddMember("type", "envmap", document.GetAllocator());
 
-		fs::path mapPath(world_get_env_light_map(lightHandle));
+		fs::path mapPath(world_get_env_light_map(m_mffInstHdl, lightHandle));
 
 		light.AddMember("map", store_in_string_relative_to_destination_path(mapPath, document), document.GetAllocator());
 
 		Vec3 scale;
-		world_get_env_light_scale(lightHandle, &scale);
+		world_get_env_light_scale(m_mffInstHdl, lightHandle, &scale);
 		light.AddMember("scale", store_in_array(scale, document), document.GetAllocator());
 
 		rapidjson::Value lightName;
-		lightName.SetString(rapidjson::StringRef(world_get_light_name(lightHandle)));
+		lightName.SetString(rapidjson::StringRef(world_get_light_name(m_mffInstHdl, lightHandle)));
 		lights.AddMember(lightName, light, document.GetAllocator());
 	}
 
@@ -348,17 +348,17 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const {
 bool SceneExporter::save_materials(rapidjson::Document& document) const {
 	rapidjson::Value materials;
 	materials.SetObject();
-	size_t materialCount = world_get_material_count();
+	size_t materialCount = world_get_material_count(m_mffInstHdl);
 
 	std::vector<std::byte> buffer;
 	for(size_t i = 0; i < materialCount; i++) {
-		MaterialHdl materialHandle = world_get_material(IndexType(i));
+		MaterialHdl materialHandle = world_get_material(m_mffInstHdl, IndexType(i));
 
 		buffer.resize(world_get_material_size(materialHandle));
 
 		MaterialParams* materialParams = reinterpret_cast<MaterialParams*>(buffer.data());
 
-		world_get_material_data(materialHandle, materialParams);
+		world_get_material_data(m_mffInstHdl, materialHandle, materialParams);
 
 		rapidjson::Value materialName;
 		materialName.SetString(world_get_material_name(materialHandle), document.GetAllocator());
@@ -444,11 +444,11 @@ rapidjson::Value SceneExporter::save_material(const MaterialParams& materialPara
 	bool SceneExporter::save_scenarios(rapidjson::Document& document) const {
 	rapidjson::Value scenarios;
 	scenarios.SetObject();
-	size_t scenarioCount = world_get_scenario_count();
+	size_t scenarioCount = world_get_scenario_count(m_mffInstHdl);
 	for(size_t i = 0; i < scenarioCount; i++) {
 		rapidjson::Value scenario;
 		scenario.SetObject();
-		ScenarioHdl scenarioHandle = world_get_scenario_by_index(uint32_t(i));
+		ScenarioHdl scenarioHandle = world_get_scenario_by_index(m_mffInstHdl, uint32_t(i));
 
 		rapidjson::Value camera;
 		camera.SetString(rapidjson::StringRef(world_get_camera_name(scenario_get_camera(scenarioHandle))));
@@ -466,28 +466,28 @@ rapidjson::Value SceneExporter::save_material(const MaterialParams& materialPara
 
 		rapidjson::Value lights;
 		lights.SetArray();
-		if(scenario_has_envmap_light(scenarioHandle)) {
+		if(scenario_has_envmap_light(m_mffInstHdl, scenarioHandle)) {
 			LightHdl lightHandle = scenario_get_light_handle(scenarioHandle, 0, LIGHT_ENVMAP);
-			lights.PushBack(rapidjson::StringRef(world_get_light_name(lightHandle)), document.GetAllocator());
+			lights.PushBack(rapidjson::StringRef(world_get_light_name(m_mffInstHdl, lightHandle)), document.GetAllocator());
 		}
 		size_t pointLightCount = scenario_get_point_light_count(scenarioHandle);
 
 		for(size_t j = 0; j < pointLightCount; j++) {
 			LightHdl lightHandle = scenario_get_light_handle(scenarioHandle, IndexType(j), LIGHT_POINT);
-			lights.PushBack(rapidjson::StringRef(world_get_light_name(lightHandle)), document.GetAllocator());
+			lights.PushBack(rapidjson::StringRef(world_get_light_name(m_mffInstHdl, lightHandle)), document.GetAllocator());
 		}
 
 		size_t dirLightCount = scenario_get_dir_light_count(scenarioHandle);
 
 		for(size_t j = 0; j < dirLightCount; j++) {
 			LightHdl lightHandle = scenario_get_light_handle(scenarioHandle, IndexType(j), LIGHT_DIRECTIONAL);
-			lights.PushBack(rapidjson::StringRef(world_get_light_name(lightHandle)), document.GetAllocator());
+			lights.PushBack(rapidjson::StringRef(world_get_light_name(m_mffInstHdl, lightHandle)), document.GetAllocator());
 		}
 		size_t spotLightCount = scenario_get_spot_light_count(scenarioHandle);
 
 		for (size_t j = 0; j < spotLightCount; j++) {
 			LightHdl lightHandle = scenario_get_light_handle(scenarioHandle, IndexType(j), LIGHT_SPOT);
-			lights.PushBack(rapidjson::StringRef(world_get_light_name(lightHandle)), document.GetAllocator());
+			lights.PushBack(rapidjson::StringRef(world_get_light_name(m_mffInstHdl, lightHandle)), document.GetAllocator());
 		}
 
 		// TODO GONIOMETRIC (not implemented yet)

@@ -9,6 +9,7 @@ extern "C" {
 #include <stdint.h>
 
 typedef uint32_t Boolean;
+typedef void* MufflonLoaderInstanceHdl;
 
 typedef enum {
 	LOADER_SUCCESS,
@@ -16,14 +17,14 @@ typedef enum {
 	LOADER_ABORT
 } LoaderStatus;
 
-LOADER_API Boolean CDECL loader_set_logger(void(*logCallback)(const char*, int));
-LOADER_API Boolean CDECL loader_set_log_level(LogLevel level);
-LOADER_API const char* CDECL loader_get_dll_error();
-LOADER_API LoaderStatus CDECL loader_load_json(const char* path);
-LOADER_API LoaderStatus CDECL loader_save_scene(const char* path);
-LOADER_API Boolean CDECL loader_load_lod(void* obj, uint32_t lod);
-LOADER_API Boolean CDECL loader_abort();
-LOADER_API const char* CDECL loader_get_loading_status();
+LOADER_API const char* CDECL loader_get_dll_error();;
+LOADER_API MufflonLoaderInstanceHdl CDECL loader_initialize(MufflonInstanceHdl);
+LOADER_API void CDECL loader_destroy(MufflonLoaderInstanceHdl);
+LOADER_API LoaderStatus CDECL loader_load_json(MufflonLoaderInstanceHdl, const char* path);
+LOADER_API LoaderStatus CDECL loader_save_scene(MufflonLoaderInstanceHdl, const char* path);
+LOADER_API Boolean CDECL loader_load_lod(MufflonLoaderInstanceHdl, void* obj, uint32_t lod);
+LOADER_API Boolean CDECL loader_abort(MufflonLoaderInstanceHdl);
+LOADER_API const char* CDECL loader_get_loading_status(MufflonLoaderInstanceHdl);
 LOADER_API void CDECL loader_profiling_enable();
 LOADER_API void CDECL loader_profiling_disable();
 LOADER_API Boolean CDECL loader_profiling_set_level(ProfilingLevel level);

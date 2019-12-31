@@ -32,7 +32,7 @@ public:
 	using DirLightHandle = std::map<std::string, lights::DirectionalLight, std::less<>>::iterator;
 	using EnvLightHandle = std::map<std::string, TextureHandle, std::less<>>::iterator;
 
-	using LodLoadFuncPtr = std::uint32_t(CDECL*)(ObjectHandle obj, u32 lod);
+	using LodLoadFuncPtr = std::uint32_t(CDECL*)(void* userParams, ObjectHandle obj, u32 lod);
 
 
 	enum class Sanity {
@@ -46,9 +46,13 @@ public:
 	// --------------------------------------------------------------------------------
 	// ------------------------- World container interaction --------------------------
 	// --------------------------------------------------------------------------------
-	static WorldContainer& instance();
-	// Clears the world object from all resources
-	static void clear_instance();
+	WorldContainer();
+	WorldContainer(const WorldContainer&) = delete;
+	WorldContainer(WorldContainer&&) = default;
+	WorldContainer& operator=(const WorldContainer&) = delete;
+	WorldContainer& operator=(WorldContainer&&) = default;
+	~WorldContainer() = default;
+
 	// Prepares the world for a fresh load.
 	// clear_instance() must be called before (or the world has not been changed yet).
 	// Must not be called after the world has been modified.
@@ -173,7 +177,7 @@ public:
 	// Set the new animation frame. Caution: this invalidates the currently loaded scene
 	// which must thus be set for any active renderer!
 	bool set_frame_current(const u32 frameCurrent);
-	void set_lod_loader_function(LodLoadFuncPtr func);
+	void set_lod_loader_function(LodLoadFuncPtr func, void* userParams);
 	void set_tessellation_level(const float tessLevel) { m_tessLevel = tessLevel; }
 
 
@@ -190,21 +194,12 @@ public:
 	bool mark_light_dirty(u32 index, lights::LightType type);
 
 private:
-	WorldContainer();
-	WorldContainer(const WorldContainer&) = delete;
-	WorldContainer(WorldContainer&&) = default;
-	WorldContainer& operator=(const WorldContainer&) = delete;
-	WorldContainer& operator=(WorldContainer&&) = default;
-	~WorldContainer() = default;
-
 	SceneHandle load_scene(Scenario& scenario, renderer::IRenderer* renderer);
 	bool load_scene_lights();
 
-	// Global container object for everything
-	static WorldContainer s_container;
-
 	// Function pointer for loading a LoD from a scene
-	std::uint32_t(CDECL *m_load_lod)(ObjectHandle obj, u32 lod) = nullptr;
+	LodLoadFuncPtr m_loadLod = nullptr;
+	void* m_loadLodUserParams = nullptr;
 
 	// A pool for all object/instance names (keeps references valid until world clear)
 	util::StringPool m_namePool;

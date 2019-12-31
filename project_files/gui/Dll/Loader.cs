@@ -14,6 +14,8 @@ namespace gui.Dll
     /// </summary>
     public static class Loader
     {
+        private static IntPtr mffLoaderInstHdl;
+
         public enum LoaderStatus
         {
             SUCCESS,
@@ -21,30 +23,37 @@ namespace gui.Dll
             ABORT
         };
 
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool loader_set_logger(Core.LogCallback logCallback);
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool loader_set_log_level(Core.Severity severity);
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LoaderStatus loader_load_json(string path);
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LoaderStatus loader_save_scene(string path);
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool loader_abort();
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_get_dll_error")]
+        private static extern IntPtr loader_get_dll_error_();
+        internal static string loader_get_dll_error() { return StringUtil.FromNativeUTF8(loader_get_dll_error_()); }
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_initialize")]
+        private static extern IntPtr loader_initialize_(IntPtr mffInstHdl);
+        internal static bool loader_initialize() { mffLoaderInstHdl = loader_initialize_(Core.muffInstHdl); return mffLoaderInstHdl != IntPtr.Zero; }
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_destroy")]
+        private static extern void loader_destroy_(IntPtr instHdl);
+        internal static void loader_destroy() { loader_destroy_(mffLoaderInstHdl); }
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_load_json")]
+        private static extern LoaderStatus loader_load_json_(IntPtr instHdl, IntPtr path);
+        internal static LoaderStatus loader_load_json(string path) { return loader_load_json_(mffLoaderInstHdl, StringUtil.ToNativeUtf8(path)); }
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_save_scene")]
+        private static extern LoaderStatus loader_save_scene_(IntPtr instHdl, IntPtr path);
+        internal static LoaderStatus loader_save_scene(string path) { return loader_save_scene_(mffLoaderInstHdl, StringUtil.ToNativeUtf8(path)); }
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_load_lod")]
+        private static extern Boolean loader_load_lod_(IntPtr instHdl, IntPtr obj, UInt32 lod);
+        internal static Boolean loader_load_lod(IntPtr obj, UInt32 lod) { return loader_load_lod_(mffLoaderInstHdl, obj, lod); }
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_abort")]
+        private static extern Boolean loader_abort_(IntPtr instHdl);
+        internal static Boolean loader_abort() { return loader_abort_(mffLoaderInstHdl); }
         [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_get_loading_status")]
-        private static extern IntPtr loader_get_loading_status_();
-        internal static string loader_get_loading_status() { return StringUtil.FromNativeUTF8(loader_get_loading_status_()); }
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr loader_get_loading_status_(IntPtr instHdl);
+        internal static string loader_get_loading_status() { return StringUtil.FromNativeUTF8(loader_get_loading_status_(mffLoaderInstHdl)); }
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_profiling_enable")]
         internal static extern void loader_profiling_enable();
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_profiling_disable")]
         internal static extern void loader_profiling_disable();
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_profiling_set_level")]
         internal static extern Boolean loader_profiling_set_level(Core.ProfilingLevel level);
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern Boolean loader_profiling_save_current_state(string path);
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern Boolean loader_profiling_save_snapshots(string path);
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_profiling_save_current_state")]
         internal static extern Boolean loader_profiling_save_total_and_snapshots(string path);
         [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_profiling_get_current_state")]
         private static extern IntPtr loader_profiling_get_current_state_();
@@ -58,10 +67,7 @@ namespace gui.Dll
         [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_profiling_get_total_and_snapshots")]
         private static extern IntPtr loader_profiling_get_total_and_snapshots_();
         internal static string loader_profiling_get_total_and_snapshots() { return StringUtil.FromNativeUTF8(loader_profiling_get_total_and_snapshots_()); }
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_profiling_reset")]
         internal static extern void loader_profiling_reset();
-        [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.LPStr)]
-        internal static extern string loader_get_dll_error();
     }
 }

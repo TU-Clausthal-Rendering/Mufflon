@@ -13,7 +13,8 @@ class SceneExporter
 public:
 	static constexpr const char FILE_VERSION[] = "1.0";
 
-	SceneExporter(fs::path fileDestinationPath, fs::path mffPath) :
+	SceneExporter(MufflonInstanceHdl mffInstHdl, fs::path fileDestinationPath, fs::path mffPath) :
+		m_mffInstHdl{ mffInstHdl },
 		m_fileDestinationPath(fs::canonical(fileDestinationPath)),
 		m_mffPath(mffPath)
 	{}
@@ -36,6 +37,7 @@ private:
 
 	rapidjson::Value store_in_string_relative_to_destination_path(const fs::path& path, rapidjson::Document& document) const;
 
+	MufflonInstanceHdl m_mffInstHdl;
 	const fs::path m_fileDestinationPath;
 	const fs::path m_mffPath;
 };

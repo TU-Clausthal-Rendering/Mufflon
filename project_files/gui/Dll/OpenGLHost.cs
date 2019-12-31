@@ -128,12 +128,12 @@ namespace gui.Dll
 
             // Hold up with the cleanup until we destroy the window
             m_cleanup.WaitOne();
-            if (OpenGlContextCreated)
-                Core.mufflon_destroy_opengl();
 
+            // Unload the scene loader
+            Loader.loader_destroy();
             // Unload the core DLL
             Core.mufflon_destroy();
-            
+
             // Release the contexts
             if (m_renderContext != IntPtr.Zero)
                 User32.ReleaseDC(m_hWnd, m_renderContext);

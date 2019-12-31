@@ -20,7 +20,7 @@ namespace gui.Model.Light
             return new DirectionalLightViewModel(models, this);
         }
 
-        public DirectionalLightModel(IntPtr handle) : base(handle)
+        public DirectionalLightModel(UInt32 handle) : base(handle)
         {
 
         }

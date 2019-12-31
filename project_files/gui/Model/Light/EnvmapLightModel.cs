@@ -21,7 +21,7 @@ namespace gui.Model.Light
             return new EnvmapLightViewModel(models, this);
         }
 
-        public EnvmapLightModel(IntPtr handle) : base(handle)
+        public EnvmapLightModel(UInt32 handle) : base(handle)
         {
             EnvType = Core.world_get_env_light_type(Handle);
         }
@@ -63,7 +63,7 @@ namespace gui.Model.Light
             {
                 if (EnvType != Core.BackgroundType.Envmap || Equals(value, Map)) return;
                 
-                var texHandle = Core.world_add_texture(value, Core.TextureSampling.Nearest);
+                var texHandle = Core.world_add_texture(value, Core.TextureSampling.Nearest, Core.MipmapType.NONE, null, IntPtr.Zero);
                 if(texHandle == IntPtr.Zero)
                     throw new Exception(Core.core_get_dll_error());
                 if(!Core.world_set_env_light_map(Handle, texHandle))

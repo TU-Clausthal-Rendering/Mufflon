@@ -87,35 +87,36 @@ using PolyVHdl = Polygons::VertexHandle;
 using PolyFHdl = Polygons::FaceHandle;
 using SphereVHdl = Spheres::SphereHandle;
 
+// Encapsulates one instance of Mufflon (world, renderers etc.)
+struct MufflonInstance {
+	WorldContainer world{};
+	// List of renderers
+	util::IndexedStringMap<std::vector<std::unique_ptr<renderer::IRenderer>>> renderers{};
+	renderer::IRenderer* currentRenderer{ nullptr };
+	// Current iteration counter
+	std::unique_ptr<renderer::IOutputHandler> imageOutput{};
+	std::unique_ptr<float[]> screenTexture{};
+	int screenTextureNumChannels{ 0 };
+	// Mutex for exclusive renderer access: during an iteration no other thread may change renderer properties
+	std::mutex iterationMutex{};
+	std::mutex screenTextureMutex{};
+	// Set of render targets to enable/disable
+	std::set<std::pair<std::string, bool>> targetsToEnable{};
+	std::set<std::pair<std::string, bool>> targetsToDisable{};
+};
+
 // Return values for invalid handles/attributes
 namespace {
 
-// static variables for interacting with the renderer
-renderer::IRenderer* s_currentRenderer;
-// Current iteration counter
-std::unique_ptr<renderer::IOutputHandler> s_imageOutput;
-std::unique_ptr<float[]> s_screenTexture;
-int s_screenTextureNumChannels;
-WorldContainer& s_world = WorldContainer::instance();
 static void(*s_logCallback)(const char*, int);
 // Holds the CUDA device index
 int s_cudaDevIndex = -1;
 // Holds the last error for the GUI to display
 std::string s_lastError;
-// Mutex for exclusive renderer access: during an iteration no other thread may change renderer properties
-std::mutex s_iterationMutex{};
-std::mutex s_screenTextureMutex{};
 // Log file
 std::ofstream s_logFile;
-// Set of render targets to enable/disable
-std::set<std::pair<std::string, bool>> s_targetsToEnable;
-std::set<std::pair<std::string, bool>> s_targetsToDisable;
-
 // Plugin container
 std::vector<TextureLoaderPlugin> s_plugins;
-
-// List of renderers
-util::IndexedStringMap<std::vector<std::unique_ptr<renderer::IRenderer>>> s_renderers;
 
 constexpr VertexAttributeHdl INVALID_POLY_VATTR_HANDLE{ ATTRTYPE_COUNT, nullptr };
 constexpr FaceAttributeHdl INVALID_POLY_FATTR_HANDLE{ ATTRTYPE_COUNT, nullptr };
@@ -123,29 +124,33 @@ constexpr SphereAttributeHdl INVALID_SPHERE_ATTR_HANDLE{ ATTRTYPE_COUNT, nullptr
 
 // Initializes all renderers
 template < bool initOpenGL, std::size_t I = 0u >
-inline void init_renderers() {
+inline void init_renderers(MufflonInstance& instance) {
 	if constexpr(I == 0u && !initOpenGL)
-		s_renderers.clear();
+		instance.renderers.clear();
 
 	using RendererType = typename renderer::Renderers::Type<I>;
-	std::vector<std::unique_ptr<renderer::IRenderer>>* renderers = s_renderers.find(RendererType::get_name_static());
+	std::vector<std::unique_ptr<renderer::IRenderer>>* renderers = instance.renderers.find(RendererType::get_name_static());
 
 	// Only initialize opengl renderers if requested (because of deferred context init)
 	if constexpr(RendererType::may_use_device(Device::OPENGL)) {
 		if(initOpenGL) {// deferred init
 			if(renderers == nullptr)
-				renderers = &s_renderers.get(s_renderers.insert(std::string(RendererType::get_name_static()), {}));
-			renderers->push_back(std::make_unique<RendererType>());
+				renderers = &instance.renderers.get(instance.renderers.insert(std::string(RendererType::get_name_static()), {}));
+			// Special case: GlForward renderer needs to add textures...
+			if constexpr(std::is_same_v<RendererType, renderer::GlForward>)
+				renderers->push_back(std::make_unique<RendererType>(&instance));
+			else
+				renderers->push_back(std::make_unique<RendererType>());
 		}
 	}
 	// Only initialize CUDA renderers if CUDA is enabled
 	else if(!initOpenGL && (s_cudaDevIndex >= 0 || !RendererType::may_use_device(Device::CUDA))) {
 		if(renderers == nullptr)
-			renderers = &s_renderers.get(s_renderers.insert(std::string(RendererType::get_name_static()), {}));
+			renderers = &instance.renderers.get(instance.renderers.insert(std::string(RendererType::get_name_static()), {}));
 		renderers->push_back(std::make_unique<RendererType>());
 	}
 	if constexpr(I + 1u < renderer::Renderers::size)
-		init_renderers<initOpenGL, I + 1u>();
+		init_renderers<initOpenGL, I + 1u>(instance);
 }
 
 // Function delegating the logger output to the applications handle, if applicable
@@ -160,8 +165,8 @@ inline void delegateLog(LogSeverity severity, const std::string& message) {
 	CATCH_ALL(;)
 }
 
-inline std::string replace_screenshot_filename_tags(std::string name, const StringView targetName,
-													const bool variance) {
+inline std::string replace_screenshot_filename_tags(const MufflonInstance& instance, std::string name,
+													const StringView targetName, const bool variance) {
 	// Replace tags in the file name
 	auto replacer = [](std::string str, const StringView from, const StringView to) {
 		if(const auto start = str.find(from.data()); start != std::string::npos) {
@@ -171,21 +176,21 @@ inline std::string replace_screenshot_filename_tags(std::string name, const Stri
 	};
 	// Unfortunately we cannot replace the scene path since we don't know it,
 	// so that's still left to the front-end
-	name = replacer(name, "#scenario", s_world.get_current_scenario()->get_name());
-	name = replacer(name, "#renderer", s_currentRenderer->get_name());
-	name = replacer(name, "#shortrenderer", s_currentRenderer->get_short_name());
-	name = replacer(name, "#iteration", std::to_string(render_get_current_iteration()));
-	name = replacer(name, "#frame", std::to_string(s_world.get_frame_current()));
+	name = replacer(name, "#scenario", instance.world.get_current_scenario()->get_name());
+	name = replacer(name, "#renderer", instance.currentRenderer->get_name());
+	name = replacer(name, "#shortrenderer", instance.currentRenderer->get_short_name());
+	name = replacer(name, "#iteration", std::to_string(render_get_current_iteration(&instance)));
+	name = replacer(name, "#frame", std::to_string(instance.world.get_frame_current()));
 	if(variance)
 		name = replacer(name, "#target", std::string(targetName) + "(Variance)");
 	else
 		name = replacer(name, "#target", targetName);
 	// TODO: enum to string would be nice here...
-	const std::string usedDevices = std::string(s_currentRenderer->uses_device(Device::CPU) ? ",CPU" : "")
-		+ std::string(s_currentRenderer->uses_device(Device::CUDA) ? ",CUDA" : "")
-		+ std::string(s_currentRenderer->uses_device(Device::OPENGL) ? ",OPENGL" : "");
+	const std::string usedDevices = std::string(instance.currentRenderer->uses_device(Device::CPU) ? ",CPU" : "")
+		+ std::string(instance.currentRenderer->uses_device(Device::CUDA) ? ",CUDA" : "")
+		+ std::string(instance.currentRenderer->uses_device(Device::OPENGL) ? ",OPENGL" : "");
 	name = replacer(name, "#devices", usedDevices.size() > 0 ? StringView(&usedDevices[1], usedDevices.size() - 1) : usedDevices);
-	name = replacer(name, "#camera", s_world.get_current_scenario()->get_camera()->get_name());
+	name = replacer(name, "#camera", instance.world.get_current_scenario()->get_camera()->get_name());
 	return name;
 }
 
@@ -220,27 +225,31 @@ Boolean core_set_log_level(LogLevel level) {
 	}
 }
 
-Boolean core_set_lod_loader(Boolean(*func)(ObjectHdl, uint32_t)) {
+Boolean mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t), void* userParams) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& instance = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(func, "LoD loader function", false);
-	s_world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(ObjectHandle, u32)>(func));
+	instance.world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(void*, ObjectHandle, u32)>(func), userParams);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean core_get_target_image(const char* name, Boolean variance, const float** ptr) {
+Boolean mufflon_get_target_image(MufflonInstanceHdl instHdl, const char* name, Boolean variance, const float** ptr) {
 	TRY
-	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
-	std::scoped_lock iterLock{ s_iterationMutex };
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& instance = *static_cast<MufflonInstance*>(instHdl);
+	CHECK_NULLPTR(instance.currentRenderer, "current renderer", false);
+	std::scoped_lock iterLock{ instance.iterationMutex };
 		
 	// If there's no output yet, we "return" a nullptr
-	if(s_imageOutput != nullptr) {
-		auto data = s_imageOutput->get_data(name, variance);
-		std::scoped_lock screenLock{ s_screenTextureMutex };
-		s_screenTexture = std::move(data);
-		s_screenTextureNumChannels = s_imageOutput->get_num_channels(name);
+	if(instance.imageOutput != nullptr) {
+		auto data = instance.imageOutput->get_data(name, variance);
+		std::scoped_lock screenLock{ instance.screenTextureMutex };
+		instance.screenTexture = std::move(data);
+		instance.screenTextureNumChannels = instance.imageOutput->get_num_channels(name);
 		if(ptr != nullptr)
-			*ptr = reinterpret_cast<const float*>(s_screenTexture.get());
+			*ptr = instance.screenTexture.get();
 	} else if(ptr != nullptr) {
 		*ptr = nullptr;
 	}
@@ -248,25 +257,29 @@ Boolean core_get_target_image(const char* name, Boolean variance, const float** 
 	CATCH_ALL(false)
 }
 
-Boolean core_get_target_image_num_channels(int* numChannels) {
-	CHECK_NULLPTR(s_screenTexture, "screen texture", false);
-	*numChannels = s_screenTextureNumChannels;
+Boolean mufflon_get_target_image_num_channels(MufflonInstanceHdl instHdl, int* numChannels) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& instance = *static_cast<MufflonInstance*>(instHdl);
+	CHECK_NULLPTR(instance.screenTexture, "screen texture", false);
+	*numChannels = instance.screenTextureNumChannels;
 	return true;
 }
 
-Boolean core_copy_screen_texture_rgba32(Vec4* ptr, const float factor) {
+Boolean mufflon_copy_screen_texture_rgba32(MufflonInstanceHdl instHdl, Vec4* ptr, const float factor) {
 	TRY
-	CHECK_NULLPTR(s_currentRenderer, "current renderer", false);
-	std::scoped_lock lock{ s_screenTextureMutex };
-	if(ptr != nullptr && s_screenTexture != nullptr) {
-		const int numPixels = s_imageOutput->get_width() * s_imageOutput->get_height();
-		const float* texData = s_screenTexture.get();
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& instance = *static_cast<MufflonInstance*>(instHdl);
+	CHECK_NULLPTR(instance.currentRenderer, "current renderer", false);
+	std::scoped_lock lock{ instance.screenTextureMutex };
+	if(ptr != nullptr && instance.screenTexture != nullptr) {
+		const int numPixels = instance.imageOutput->get_width() * instance.imageOutput->get_height();
+		const float* texData = instance.screenTexture.get();
 #pragma PARALLEL_FOR
 		for(int i = 0; i < numPixels; ++i) {
 			Vec4 pixel { 0.f, 0.f, 0.f, 0.f };
 			float* dst = reinterpret_cast<float*>(&pixel);
-			int idx = i * s_screenTextureNumChannels;
-			for(int c = 0; c < s_screenTextureNumChannels; ++c)
+			int idx = i * instance.screenTextureNumChannels;
+			for(int c = 0; c < instance.screenTextureNumChannels; ++c)
 				dst[c] = factor * texData[idx+c];
 			ptr[i] = pixel;
 		}
@@ -275,20 +288,23 @@ Boolean core_copy_screen_texture_rgba32(Vec4* ptr, const float factor) {
 	CATCH_ALL(false)
 }
 
-Boolean core_get_pixel_info(uint32_t x, uint32_t y, Boolean borderClamp, float* r, float* g, float* b, float* a) {
+Boolean mufflon_get_pixel_info(MufflonInstanceHdl instHdl, uint32_t x, uint32_t y, Boolean borderClamp, float* r, float* g, float* b, float* a) {
 	TRY
-	CHECK(borderClamp || ((int)x < s_imageOutput->get_width() && (int)y < s_imageOutput->get_height()),
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& instance = *static_cast<MufflonInstance*>(instHdl);
+	CHECK(borderClamp || ((int)x < instance.imageOutput->get_width()
+						  && (int)y < instance.imageOutput->get_height()),
 		  "Pixel coordinates are out of bounds", false);
 	*r = *g = *b = *a = 0.0f;
-	if(s_screenTexture) {
-		auto coordX = std::min<std::uint32_t>(s_imageOutput->get_width() - 1, x);
-		auto coordY = std::min<std::uint32_t>(s_imageOutput->get_height() - 1, y);
-		int idx = (coordX + coordY * s_imageOutput->get_width()) * s_screenTextureNumChannels;
-		switch(s_screenTextureNumChannels) {
-			case 4: *a = s_screenTexture[idx+3]; // FALLTHROUGH
-			case 3: *b = s_screenTexture[idx+2]; // FALLTHROUGH
-			case 2: *g = s_screenTexture[idx+1]; // FALLTHROUGH
-			case 1: *r = s_screenTexture[idx];
+	if(instance.screenTexture) {
+		auto coordX = std::min<std::uint32_t>(instance.imageOutput->get_width() - 1, x);
+		auto coordY = std::min<std::uint32_t>(instance.imageOutput->get_height() - 1, y);
+		int idx = (coordX + coordY * instance.imageOutput->get_width()) * instance.screenTextureNumChannels;
+		switch(instance.screenTextureNumChannels) {
+			case 4: *a = instance.screenTexture[idx+3]; // FALLTHROUGH
+			case 3: *b = instance.screenTexture[idx+2]; // FALLTHROUGH
+			case 2: *g = instance.screenTexture[idx+1]; // FALLTHROUGH
+			case 1: *r = instance.screenTexture[idx];
 		}
 	}
 	return true;
@@ -1000,35 +1016,41 @@ Boolean object_get_id(ObjectHdl obj, uint32_t* id) {
 	CATCH_ALL(false)
 }
 
-Boolean instance_set_transformation_matrix(InstanceHdl inst, const Mat3x4* mat,
+Boolean instance_set_transformation_matrix(MufflonInstanceHdl instHdl, InstanceHdl inst, const Mat3x4* mat,
 										   const Boolean isWorldToInst) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(inst, "instance handle", false);
 	CHECK_NULLPTR(mat, "transformation matrix", false);
 	ConstInstanceHandle instance = static_cast<ConstInstanceHandle>(inst);
 	if(isWorldToInst)
-		s_world.set_world_to_instance_transformation(instance, util::pun<ei::Mat3x4>(*mat));
+		muffInst.world.set_world_to_instance_transformation(instance, util::pun<ei::Mat3x4>(*mat));
 	else
-		s_world.set_instance_to_world_transformation(instance, util::pun<ei::Mat3x4>(*mat));
+		muffInst.world.set_instance_to_world_transformation(instance, util::pun<ei::Mat3x4>(*mat));
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean instance_get_transformation_matrix(InstanceHdl inst, Mat3x4* mat) {
+Boolean instance_get_transformation_matrix(MufflonInstanceHdl instHdl, InstanceHdl inst, Mat3x4* mat) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(inst, "instance handle", false);
 	ConstInstanceHandle instance = static_cast<ConstInstanceHandle>(inst);
 	if(mat != nullptr)
-		*mat = util::pun<Mat3x4>(s_world.compute_instance_to_world_transformation(instance));
+		*mat = util::pun<Mat3x4>(muffInst.world.compute_instance_to_world_transformation(instance));
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max, LodLevel lod) {
+Boolean instance_get_bounding_box(MufflonInstanceHdl instHdl, InstanceHdl inst, Vec3* min, Vec3* max, LodLevel lod) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(inst, "instance handle", false);
 	const Instance& instance = *static_cast<ConstInstanceHandle>(inst);
-	const ei::Box& aabb = instance.get_bounding_box(lod, s_world.compute_instance_to_world_transformation(&instance));
+	const ei::Box& aabb = instance.get_bounding_box(lod, muffInst.world.compute_instance_to_world_transformation(&instance));
 	if(min != nullptr)
 		*min = util::pun<Vec3>(aabb.min);
 	if(max != nullptr)
@@ -1037,54 +1059,68 @@ Boolean instance_get_bounding_box(InstanceHdl inst, Vec3* min, Vec3* max, LodLev
 	CATCH_ALL(false)
 }
 
-void world_clear_all() {
+void world_clear_all(MufflonInstanceHdl instHdl) {
 	TRY
-	auto iterLock = std::scoped_lock(s_iterationMutex);
-	auto screenLock = std::scoped_lock(s_screenTextureMutex);
-	for(std::size_t i = 0u; i < s_renderers.size(); ++i)
-		for(auto& renderer : s_renderers.get(i))
+	CHECK_NULLPTR(instHdl, "mufflon instance", ;);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	auto iterLock = std::scoped_lock(muffInst.iterationMutex);
+	auto screenLock = std::scoped_lock(muffInst.screenTextureMutex);
+	for(std::size_t i = 0u; i < muffInst.renderers.size(); ++i)
+		for(auto& renderer : muffInst.renderers.get(i))
 			renderer->on_world_clearing();
-	WorldContainer::clear_instance();
-	s_screenTexture.reset();
+	muffInst.world = WorldContainer{};
+	muffInst.screenTexture.reset();
 	CATCH_ALL(;)
 }
 
-void world_reserve_objects_instances(const uint32_t objects, const uint32_t instances) {
+void world_reserve_objects_instances(MufflonInstanceHdl instHdl, const uint32_t objects, const uint32_t instances) {
 	TRY
-	s_world.reserve(objects, instances);
+	CHECK_NULLPTR(instHdl, "mufflon instance", ;);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	muffInst.world.reserve(objects, instances);
 	CATCH_ALL(;)
 }
 
-void world_reserve_scenarios(const uint32_t scenarios) {
+void world_reserve_scenarios(MufflonInstanceHdl instHdl, const uint32_t scenarios) {
 	TRY
-	s_world.reserve(scenarios);
+	CHECK_NULLPTR(instHdl, "mufflon instance", ;);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	muffInst.world.reserve(scenarios);
 	CATCH_ALL(;)
 }
 
-void world_reserve_animation(const uint32_t numBones, const uint32_t frameCount) {
+void world_reserve_animation(MufflonInstanceHdl instHdl, const uint32_t numBones, const uint32_t frameCount) {
 	TRY
-	s_world.reserve_animation(numBones, frameCount);
+	CHECK_NULLPTR(instHdl, "mufflon instance", ;);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	muffInst.world.reserve_animation(numBones, frameCount);
 	CATCH_ALL(;)
 }
 
-ObjectHdl world_create_object(const char* name, ::ObjectFlags flags) {
+ObjectHdl world_create_object(MufflonInstanceHdl instHdl, const char* name, ::ObjectFlags flags) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(name, "object name", nullptr);
-	return static_cast<ObjectHdl>(s_world.create_object(name,
+	return static_cast<ObjectHdl>(muffInst.world.create_object(name,
 			util::pun<scene::ObjectFlags>(flags)));
 	CATCH_ALL(nullptr)
 }
 
-void world_set_bone(const uint32_t boneIndex, const uint32_t frame, const DualQuaternion* transformation) {
+void world_set_bone(MufflonInstanceHdl instHdl, const uint32_t boneIndex, const uint32_t frame, const DualQuaternion* transformation) {
 	TRY
-	s_world.set_bone(boneIndex, frame, util::pun<ei::DualQuaternion>(*transformation));
+	CHECK_NULLPTR(instHdl, "mufflon instance", ;);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	muffInst.world.set_bone(boneIndex, frame, util::pun<ei::DualQuaternion>(*transformation));
 	CATCH_ALL(;)
 }
 
-ObjectHdl world_get_object(const char* name) {
+ObjectHdl world_get_object(MufflonInstanceHdl instHdl, const char* name) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(name, "object name", nullptr);
-	return static_cast<ObjectHdl>(s_world.get_object(name));
+	return static_cast<ObjectHdl>(muffInst.world.get_object(name));
 	CATCH_ALL(nullptr)
 }
 
@@ -1095,61 +1131,74 @@ const char* world_get_object_name(ObjectHdl obj) {
 	CATCH_ALL(nullptr)
 }
 
-InstanceHdl world_create_instance(ObjectHdl obj, const uint32_t animationFrame) {
+InstanceHdl world_create_instance(MufflonInstanceHdl instHdl, ObjectHdl obj, const uint32_t animationFrame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(obj, "object handle", nullptr);
 	ObjectHandle hdl = static_cast<Object*>(obj);
-	return static_cast<InstanceHdl>(s_world.create_instance(hdl, animationFrame));
+	return static_cast<InstanceHdl>(muffInst.world.create_instance(hdl, animationFrame));
 	CATCH_ALL(nullptr)
 }
 
-Boolean world_apply_instance_transformation(InstanceHdl inst) {
+Boolean world_apply_instance_transformation(MufflonInstanceHdl instHdl, InstanceHdl inst) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(inst, "instance handle", false);
-	s_world.apply_transformation(static_cast<Instance*>(inst));
+	muffInst.world.apply_transformation(static_cast<Instance*>(inst));
 	return true;
 	CATCH_ALL(false)
 }
 
-uint32_t world_get_instance_count(const uint32_t frame) {
+uint32_t world_get_instance_count(MufflonInstanceHdl instHdl, const uint32_t frame) {
 	TRY
-	return static_cast<uint32_t>(s_world.get_instance_count(frame));
+	CHECK_NULLPTR(instHdl, "mufflon instance", 0);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return static_cast<uint32_t>(muffInst.world.get_instance_count(frame));
 	CATCH_ALL(0u)
 }
 
-uint32_t world_get_highest_instance_frame() {
+uint32_t world_get_highest_instance_frame(MufflonInstanceHdl instHdl) {
 	TRY
-	return static_cast<uint32_t>(s_world.get_highest_instance_frame());
+	CHECK_NULLPTR(instHdl, "mufflon instance", 0);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return static_cast<uint32_t>(muffInst.world.get_highest_instance_frame());
 	CATCH_ALL(0u)
 }
 
-InstanceHdl world_get_instance_by_index(uint32_t index, const uint32_t animationFrame)
-{
+InstanceHdl world_get_instance_by_index(MufflonInstanceHdl instHdl, uint32_t index, const uint32_t animationFrame) {
 	TRY
-	const uint32_t MAX_INDEX = static_cast<uint32_t>(s_world.get_instance_count(animationFrame));
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	const uint32_t MAX_INDEX = static_cast<uint32_t>(muffInst.world.get_instance_count(animationFrame));
 	if (index >= MAX_INDEX) {
 		logError("[", FUNCTION_NAME, "] Instance index '", index, "' out of bounds (",
 			MAX_INDEX, ')');
 		return nullptr;
 	}
-	return s_world.get_instance(index, animationFrame);
+	return muffInst.world.get_instance(index, animationFrame);
 	CATCH_ALL(nullptr)
 }
 
 
-ScenarioHdl world_create_scenario(const char* name) {
+ScenarioHdl world_create_scenario(MufflonInstanceHdl instHdl, const char* name) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(name, "scenario name", nullptr);
-	ScenarioHandle hdl = s_world.create_scenario(name);
+	ScenarioHandle hdl = muffInst.world.create_scenario(name);
 	return static_cast<ScenarioHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
 
-ScenarioHdl world_find_scenario(const char* name) {
+ScenarioHdl world_find_scenario(MufflonInstanceHdl instHdl, const char* name) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(name, "scenario name", nullptr);
 	StringView nameView{ name };
-	ScenarioHandle hdl = s_world.get_scenario(nameView);
+	ScenarioHandle hdl = muffInst.world.get_scenario(nameView);
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Could not find scenario '",
 				 nameView, "'");
@@ -1159,27 +1208,33 @@ ScenarioHdl world_find_scenario(const char* name) {
 	CATCH_ALL(nullptr)
 }
 
-uint32_t world_get_scenario_count() {
+uint32_t world_get_scenario_count(MufflonInstanceHdl instHdl) {
 	TRY
-	return static_cast<uint32_t>(s_world.get_scenario_count());
+	CHECK_NULLPTR(instHdl, "mufflon instance", 0);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return static_cast<uint32_t>(muffInst.world.get_scenario_count());
 	CATCH_ALL(0u)
 }
 
-ScenarioHdl world_get_scenario_by_index(uint32_t index) {
+ScenarioHdl world_get_scenario_by_index(MufflonInstanceHdl instHdl, uint32_t index) {
 	TRY
-	const uint32_t MAX_INDEX = static_cast<uint32_t>(s_world.get_scenario_count());
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	const uint32_t MAX_INDEX = static_cast<uint32_t>(muffInst.world.get_scenario_count());
 	if(index >= MAX_INDEX) {
 		logError("[", FUNCTION_NAME, "] Scenario index '", index, "' out of bounds (",
 				 MAX_INDEX, ')');
 		return nullptr;
 	}
-	return s_world.get_scenario(index);
+	return muffInst.world.get_scenario(index);
 	CATCH_ALL(nullptr)
 }
 
-ConstScenarioHdl world_get_current_scenario() {
+ConstScenarioHdl world_get_current_scenario(MufflonInstanceHdl instHdl) {
 	TRY
-	return static_cast<ConstScenarioHdl>(s_world.get_current_scenario());
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return static_cast<ConstScenarioHdl>(muffInst.world.get_current_scenario());
 	CATCH_ALL(nullptr)
 }
 
@@ -1219,7 +1274,7 @@ std::tuple<Spectrum, float, TextureHandle, materials::ShadowingModel, materials:
 			convertShadowingModel(params.shadowingModel),
 			convertNdf(params.ndf)};
 }
-std::unique_ptr<materials::IMaterial> convert_material(const char* name, const MaterialParams* mat) {
+std::unique_ptr<materials::IMaterial> convert_material(MufflonInstance& muffInst, const char* name, const MaterialParams* mat) {
 	using namespace materials;
 	using std::get;
 	CHECK_NULLPTR(name, "material name", nullptr);
@@ -1308,8 +1363,8 @@ std::unique_ptr<materials::IMaterial> convert_material(const char* name, const M
 		util::pun<ei::Vec2>(mat->outerMedium.refractionIndex),
 		util::pun<Spectrum>(mat->outerMedium.absorption)
 	};
-	newMaterial->set_outer_medium( s_world.add_medium(outerMedium) );
-	newMaterial->set_inner_medium( s_world.add_medium(newMaterial->compute_medium(outerMedium)) );
+	newMaterial->set_outer_medium( muffInst.world.add_medium(outerMedium) );
+	newMaterial->set_inner_medium( muffInst.world.add_medium(newMaterial->compute_medium(outerMedium)) );
 	if(mat->alpha != nullptr)
 		newMaterial->set_alpha_texture(static_cast<TextureHandle>(mat->alpha));
 	if(mat->displacement.map != nullptr) {
@@ -1338,13 +1393,15 @@ void APIENTRY opengl_callback(GLenum /*source*/, GLenum /*type*/, GLuint id,
 
 } // namespace ::
 
-MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
+MaterialHdl world_add_material(MufflonInstanceHdl instHdl, const char* name, const MaterialParams* mat) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	if(mat->innerType >= MATERIAL_NUM) {
 		logError("[world_add_material] Invalid material params: type unknown.");
 		return nullptr;
 	}
-	MaterialHandle hdl = s_world.add_material(convert_material(name, mat));
+	MaterialHandle hdl = muffInst.world.add_material(convert_material(muffInst, name, mat));
 
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Error creating material '",
@@ -1356,13 +1413,17 @@ MaterialHdl world_add_material(const char* name, const MaterialParams* mat) {
 	CATCH_ALL(nullptr)
 }
 
-IndexType world_get_material_count() {
-	return static_cast<IndexType>(s_world.get_material_count());
+IndexType world_get_material_count(MufflonInstanceHdl instHdl) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", 0);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return static_cast<IndexType>(muffInst.world.get_material_count());
 }
 
-MaterialHdl world_get_material(IndexType index) {
+MaterialHdl world_get_material(MufflonInstanceHdl instHdl, IndexType index) {
 	TRY
-	return s_world.get_material(index);
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return muffInst.world.get_material(index);
 	CATCH_ALL(nullptr)
 }
 
@@ -1394,12 +1455,12 @@ const char* world_get_material_name(MaterialHdl material) {
 	CATCH_ALL(nullptr)
 }
 
-int _world_get_material_data(MaterialHdl material, MaterialParams* buffer) {
+int _world_get_material_data(MufflonInstance& muffInst, MaterialHdl material, MaterialParams* buffer) {
 	using namespace materials;
 	CHECK_NULLPTR(material, "material handle", 0);
 	CHECK_NULLPTR(buffer, "material buffer", 0);
 	MaterialHandle hdl = static_cast<MaterialHandle>(material);
-	const materials::Medium& medium = s_world.get_medium(hdl->get_outer_medium());
+	const materials::Medium& medium = muffInst.world.get_medium(hdl->get_outer_medium());
 	buffer->outerMedium.absorption = util::pun<Vec3>(medium.get_absorption_coeff());
 	buffer->outerMedium.refractionIndex = util::pun<Vec2>(medium.get_refraction_index());
 	switch(hdl->get_type()) {
@@ -1437,19 +1498,23 @@ int _world_get_material_data(MaterialHdl material, MaterialParams* buffer) {
 	return 1;
 }
 
-Boolean world_get_material_data(MaterialHdl material, MaterialParams* buffer) {
+Boolean world_get_material_data(MufflonInstanceHdl instHdl, MaterialHdl material, MaterialParams* buffer) {
 	TRY
-	return _world_get_material_data(material, buffer) >= 1;
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return _world_get_material_data(muffInst, material, buffer) >= 1;
 	CATCH_ALL(false)
 }
 
 
-CameraHdl world_add_pinhole_camera(const char* name, const Vec3* position, const Vec3* dir,
+CameraHdl world_add_pinhole_camera(MufflonInstanceHdl instHdl, const char* name, const Vec3* position, const Vec3* dir,
 								   const Vec3* up, const std::uint32_t pathCount, float near,
 								   float far, float vFov) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(name, "camera name", nullptr);
-	CameraHandle hdl = s_world.add_camera(name,
+	CameraHandle hdl = muffInst.world.add_camera(name,
 		std::make_unique<cameras::Pinhole>(
 			reinterpret_cast<const ei::Vec3*>(position), reinterpret_cast<const ei::Vec3*>(dir),
 			reinterpret_cast<const ei::Vec3*>(up), pathCount, vFov, near, far
@@ -1462,13 +1527,15 @@ CameraHdl world_add_pinhole_camera(const char* name, const Vec3* position, const
 	CATCH_ALL(nullptr)
 }
 
-CameraHdl world_add_focus_camera(const char* name, const Vec3* position, const Vec3* dir,
+CameraHdl world_add_focus_camera(MufflonInstanceHdl instHdl, const char* name, const Vec3* position, const Vec3* dir,
 								 const Vec3* up, const std::uint32_t pathCount, float near, float far,
 								 float focalLength, float focusDistance,
 								 float lensRad, float chipHeight) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(name, "camera name", nullptr);
-	CameraHandle hdl = s_world.add_camera(name,
+	CameraHandle hdl = muffInst.world.add_camera(name,
 		std::make_unique<cameras::Focus>(
 			reinterpret_cast<const ei::Vec3*>(position), reinterpret_cast<const ei::Vec3*>(dir),
 			reinterpret_cast<const ei::Vec3*>(up), pathCount, focalLength, focusDistance,
@@ -1482,27 +1549,31 @@ CameraHdl world_add_focus_camera(const char* name, const Vec3* position, const V
 	CATCH_ALL(nullptr)
 }
 
-Boolean world_remove_camera(CameraHdl hdl) {
+Boolean world_remove_camera(MufflonInstanceHdl instHdl, CameraHdl hdl) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(hdl, "camera handle", false);
-	s_world.remove_camera(static_cast<CameraHandle>(hdl));
+	muffInst.world.remove_camera(static_cast<CameraHandle>(hdl));
 	return true;
 	CATCH_ALL(false)
 }
 
-LightHdl world_add_light(const char* name, LightType type, const uint32_t count) {
+LightHdl world_add_light(MufflonInstanceHdl instHdl, const char* name, LightType type, const uint32_t count) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", (LightHdl{ 7, 0 }));
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(name, "light name", (LightHdl{7, 0}));
 	std::optional<u32> hdl;
 	switch(type) {
 		case LIGHT_POINT: {
-			hdl = s_world.add_light(name, lights::PointLight{}, count);
+			hdl = muffInst.world.add_light(name, lights::PointLight{}, count);
 		} break;
 		case LIGHT_SPOT: {
-			hdl = s_world.add_light(name, lights::SpotLight{}, count);
+			hdl = muffInst.world.add_light(name, lights::SpotLight{}, count);
 		} break;
 		case LIGHT_DIRECTIONAL: {
-			hdl = s_world.add_light(name, lights::DirectionalLight{}, count);
+			hdl = muffInst.world.add_light(name, lights::DirectionalLight{}, count);
 		} break;
 		case LIGHT_ENVMAP:
 			logError("[", FUNCTION_NAME, "] This function is not suited for adding background lights; "
@@ -1520,19 +1591,21 @@ LightHdl world_add_light(const char* name, LightType type, const uint32_t count)
 	CATCH_ALL((LightHdl{7, 0}))
 }
 
-LightHdl world_add_background_light(const char* name, BackgroundType type) {
+LightHdl world_add_background_light(MufflonInstanceHdl instHdl, const char* name, BackgroundType type) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", (LightHdl{ 7, 0 }));
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(name, "light name", (LightHdl{ 7, 0 }));
 	std::optional<u32> hdl;
 	switch(type) {
 		case BackgroundType::BACKGROUND_MONOCHROME: {
-			hdl = s_world.add_light(name, lights::BackgroundType::COLORED);
+			hdl = muffInst.world.add_light(name, lights::BackgroundType::COLORED);
 		}	break;
 		case BackgroundType::BACKGROUND_ENVMAP: {
-			hdl = s_world.add_light(name, lights::BackgroundType::ENVMAP);
+			hdl = muffInst.world.add_light(name, lights::BackgroundType::ENVMAP);
 		}	break;
 		case BackgroundType::BACKGROUND_SKY_HOSEK: {
-			hdl = s_world.add_light(name, lights::BackgroundType::SKY_HOSEK);
+			hdl = muffInst.world.add_light(name, lights::BackgroundType::SKY_HOSEK);
 		}	break;
 		default:
 			logError("[", FUNCTION_NAME, "] Unknown background type");
@@ -1546,24 +1619,30 @@ LightHdl world_add_background_light(const char* name, BackgroundType type) {
 	CATCH_ALL((LightHdl{ 7, 0 }))
 }
 
-Boolean world_set_light_name(LightHdl hdl, const char* newName) {
+Boolean world_set_light_name(MufflonInstanceHdl instHdl, LightHdl hdl, const char* newName) {
 	TRY
-	s_world.set_light_name(hdl.index, static_cast<lights::LightType>(hdl.type), newName);
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	muffInst.world.set_light_name(hdl.index, static_cast<lights::LightType>(hdl.type), newName);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_remove_light(LightHdl hdl) {
+Boolean world_remove_light(MufflonInstanceHdl instHdl, LightHdl hdl) {
 	TRY
-	s_world.remove_light(hdl.index, static_cast<lights::LightType>(hdl.type));
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	muffInst.world.remove_light(hdl.index, static_cast<lights::LightType>(hdl.type));
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_find_light(const char* name, LightHdl* hdl) {
+Boolean world_find_light(MufflonInstanceHdl instHdl, const char* name, LightHdl* hdl) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(name, "light name", false);
-	std::optional<std::pair<u32, lights::LightType>> light = s_world.find_light(name);
+	std::optional<std::pair<u32, lights::LightType>> light = muffInst.world.find_light(name);
 	if(!light.has_value())
 		return false;
 	if(hdl != nullptr)
@@ -1572,47 +1651,61 @@ Boolean world_find_light(const char* name, LightHdl* hdl) {
 	CATCH_ALL(false);
 }
 
-size_t world_get_camera_count() {
+size_t world_get_camera_count(MufflonInstanceHdl instHdl) {
 	TRY
-	return s_world.get_camera_count();
+	CHECK_NULLPTR(instHdl, "mufflon instance", 0);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return muffInst.world.get_camera_count();
 	CATCH_ALL(0u)
 }
 
-CameraHdl world_get_camera(const char* name) {
+CameraHdl world_get_camera(MufflonInstanceHdl instHdl, const char* name) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(name, "camera name", nullptr);
-	return static_cast<CameraHdl>(s_world.get_camera(name));
+	return static_cast<CameraHdl>(muffInst.world.get_camera(name));
 	CATCH_ALL(nullptr)
 }
 
-CameraHdl world_get_camera_by_index(size_t index) {
+CameraHdl world_get_camera_by_index(MufflonInstanceHdl instHdl, size_t index) {
 	TRY
-	return static_cast<CameraHdl>(s_world.get_camera(index));
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return static_cast<CameraHdl>(muffInst.world.get_camera(index));
 	CATCH_ALL(0u)
 }
 
-size_t world_get_point_light_count() {
+size_t world_get_point_light_count(MufflonInstanceHdl instHdl) {
 	TRY
-	return s_world.get_point_light_count();
+	CHECK_NULLPTR(instHdl, "mufflon instance", 0);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return muffInst.world.get_point_light_count();
 	CATCH_ALL(0u)
 }
 
-size_t world_get_spot_light_count() {
+size_t world_get_spot_light_count(MufflonInstanceHdl instHdl) {
 	TRY
-	return s_world.get_spot_light_count();
+	CHECK_NULLPTR(instHdl, "mufflon instance", 0);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return muffInst.world.get_spot_light_count();
 	CATCH_ALL(0u)
 }
 
-size_t world_get_dir_light_count() {
+size_t world_get_dir_light_count(MufflonInstanceHdl instHdl) {
 	TRY
-	return s_world.get_dir_light_count();
+	CHECK_NULLPTR(instHdl, "mufflon instance", 0);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return muffInst.world.get_dir_light_count();
 	CATCH_ALL(0u)
 }
 
-size_t world_get_env_light_count() {
+size_t world_get_env_light_count(MufflonInstanceHdl instHdl) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", 0);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	// Lessen the count by one due to the default background
-	return s_world.get_env_light_count() - 1u;
+	return muffInst.world.get_env_light_count() - 1u;
 	CATCH_ALL(0u)
 }
 
@@ -1627,11 +1720,13 @@ LightType world_get_light_type(LightHdl hdl) {
 	return static_cast<LightType>(hdl.type);
 }
 
-BackgroundType world_get_env_light_type(LightHdl hdl) {
+BackgroundType world_get_env_light_type(MufflonInstanceHdl instHdl, LightHdl hdl) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", BackgroundType::BACKGROUND_COUNT);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	if(hdl.type == (u32)LightType::LIGHT_ENVMAP) {
 		// We also have to check if we actually have an envmap or a different background
-		const auto* background = s_world.get_background((u32)hdl.index);
+		const auto* background = muffInst.world.get_background((u32)hdl.index);
 		CHECK(background, "background handle", BackgroundType::BACKGROUND_COUNT);
 		switch(background->get_type()) {
 			case lights::BackgroundType::COLORED:
@@ -1651,47 +1746,55 @@ BackgroundType world_get_env_light_type(LightHdl hdl) {
 	CATCH_ALL(BackgroundType::BACKGROUND_COUNT)
 }
 
-const char* world_get_light_name(LightHdl hdl) {
+const char* world_get_light_name(MufflonInstanceHdl instHdl, LightHdl hdl) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	constexpr lights::LightType TYPES[] = {
 		lights::LightType::POINT_LIGHT,
 		lights::LightType::SPOT_LIGHT,
 		lights::LightType::DIRECTIONAL_LIGHT,
 		lights::LightType::ENVMAP_LIGHT
 	};
-	return s_world.get_light_name(hdl.index, TYPES[hdl.type]).data();
+	return muffInst.world.get_light_name(hdl.index, TYPES[hdl.type]).data();
 	CATCH_ALL(nullptr)
 }
 
-SceneHdl world_load_scenario(ScenarioHdl scenario) {
+SceneHdl world_load_scenario(MufflonInstanceHdl instHdl, ScenarioHdl scenario) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(scenario, "scenario handle", nullptr);
-	auto lock = std::scoped_lock(s_iterationMutex);
-	auto screenLock = std::scoped_lock(s_screenTextureMutex);
-	SceneHandle hdl = s_world.load_scene(static_cast<ScenarioHandle>(scenario), s_currentRenderer);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	auto screenLock = std::scoped_lock(muffInst.screenTextureMutex);
+	SceneHandle hdl = muffInst.world.load_scene(static_cast<ScenarioHandle>(scenario), muffInst.currentRenderer);
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Failed to load scenario");
 		return nullptr;
 	}
 	ei::IVec2 res = static_cast<ConstScenarioHandle>(scenario)->get_resolution();
-	if(s_currentRenderer != nullptr) {
-		s_currentRenderer->load_scene(hdl);
-		s_imageOutput->resize(res.x, res.y);
+	if(muffInst.currentRenderer != nullptr) {
+		muffInst.currentRenderer->load_scene(hdl);
+		muffInst.imageOutput->resize(res.x, res.y);
 	}
-	s_screenTexture = nullptr;
+	muffInst.screenTexture = nullptr;
 	return static_cast<SceneHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
 
-SceneHdl world_get_current_scene() {
+SceneHdl world_get_current_scene(MufflonInstanceHdl instHdl) {
 	TRY
-	return static_cast<SceneHdl>(s_world.get_current_scene());
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return static_cast<SceneHdl>(muffInst.world.get_current_scene());
 	CATCH_ALL(nullptr)
 }
 
-Boolean world_finalize(const char** msg) {
+Boolean world_finalize(MufflonInstanceHdl instHdl, const char** msg) {
 	TRY
-	switch(s_world.finalize_world()) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	switch(muffInst.world.finalize_world()) {
 		case WorldContainer::Sanity::SANE: *msg = "";  return true;
 		case WorldContainer::Sanity::NO_CAMERA: *msg = "No camera"; return false;
 		case WorldContainer::Sanity::NO_INSTANCES: *msg = "No instances"; return false;
@@ -1702,10 +1805,12 @@ Boolean world_finalize(const char** msg) {
 	CATCH_ALL(false)
 }
 
-TextureHdl world_get_texture(const char* path) {
+TextureHdl world_get_texture(MufflonInstanceHdl instHdl, const char* path) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(path, "texture path", nullptr);
-	auto hdl = s_world.find_texture(path);
+	auto hdl = muffInst.world.find_texture(path);
 	if(hdl == nullptr) {
 		logError("[", FUNCTION_NAME, "] Could not find texture ",
 				 path);
@@ -1715,16 +1820,18 @@ TextureHdl world_get_texture(const char* path) {
 	CATCH_ALL(nullptr)
 }
 
-TextureHdl world_add_texture(const char* path, TextureSampling sampling, MipmapType type,
+TextureHdl world_add_texture(MufflonInstanceHdl instHdl, const char* path, TextureSampling sampling, MipmapType type,
 							 TextureCallback callback, void* userParams) {
 
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(path, "texture path", nullptr);
 
 	// Check if the texture is already loaded
-	auto hdl = s_world.find_texture(path);
+	auto hdl = muffInst.world.find_texture(path);
 	if(hdl != nullptr) {
-		s_world.ref_texture(hdl);
+		muffInst.world.ref_texture(hdl);
 		return static_cast<TextureHdl>(hdl);
 	}
 
@@ -1766,14 +1873,16 @@ TextureHdl world_add_texture(const char* path, TextureSampling sampling, MipmapT
 		}
 	}
 
-	hdl = s_world.add_texture(std::move(texture));
+	hdl = muffInst.world.add_texture(std::move(texture));
 	return static_cast<TextureHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
 
-TextureHdl world_add_texture_converted(const char* path, TextureSampling sampling, TextureFormat targetFormat,
+TextureHdl world_add_texture_converted(MufflonInstanceHdl instHdl, const char* path, TextureSampling sampling, TextureFormat targetFormat,
 									   MipmapType type, TextureCallback callback, void* userParams) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(path, "texture path", nullptr);
 
 	// Give the texture a special name to avoid conflicts with regularly loaded textures
@@ -1782,9 +1891,9 @@ TextureHdl world_add_texture_converted(const char* path, TextureSampling samplin
 		+ std::string("##");
 
 	// Check if the texture is already loaded
-	auto hdl = s_world.find_texture(textureName);
+	auto hdl = muffInst.world.find_texture(textureName);
 	if(hdl != nullptr) {
-		s_world.ref_texture(hdl);
+		muffInst.world.ref_texture(hdl);
 		return static_cast<TextureHdl>(hdl);
 	}
 
@@ -1839,13 +1948,15 @@ TextureHdl world_add_texture_converted(const char* path, TextureSampling samplin
 	finalTex->mark_changed(Device::CPU);
 
 	// The texture will take ownership of the pointer
-	hdl = s_world.add_texture(std::move(finalTex));
+	hdl = muffInst.world.add_texture(std::move(finalTex));
 	return static_cast<TextureHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
 
-TextureHdl world_add_texture_value(const float* value, int num, TextureSampling sampling) {
+TextureHdl world_add_texture_value(MufflonInstanceHdl instHdl, const float* value, int num, TextureSampling sampling) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	mAssert(num >= 1 && num <= 4);
 	// Create an artifical name for the value texture (for compatibilty with file-textures)
 	std::string name = std::to_string(value[0]);
@@ -1853,9 +1964,9 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 		name += " " + std::to_string(value[i]);
 
 	// Check if the texture is already loaded
-	auto hdl = s_world.find_texture(name);
+	auto hdl = muffInst.world.find_texture(name);
 	if(hdl != nullptr) {
-		s_world.ref_texture(hdl);
+		muffInst.world.ref_texture(hdl);
 		return static_cast<TextureHdl>(hdl);
 	}
 
@@ -1878,13 +1989,15 @@ TextureHdl world_add_texture_value(const float* value, int num, TextureSampling 
 	auto texture = std::make_unique<textures::Texture>(name, 1, 1, 1, textures::MipmapType::NONE, format,
 													   static_cast<textures::SamplingMode>(sampling),
 													   false, true, move(data));
-	hdl = s_world.add_texture(std::move(texture));
+	hdl = muffInst.world.add_texture(std::move(texture));
 	return static_cast<TextureHdl>(hdl);
 	CATCH_ALL(nullptr)
 }
 
-Boolean world_add_displacement_map(const char* path, TextureHdl* hdlTex, TextureHdl* hdlMips) {
+Boolean world_add_displacement_map(MufflonInstanceHdl instHdl, const char* path, TextureHdl* hdlTex, TextureHdl* hdlMips) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(path, "texture path", false);
 	CHECK_NULLPTR(hdlTex, "texture handle", false);
 	CHECK_NULLPTR(hdlMips, "texture max MIPMaps handle", false);
@@ -1894,16 +2007,16 @@ Boolean world_add_displacement_map(const char* path, TextureHdl* hdlTex, Texture
 	std::string textureMipsName = std::string(path) + std::string("##DISPLACEMENT_MAP_MIPS##");
 
 	// Check if the texture is already loaded
-	auto hdl = s_world.find_texture(textureName);
+	auto hdl = muffInst.world.find_texture(textureName);
 	if(hdl != nullptr) {
 		// Also find the max mipmaps
-		auto hdlMaxMips = s_world.find_texture(textureMipsName);
+		auto hdlMaxMips = muffInst.world.find_texture(textureMipsName);
 		if(hdlMaxMips == nullptr) {
 			logError("[", FUNCTION_NAME, "] Failed to find max MIPMaps for existing displacement map");
 			return false;
 		}
-		s_world.ref_texture(hdl);
-		s_world.ref_texture(hdlMaxMips);
+		muffInst.world.ref_texture(hdl);
+		muffInst.world.ref_texture(hdlMaxMips);
 		*hdlTex = hdl;
 		*hdlMips = hdlMaxMips;
 		return true;
@@ -1952,13 +2065,13 @@ Boolean world_add_displacement_map(const char* path, TextureHdl* hdlTex, Texture
 		}
 		cpuFinalTex->recompute_mipmaps(textures::MipmapType::MIN);
 		finalTex->mark_changed(Device::CPU);
-		dispMap = s_world.add_texture(std::move(finalTex));
+		dispMap = muffInst.world.add_texture(std::move(finalTex));
 	} else {
 		auto finalTex = std::make_unique<textures::Texture>(std::move(textureName), texData.width, texData.height, texData.layers,
 															textures::MipmapType::MIN, textures::Format::R32F,
 															textures::SamplingMode::NEAREST,
 															texData.sRgb, false, std::unique_ptr<u8[]>(texData.data));
-		dispMap = s_world.add_texture(std::move(finalTex));
+		dispMap = muffInst.world.add_texture(std::move(finalTex));
 	}
 	*hdlTex = dispMap;
 
@@ -1987,7 +2100,7 @@ Boolean world_add_displacement_map(const char* path, TextureHdl* hdlTex, Texture
 			}
 		}
 		cpuMipTech->recompute_mipmaps(textures::MipmapType::MAX);
-		*hdlMips = s_world.add_texture(std::move(mipTex));
+		*hdlMips = muffInst.world.add_texture(std::move(mipTex));
 	}
 
 	return true;
@@ -2053,12 +2166,14 @@ Boolean world_get_camera_position(ConstCameraHdl cam, Vec3* pos, const std::uint
 	CATCH_ALL(false)
 }
 
-Boolean world_get_camera_current_position(ConstCameraHdl cam, Vec3* pos) {
+Boolean world_get_camera_current_position(MufflonInstanceHdl instHdl, ConstCameraHdl cam, Vec3* pos) {
 	TRY
-		CHECK_NULLPTR(cam, "camera handle", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	CHECK_NULLPTR(cam, "camera handle", false);
 	if(pos != nullptr) {
 		const auto& camera = *static_cast<const cameras::Camera*>(cam);
-		*pos = util::pun<Vec3>(camera.get_position(std::min(s_world.get_frame_current(),
+		*pos = util::pun<Vec3>(camera.get_position(std::min(muffInst.world.get_frame_current(),
 															camera.get_path_segment_count() - 1u)));
 	}
 	return true;
@@ -2076,12 +2191,14 @@ Boolean world_get_camera_direction(ConstCameraHdl cam, Vec3* dir, const std::uin
 	CATCH_ALL(false)
 }
 
-Boolean world_get_camera_current_direction(ConstCameraHdl cam, Vec3* dir) {
+Boolean world_get_camera_current_direction(MufflonInstanceHdl instHdl, ConstCameraHdl cam, Vec3* dir) {
 	TRY
-		CHECK_NULLPTR(cam, "camera handle", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	CHECK_NULLPTR(cam, "camera handle", false);
 	if(dir != nullptr) {
 		const auto& camera = *static_cast<const cameras::Camera*>(cam);
-		*dir = util::pun<Vec3>(camera.get_view_dir(std::min(s_world.get_frame_current(),
+		*dir = util::pun<Vec3>(camera.get_view_dir(std::min(muffInst.world.get_frame_current(),
 															camera.get_path_segment_count() - 1u)));
 	}
 	return true;
@@ -2099,12 +2216,14 @@ Boolean world_get_camera_up(ConstCameraHdl cam, Vec3* up, const std::uint32_t pa
 	CATCH_ALL(false)
 }
 
-Boolean world_get_camera_current_up(ConstCameraHdl cam, Vec3* up) {
+Boolean world_get_camera_current_up(MufflonInstanceHdl instHdl, ConstCameraHdl cam, Vec3* up) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(cam, "camera handle", false);
 	if(up != nullptr) {
 		const auto& camera = *static_cast<const cameras::Camera*>(cam);
-		*up = util::pun<Vec3>(camera.get_up_dir(std::min(s_world.get_frame_current(),
+		*up = util::pun<Vec3>(camera.get_up_dir(std::min(muffInst.world.get_frame_current(),
 															camera.get_path_segment_count() - 1u)));
 	}
 	return true;
@@ -2138,11 +2257,13 @@ Boolean world_set_camera_position(CameraHdl cam, Vec3 pos, const std::uint32_t p
 	CATCH_ALL(false)
 }
 
-Boolean world_set_camera_current_position(CameraHdl cam, Vec3 pos) {
+Boolean world_set_camera_current_position(MufflonInstanceHdl instHdl, CameraHdl cam, Vec3 pos) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(cam, "camera handle", false);
 	auto& camera = *static_cast<cameras::Camera*>(cam);
-	camera.set_position(util::pun<scene::Point>(pos), std::min(s_world.get_frame_current(),
+	camera.set_position(util::pun<scene::Point>(pos), std::min(muffInst.world.get_frame_current(),
 															   camera.get_path_segment_count() - 1u));
 	return true;
 	CATCH_ALL(false)
@@ -2160,12 +2281,14 @@ Boolean world_set_camera_direction(CameraHdl cam, Vec3 dir, Vec3 up, const std::
 	CATCH_ALL(false)
 }
 
-Boolean world_set_camera_current_direction(CameraHdl cam, Vec3 dir, Vec3 up) {
+Boolean world_set_camera_current_direction(MufflonInstanceHdl instHdl, CameraHdl cam, Vec3 dir, Vec3 up) {
 	TRY
-		CHECK_NULLPTR(cam, "camera handle", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	CHECK_NULLPTR(cam, "camera handle", false);
 	auto& camera = *static_cast<cameras::Camera*>(cam);
 	camera.set_view_dir(util::pun<scene::Direction>(dir), util::pun<scene::Direction>(up),
-						std::min(s_world.get_frame_current(),
+						std::min(muffInst.world.get_frame_current(),
 								 camera.get_path_segment_count() - 1u));
 	// TODO: compute proper rotation
 	return true;
@@ -2334,51 +2457,63 @@ CameraHdl scenario_get_camera(ScenarioHdl scenario) {
 	CATCH_ALL(nullptr)
 }
 
-Boolean world_set_frame_current(const uint32_t animationFrame) {
+Boolean world_set_frame_current(MufflonInstanceHdl instHdl, const uint32_t animationFrame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	// Necessary to lock because setting a new frame clears out the scene!
-	auto lock = std::scoped_lock(s_iterationMutex);
-	const u32 oldFrame = s_world.get_frame_current();
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->on_animation_frame_changing(oldFrame, animationFrame);
-	if(s_world.set_frame_current(animationFrame))
-		for(std::size_t i = 0u; i < s_renderers.size(); ++i)
-			for(auto& renderer : s_renderers.get(i))
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	const u32 oldFrame = muffInst.world.get_frame_current();
+	if(muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_animation_frame_changing(oldFrame, animationFrame);
+	if(muffInst.world.set_frame_current(animationFrame))
+		for(std::size_t i = 0u; i < muffInst.renderers.size(); ++i)
+			for(auto& renderer : muffInst.renderers.get(i))
 				renderer->on_animation_frame_changed(oldFrame, animationFrame);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_frame_current(uint32_t* animationFrame) {
+Boolean world_get_frame_current(MufflonInstanceHdl instHdl, uint32_t* animationFrame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	if(animationFrame != nullptr)
-		*animationFrame = s_world.get_frame_current();
+		*animationFrame = muffInst.world.get_frame_current();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_frame_count(uint32_t* frameCount) {
+Boolean world_get_frame_count(MufflonInstanceHdl instHdl, uint32_t* frameCount) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	if(frameCount != nullptr)
-		*frameCount = s_world.get_frame_count();
+		*frameCount = muffInst.world.get_frame_count();
 	return true;
 	CATCH_ALL(false)
 }
 
-void world_set_tessellation_level(const float maxTessLevel) {
-	s_world.set_tessellation_level(maxTessLevel);
+void world_set_tessellation_level(MufflonInstanceHdl instHdl, const float maxTessLevel) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", ;);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	muffInst.world.set_tessellation_level(maxTessLevel);
 }
 
-float world_get_tessellation_level() {
-	return s_world.get_tessellation_level();
+float world_get_tessellation_level(MufflonInstanceHdl instHdl) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return muffInst.world.get_tessellation_level();
 }
 
-Boolean scenario_set_camera(ScenarioHdl scenario, CameraHdl cam) {
+Boolean scenario_set_camera(MufflonInstanceHdl instHdl, ScenarioHdl scenario, CameraHdl cam) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	static_cast<Scenario*>(scenario)->set_camera(static_cast<CameraHandle>(cam));
-	if(scenario == world_get_current_scenario() && s_world.get_current_scene() != nullptr)
-		s_world.get_current_scene()->set_camera(static_cast<CameraHandle>(cam));
+	if(scenario == world_get_current_scenario(instHdl) && muffInst.world.get_current_scene() != nullptr)
+		muffInst.world.get_current_scene()->set_camera(static_cast<CameraHandle>(cam));
 	return true;
 	CATCH_ALL(false)
 }
@@ -2450,15 +2585,17 @@ Boolean scenario_has_object_tessellation_info(ScenarioHdl scenario, ObjectHdl hd
 	CATCH_ALL(false)
 }
 
-Boolean scenario_get_object_tessellation_level(ScenarioHdl scenario, ObjectHdl hdl, float* level) {
+Boolean scenario_get_object_tessellation_level(MufflonInstanceHdl instHdl, ScenarioHdl scenario, ObjectHdl hdl, float* level) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(hdl, "object handle", false);
 	const Scenario& scen = *static_cast<const Scenario*>(scenario);
 	const auto info = scen.get_tessellation_info(static_cast<ConstObjectHandle>(hdl));
 	CHECK(info, "object tessellation info", false);
 	if(level)
-		*level = info->level.value_or(s_world.get_tessellation_level());
+		*level = info->level.value_or(muffInst.world.get_tessellation_level());
 	return true;
 	CATCH_ALL(false)
 }
@@ -2540,11 +2677,13 @@ IndexType scenario_get_dir_light_count(ScenarioHdl scenario) {
 	CATCH_ALL(INVALID_INDEX)
 }
 
-Boolean scenario_has_envmap_light(ScenarioHdl scenario) {
+Boolean scenario_has_envmap_light(MufflonInstanceHdl instHdl, ScenarioHdl scenario) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	const Scenario& scen = *static_cast<const Scenario*>(scenario);
-	return (s_world.get_background(scen.get_background()) != &s_world.get_default_background());
+	return (muffInst.world.get_background(scen.get_background()) != &muffInst.world.get_default_background());
 	CATCH_ALL(INVALID_INDEX)
 }
 
@@ -2592,53 +2731,55 @@ LightHdl scenario_get_light_handle(ScenarioHdl scenario, IndexType index, LightT
 	CATCH_ALL(invalid)
 }
 
-Boolean scenario_add_light(ScenarioHdl scenario, LightHdl hdl) {
+Boolean scenario_add_light(MufflonInstanceHdl instHdl, ScenarioHdl scenario, LightHdl hdl) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	Scenario& scen = *static_cast<Scenario*>(scenario);
 
 	switch(hdl.type) {
 		case LightType::LIGHT_POINT: {
-			if(s_world.get_point_light(hdl.index, 0u) == nullptr) {
+			if(muffInst.world.get_point_light(hdl.index, 0u) == nullptr) {
 				logError("[", FUNCTION_NAME, "] Invalid point light handle");
 				return false;
 			}
 			scen.add_point_light(hdl.index);
-			if(s_currentRenderer != nullptr && s_currentRenderer->has_scene() && scenario == s_world.get_current_scenario())
-				s_currentRenderer->on_light_changed();
+			if(muffInst.currentRenderer != nullptr && muffInst.currentRenderer->has_scene() && scenario == muffInst.world.get_current_scenario())
+				muffInst.currentRenderer->on_light_changed();
 		}	break;
 		case LightType::LIGHT_SPOT: {
-			if(s_world.get_spot_light(hdl.index, 0u) == nullptr) {
+			if(muffInst.world.get_spot_light(hdl.index, 0u) == nullptr) {
 				logError("[", FUNCTION_NAME, "] Invalid spot light handle");
 				return false;
 			}
 			scen.add_spot_light(hdl.index);
-			if(s_currentRenderer != nullptr && s_currentRenderer->has_scene() && scenario == s_world.get_current_scenario())
-				s_currentRenderer->on_light_changed();
+			if(muffInst.currentRenderer != nullptr && muffInst.currentRenderer->has_scene() && scenario == muffInst.world.get_current_scenario())
+				muffInst.currentRenderer->on_light_changed();
 		}	break;
 		case LightType::LIGHT_DIRECTIONAL: {
-			if(s_world.get_dir_light(hdl.index, 0u) == nullptr) {
+			if(muffInst.world.get_dir_light(hdl.index, 0u) == nullptr) {
 				logError("[", FUNCTION_NAME, "] Invalid directional light handle");
 				return false;
 			}
 			scen.add_dir_light(hdl.index);
-			if(s_currentRenderer != nullptr && s_currentRenderer->has_scene() && scenario == s_world.get_current_scenario())
-				s_currentRenderer->on_light_changed();
+			if(muffInst.currentRenderer != nullptr && muffInst.currentRenderer->has_scene() && scenario == muffInst.world.get_current_scenario())
+				muffInst.currentRenderer->on_light_changed();
 		}	break;
 		case LightType::LIGHT_ENVMAP: {
-			lights::Background* light = s_world.get_background(hdl.index);
-			if(s_world.get_background(hdl.index) == nullptr) {
+			lights::Background* light = muffInst.world.get_background(hdl.index);
+			if(muffInst.world.get_background(hdl.index) == nullptr) {
 				logError("[", FUNCTION_NAME, "] Invalid background light handle");
 				return false;
 			}
-			if(light->get_type() == lights::BackgroundType::ENVMAP && s_world.get_background(scen.get_background())->get_type() == lights::BackgroundType::ENVMAP) {
+			if(light->get_type() == lights::BackgroundType::ENVMAP && muffInst.world.get_background(scen.get_background())->get_type() == lights::BackgroundType::ENVMAP) {
 				logWarning("[", FUNCTION_NAME, "] The scenario already has an environment light; overwriting '",
-						   s_world.get_light_name(scen.get_background(), lights::LightType::ENVMAP_LIGHT), "' with '",
-						   s_world.get_light_name(hdl.index, lights::LightType::ENVMAP_LIGHT), "'");
+						   muffInst.world.get_light_name(scen.get_background(), lights::LightType::ENVMAP_LIGHT), "' with '",
+						   muffInst.world.get_light_name(hdl.index, lights::LightType::ENVMAP_LIGHT), "'");
 			}
 			scen.set_background(hdl.index);
-			if(s_currentRenderer != nullptr && s_currentRenderer->has_scene() && scenario == s_world.get_current_scenario())
-				s_currentRenderer->on_light_changed();
+			if(muffInst.currentRenderer != nullptr && muffInst.currentRenderer->has_scene() && scenario == muffInst.world.get_current_scenario())
+				muffInst.currentRenderer->on_light_changed();
 		}	break;
 		default:
 			logError("[", FUNCTION_NAME, "] Unknown or invalid light type");
@@ -2648,8 +2789,10 @@ Boolean scenario_add_light(ScenarioHdl scenario, LightHdl hdl) {
 	CATCH_ALL(false)
 }
 
-Boolean scenario_remove_light(ScenarioHdl scenario, LightHdl hdl) {
+Boolean scenario_remove_light(MufflonInstanceHdl instHdl, ScenarioHdl scenario, LightHdl hdl) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	Scenario& scen = *static_cast<Scenario*>(scenario);
 	// TODO: don't remove the light if it's the last remaining one
@@ -2657,25 +2800,25 @@ Boolean scenario_remove_light(ScenarioHdl scenario, LightHdl hdl) {
 	switch(hdl.type) {
 		case LightType::LIGHT_POINT: {
 			scen.remove_point_light(hdl.index);
-			if(s_currentRenderer != nullptr && s_currentRenderer->has_scene() && scenario == s_world.get_current_scenario())
-				s_currentRenderer->on_light_changed();
+			if(muffInst.currentRenderer != nullptr && muffInst.currentRenderer->has_scene() && scenario == muffInst.world.get_current_scenario())
+				muffInst.currentRenderer->on_light_changed();
 		}	break;
 		case LightType::LIGHT_SPOT: {
 			scen.remove_spot_light(hdl.index);
-			if(s_currentRenderer != nullptr && s_currentRenderer->has_scene() && scenario == s_world.get_current_scenario())
-				s_currentRenderer->on_light_changed();
+			if(muffInst.currentRenderer != nullptr && muffInst.currentRenderer->has_scene() && scenario == muffInst.world.get_current_scenario())
+				muffInst.currentRenderer->on_light_changed();
 		}	break;
 		case LightType::LIGHT_DIRECTIONAL: {
 			scen.remove_dir_light(hdl.index);
-			if(s_currentRenderer != nullptr && s_currentRenderer->has_scene() && scenario == s_world.get_current_scenario())
-				s_currentRenderer->on_light_changed();
+			if(muffInst.currentRenderer != nullptr && muffInst.currentRenderer->has_scene() && scenario == muffInst.world.get_current_scenario())
+				muffInst.currentRenderer->on_light_changed();
 		}	break;
 		case LightType::LIGHT_ENVMAP: {
 			// Make sure we only remove the background from the scenario if it is actually active
 			if(scen.get_background() == hdl.index) {
 				scen.remove_background();
-				if(s_currentRenderer != nullptr && s_currentRenderer->has_scene() && scenario == s_world.get_current_scenario())
-					s_currentRenderer->on_light_changed();
+				if(muffInst.currentRenderer != nullptr && muffInst.currentRenderer->has_scene() && scenario == muffInst.world.get_current_scenario())
+					muffInst.currentRenderer->on_light_changed();
 			}
 		}	break;
 		default:
@@ -2747,7 +2890,7 @@ MaterialHdl scenario_get_assigned_material(ScenarioHdl scenario,
 }
 
 Boolean scenario_assign_material(ScenarioHdl scenario, MatIdx index,
-							  MaterialHdl handle) {
+								 MaterialHdl handle) {
 	TRY
 	CHECK_NULLPTR(scenario, "scenario handle", false);
 	CHECK_NULLPTR(handle, "material handle", false);
@@ -2757,10 +2900,12 @@ Boolean scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 	CATCH_ALL(false)
 }
 
-Boolean world_finalize_scenario(ConstScenarioHdl scenario, const char** msg) {
+Boolean world_finalize_scenario(MufflonInstanceHdl instHdl, ConstScenarioHdl scenario, const char** msg) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(scenario, "scenario handle", false);
-	switch(s_world.finalize_scenario(static_cast<ConstScenarioHandle>(scenario))) {
+	switch(muffInst.world.finalize_scenario(static_cast<ConstScenarioHandle>(scenario))) {
 		case WorldContainer::Sanity::SANE: *msg = "";  return true;
 		case WorldContainer::Sanity::NO_CAMERA: *msg = "No camera"; return false;
 		case WorldContainer::Sanity::NO_INSTANCES: *msg = "No instances"; return false;
@@ -2790,26 +2935,30 @@ ConstCameraHdl scene_get_camera(SceneHdl scene) {
 	CATCH_ALL(nullptr)
 }
 
-Boolean scene_move_active_camera(float x, float y, float z) {
+Boolean scene_move_active_camera(MufflonInstanceHdl instHdl, float x, float y, float z) {
 	TRY
-	if(s_world.get_current_scene() == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.world.get_current_scene() == nullptr) {
 		logError("[", FUNCTION_NAME, "] No scene loaded yet");
 		return false;
 	}
-	auto& camera = *s_world.get_current_scenario()->get_camera();
-	camera.move(x, y, z, std::min(camera.get_path_segment_count() - 1u, s_world.get_frame_current()));
+	auto& camera = *muffInst.world.get_current_scenario()->get_camera();
+	camera.move(x, y, z, std::min(camera.get_path_segment_count() - 1u, muffInst.world.get_frame_current()));
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean scene_rotate_active_camera(float x, float y, float z) {
+Boolean scene_rotate_active_camera(MufflonInstanceHdl instHdl, float x, float y, float z) {
 	TRY
-	if(s_world.get_current_scene() == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.world.get_current_scene() == nullptr) {
 		logError("[", FUNCTION_NAME, "] No scene loaded yet");
 		return false;
 	}
-	auto& camera = *s_world.get_current_scenario()->get_camera();
-	const u32 frame = std::min(camera.get_path_segment_count() - 1u, s_world.get_frame_current());
+	auto& camera = *muffInst.world.get_current_scenario()->get_camera();
+	const u32 frame = std::min(camera.get_path_segment_count() - 1u, muffInst.world.get_frame_current());
 	camera.rotate_up_down(x, frame);
 	camera.rotate_left_right(y, frame);
 	camera.roll(z, frame);
@@ -2817,17 +2966,19 @@ Boolean scene_rotate_active_camera(float x, float y, float z) {
 	CATCH_ALL(false)
 }
 
-Boolean scene_is_sane() {
+Boolean scene_is_sane(MufflonInstanceHdl instHdl) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	ConstSceneHandle sceneHdl = nullptr;
-	if(!s_world.is_current_scene_valid()) {
+	if(!muffInst.world.is_current_scene_valid()) {
 		// Check if a rebuild was demanded
-		if(s_world.get_current_scenario() != nullptr) {
-			world_load_scenario(s_world.get_current_scenario());
-			sceneHdl = s_world.get_current_scene();
+		if(muffInst.world.get_current_scenario() != nullptr) {
+			world_load_scenario(instHdl, muffInst.world.get_current_scenario());
+			sceneHdl = muffInst.world.get_current_scene();
 		}
 	} else {
-		sceneHdl = s_world.get_current_scene();
+		sceneHdl = muffInst.world.get_current_scene();
 	}
 
 	if(sceneHdl != nullptr)
@@ -2836,22 +2987,26 @@ Boolean scene_is_sane() {
 	CATCH_ALL(false)
 }
 
-Boolean scene_request_retessellation() {
+Boolean scene_request_retessellation(MufflonInstanceHdl instHdl) {
 	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->on_tessellation_changing();
-	s_world.retessellate();
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->on_tessellation_changed();
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	if(muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_tessellation_changing();
+	muffInst.world.retessellate();
+	if(muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_tessellation_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_point_light_position(ConstLightHdl hdl, Vec3* pos, const uint32_t frame) {
+Boolean world_get_point_light_position(MufflonInstanceHdl instHdl, ConstLightHdl hdl, Vec3* pos, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_POINT, "light type must be point", false);
-	const lights::PointLight* light = s_world.get_point_light(hdl.index, frame);
+	const lights::PointLight* light = muffInst.world.get_point_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "point light handle", false);
 	if(pos != nullptr)
 		*pos = util::pun<Vec3>(light->position);
@@ -2859,10 +3014,12 @@ Boolean world_get_point_light_position(ConstLightHdl hdl, Vec3* pos, const uint3
 	CATCH_ALL(false)
 }
 
-Boolean world_get_point_light_intensity(ConstLightHdl hdl, Vec3* intensity, const uint32_t frame) {
+Boolean world_get_point_light_intensity(MufflonInstanceHdl instHdl, ConstLightHdl hdl, Vec3* intensity, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_POINT, "light type must be point", false);
-	const lights::PointLight* light = s_world.get_point_light(hdl.index, frame);
+	const lights::PointLight* light = muffInst.world.get_point_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "point light handle", false);
 	if(intensity != nullptr)
 		*intensity = util::pun<Vec3>(light->intensity);
@@ -2870,54 +3027,64 @@ Boolean world_get_point_light_intensity(ConstLightHdl hdl, Vec3* intensity, cons
 	CATCH_ALL(false)
 }
 
-Boolean world_get_point_light_path_segments(ConstLightHdl hdl, uint32_t* segments) {
+Boolean world_get_point_light_path_segments(MufflonInstanceHdl instHdl, ConstLightHdl hdl, uint32_t* segments) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_POINT, "light type must be point", false);
 	if(segments != nullptr)
-		*segments = static_cast<uint32_t>(s_world.get_point_light_segment_count(hdl.index));
+		*segments = static_cast<uint32_t>(muffInst.world.get_point_light_segment_count(hdl.index));
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_set_point_light_position(LightHdl hdl, Vec3 pos, const uint32_t frame) {
+Boolean world_set_point_light_position(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3 pos, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_POINT, "light type must be point", false);
-	auto lock = std::scoped_lock(s_iterationMutex);
-	lights::PointLight* light = s_world.get_point_light(hdl.index, frame);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	lights::PointLight* light = muffInst.world.get_point_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "point light handle", false);
 	light->position = util::pun<ei::Vec3>(pos);
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::POINT_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::POINT_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_set_point_light_intensity(LightHdl hdl, Vec3 intensity, const uint32_t frame) {
+Boolean world_set_point_light_intensity(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3 intensity, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_POINT, "light type must be point", false);
-	auto lock = std::scoped_lock(s_iterationMutex);
-	lights::PointLight* light = s_world.get_point_light(hdl.index, frame);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	lights::PointLight* light = muffInst.world.get_point_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "point light handle", false);
 	light->intensity = util::pun<ei::Vec3>(intensity);
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::POINT_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::POINT_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_path_segments(ConstLightHdl hdl, uint32_t* segments) {
+Boolean world_get_spot_light_path_segments(MufflonInstanceHdl instHdl, ConstLightHdl hdl, uint32_t* segments) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
 	if(segments != nullptr)
-		*segments = static_cast<uint32_t>(s_world.get_spot_light_segment_count(hdl.index));
+		*segments = static_cast<uint32_t>(muffInst.world.get_spot_light_segment_count(hdl.index));
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_position(ConstLightHdl hdl, Vec3* pos, const uint32_t frame) {
+Boolean world_get_spot_light_position(MufflonInstanceHdl instHdl, ConstLightHdl hdl, Vec3* pos, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	const lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
+	const lights::SpotLight* light = muffInst.world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	if(pos != nullptr)
 		*pos = util::pun<Vec3>(light->position);
@@ -2925,10 +3092,12 @@ Boolean world_get_spot_light_position(ConstLightHdl hdl, Vec3* pos, const uint32
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_intensity(ConstLightHdl hdl, Vec3* intensity, const uint32_t frame) {
+Boolean world_get_spot_light_intensity(MufflonInstanceHdl instHdl, ConstLightHdl hdl, Vec3* intensity, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	const lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
+	const lights::SpotLight* light = muffInst.world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	if(intensity != nullptr)
 		*intensity = util::pun<Vec3>(light->intensity);
@@ -2936,10 +3105,12 @@ Boolean world_get_spot_light_intensity(ConstLightHdl hdl, Vec3* intensity, const
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_direction(ConstLightHdl hdl, Vec3* direction, const uint32_t frame) {
+Boolean world_get_spot_light_direction(MufflonInstanceHdl instHdl, ConstLightHdl hdl, Vec3* direction, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	const lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
+	const lights::SpotLight* light = muffInst.world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	if(direction != nullptr)
 		*direction = util::pun<Vec3>(light->direction);
@@ -2947,10 +3118,12 @@ Boolean world_get_spot_light_direction(ConstLightHdl hdl, Vec3* direction, const
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_angle(ConstLightHdl hdl, float* angle, const uint32_t frame) {
+Boolean world_get_spot_light_angle(MufflonInstanceHdl instHdl, ConstLightHdl hdl, float* angle, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	const lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
+	const lights::SpotLight* light = muffInst.world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	if(angle != nullptr)
 		*angle = std::acos(__half2float(light->cosThetaMax));
@@ -2958,10 +3131,12 @@ Boolean world_get_spot_light_angle(ConstLightHdl hdl, float* angle, const uint32
 	CATCH_ALL(false)
 }
 
-Boolean world_get_spot_light_falloff(ConstLightHdl hdl, float* falloff, const uint32_t frame) {
+Boolean world_get_spot_light_falloff(MufflonInstanceHdl instHdl, ConstLightHdl hdl, float* falloff, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	const lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
+	const lights::SpotLight* light = muffInst.world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	if(falloff != nullptr)
 		*falloff = std::acos(__half2float(light->cosFalloffStart));
@@ -2969,37 +3144,43 @@ Boolean world_get_spot_light_falloff(ConstLightHdl hdl, float* falloff, const ui
 	CATCH_ALL(false)
 }
 
-Boolean world_set_spot_light_position(LightHdl hdl, Vec3 pos, const uint32_t frame) {
+Boolean world_set_spot_light_position(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3 pos, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	auto lock = std::scoped_lock(s_iterationMutex);
-	lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	lights::SpotLight* light = muffInst.world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	light->position = util::pun<ei::Vec3>(pos);
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::SPOT_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::SPOT_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_set_spot_light_intensity(LightHdl hdl, Vec3 intensity, const uint32_t frame) {
+Boolean world_set_spot_light_intensity(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3 intensity, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	auto lock = std::scoped_lock(s_iterationMutex);
-	lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	lights::SpotLight* light = muffInst.world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	light->intensity = util::pun<ei::Vec3>(intensity);
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::SPOT_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::SPOT_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_set_spot_light_direction(LightHdl hdl, Vec3 direction, const uint32_t frame) {
+Boolean world_set_spot_light_direction(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3 direction, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	auto lock = std::scoped_lock(s_iterationMutex);
-	lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	lights::SpotLight* light = muffInst.world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
 	ei::Vec3 actualDirection = ei::normalize(util::pun<ei::Vec3>(direction));
 	if(!ei::approx(ei::len(actualDirection), 1.0f)) {
@@ -3007,18 +3188,20 @@ Boolean world_set_spot_light_direction(LightHdl hdl, Vec3 direction, const uint3
 		return false;
 	}
 	light->direction = util::pun<ei::Vec3>(actualDirection);
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::SPOT_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::SPOT_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_set_spot_light_angle(LightHdl hdl, float angle, const uint32_t frame) {
+Boolean world_set_spot_light_angle(MufflonInstanceHdl instHdl, LightHdl hdl, float angle, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
+	lights::SpotLight* light = muffInst.world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
-	auto lock = std::scoped_lock(s_iterationMutex);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
 
 	float actualAngle = std::fmod(angle, 2.f * ei::PI);
 	if(actualAngle < 0.f)
@@ -3028,18 +3211,20 @@ Boolean world_set_spot_light_angle(LightHdl hdl, float angle, const uint32_t fra
 		actualAngle = ei::PI / 2.f;
 	}
 	light->cosThetaMax = __float2half(std::cos(actualAngle));
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::SPOT_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::SPOT_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_set_spot_light_falloff(LightHdl hdl, float falloff, const uint32_t frame) {
+Boolean world_set_spot_light_falloff(MufflonInstanceHdl instHdl, LightHdl hdl, float falloff, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_SPOT, "light type must be spot", false);
-	lights::SpotLight* light = s_world.get_spot_light(hdl.index, frame);
+	lights::SpotLight* light = muffInst.world.get_spot_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "spot light handle", false);
-	auto lock = std::scoped_lock(s_iterationMutex);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
 	// Clamp it to the opening angle!
 	float actualFalloff = std::fmod(falloff, 2.f * ei::PI);
 	if(actualFalloff < 0.f)
@@ -3053,25 +3238,29 @@ Boolean world_set_spot_light_falloff(LightHdl hdl, float falloff, const uint32_t
 	} else {
 		light->cosFalloffStart = compressedCosFalloff;
 	}
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::SPOT_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::SPOT_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_dir_light_path_segments(ConstLightHdl hdl, uint32_t* segments) {
+Boolean world_get_dir_light_path_segments(MufflonInstanceHdl instHdl, ConstLightHdl hdl, uint32_t* segments) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
 	if(segments != nullptr)
-		*segments = static_cast<uint32_t>(s_world.get_dir_light_segment_count(hdl.index));
+		*segments = static_cast<uint32_t>(muffInst.world.get_dir_light_segment_count(hdl.index));
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction, const uint32_t frame) {
+Boolean world_get_dir_light_direction(MufflonInstanceHdl instHdl, ConstLightHdl hdl, Vec3* direction, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
-	const lights::DirectionalLight* light = s_world.get_dir_light(hdl.index, frame);
+	const lights::DirectionalLight* light = muffInst.world.get_dir_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "directional light handle", false);
 	if(direction != nullptr)
 		*direction = util::pun<Vec3>(light->direction);
@@ -3079,10 +3268,12 @@ Boolean world_get_dir_light_direction(ConstLightHdl hdl, Vec3* direction, const 
 	CATCH_ALL(false)
 }
 
-Boolean world_get_dir_light_irradiance(ConstLightHdl hdl, Vec3* irradiance, const uint32_t frame) {
+Boolean world_get_dir_light_irradiance(MufflonInstanceHdl instHdl, ConstLightHdl hdl, Vec3* irradiance, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
-	const lights::DirectionalLight* light = s_world.get_dir_light(hdl.index, frame);
+	const lights::DirectionalLight* light = muffInst.world.get_dir_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "directional light handle", false);
 	if(irradiance != nullptr)
 		*irradiance = util::pun<Vec3>(light->irradiance);
@@ -3090,41 +3281,47 @@ Boolean world_get_dir_light_irradiance(ConstLightHdl hdl, Vec3* irradiance, cons
 	CATCH_ALL(false)
 }
 
-Boolean world_set_dir_light_direction(LightHdl hdl, Vec3 direction, const uint32_t frame) {
+Boolean world_set_dir_light_direction(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3 direction, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
-	lights::DirectionalLight* light = s_world.get_dir_light(hdl.index, frame);
+	lights::DirectionalLight* light = muffInst.world.get_dir_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "directional light handle", false);
-	auto lock = std::scoped_lock(s_iterationMutex);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
 	ei::Vec3 actualDirection = ei::normalize(util::pun<ei::Vec3>(direction));
 	if(!ei::approx(ei::len(actualDirection), 1.0f)) {
 		logError("[", FUNCTION_NAME, "] Directional light direction cannot be a null vector");
 		return false;
 	}
 	light->direction = util::pun<ei::Vec3>(actualDirection);
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::DIRECTIONAL_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::DIRECTIONAL_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_set_dir_light_irradiance(LightHdl hdl, Vec3 irradiance, const uint32_t frame) {
+Boolean world_set_dir_light_irradiance(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3 irradiance, const uint32_t frame) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_DIRECTIONAL, "light type must be directional", false);
-	lights::DirectionalLight* light = s_world.get_dir_light(hdl.index, frame);
+	lights::DirectionalLight* light = muffInst.world.get_dir_light(hdl.index, frame);
 	CHECK_NULLPTR(light, "directional light handle", false);
-	auto lock = std::scoped_lock(s_iterationMutex);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
 	light->irradiance = util::pun<ei::Vec3>(irradiance);
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::DIRECTIONAL_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::DIRECTIONAL_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-const char* world_get_env_light_map(ConstLightHdl hdl) {
+const char* world_get_env_light_map(MufflonInstanceHdl instHdl, ConstLightHdl hdl) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", nullptr);
-	const lights::Background* background = s_world.get_background(hdl.index);
+	const lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr || background->get_type() != lights::BackgroundType::ENVMAP) {
 		logError("[", FUNCTION_NAME, "] The background is not an environment-mapped light");
 		return nullptr;
@@ -3135,10 +3332,12 @@ const char* world_get_env_light_map(ConstLightHdl hdl) {
 	CATCH_ALL(nullptr)
 }
 
-Boolean world_get_env_light_scale(LightHdl hdl, Vec3* color) {
+Boolean world_get_env_light_scale(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3* color) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", false);
-	const lights::Background* background = s_world.get_background(hdl.index);
+	const lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr) {
 		logError("[", FUNCTION_NAME, "] The background is not an environment-mapped light");
 		return false;
@@ -3150,10 +3349,12 @@ Boolean world_get_env_light_scale(LightHdl hdl, Vec3* color) {
 	CATCH_ALL(false)
 }
 
-Boolean world_get_sky_light_turbidity(LightHdl hdl, float* turbidity) {
+Boolean world_get_sky_light_turbidity(MufflonInstanceHdl instHdl, LightHdl hdl, float* turbidity) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
-	const lights::Background* background = s_world.get_background(hdl.index);
+	const lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
 		logError("[", FUNCTION_NAME, "] The background is not a sky light");
 		return false;
@@ -3165,26 +3366,30 @@ Boolean world_get_sky_light_turbidity(LightHdl hdl, float* turbidity) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_sky_light_turbidity(LightHdl hdl, float turbidity) {
+Boolean world_set_sky_light_turbidity(MufflonInstanceHdl instHdl, LightHdl hdl, float turbidity) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
-	lights::Background* background = s_world.get_background(hdl.index);
+	lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
 		logError("[", FUNCTION_NAME, "] The background is not a sky light");
 		return false;
 	}
 	CHECK_NULLPTR(background, "sky light handle", false);
 	background->set_sky_turbidity(turbidity);
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_sky_light_albedo(LightHdl hdl, float* albedo) {
+Boolean world_get_sky_light_albedo(MufflonInstanceHdl instHdl, LightHdl hdl, float* albedo) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
-	const lights::Background* background = s_world.get_background(hdl.index);
+	const lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
 		logError("[", FUNCTION_NAME, "] The background is not a sky light");
 		return false;
@@ -3196,26 +3401,30 @@ Boolean world_get_sky_light_albedo(LightHdl hdl, float* albedo) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_sky_light_albedo(LightHdl hdl, float albedo) {
+Boolean world_set_sky_light_albedo(MufflonInstanceHdl instHdl, LightHdl hdl, float albedo) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
-	lights::Background* background = s_world.get_background(hdl.index);
+	lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
 		logError("[", FUNCTION_NAME, "] The background is not a sky light");
 		return false;
 	}
 	CHECK_NULLPTR(background, "sky light handle", false);
 	background->set_sky_albedo(albedo);
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_sky_light_solar_radius(LightHdl hdl, float* radius) {
+Boolean world_get_sky_light_solar_radius(MufflonInstanceHdl instHdl, LightHdl hdl, float* radius) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
-	const lights::Background* background = s_world.get_background(hdl.index);
+	const lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
 		logError("[", FUNCTION_NAME, "] The background is not a sky light");
 		return false;
@@ -3227,26 +3436,30 @@ Boolean world_get_sky_light_solar_radius(LightHdl hdl, float* radius) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_sky_light_solar_radius(LightHdl hdl, float radius) {
+Boolean world_set_sky_light_solar_radius(MufflonInstanceHdl instHdl, LightHdl hdl, float radius) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
-	lights::Background* background = s_world.get_background(hdl.index);
+	lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
 		logError("[", FUNCTION_NAME, "] The background is not a sky light");
 		return false;
 	}
 	CHECK_NULLPTR(background, "sky light handle", false);
 	background->set_sky_solar_radius(radius);
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_sky_light_sun_direction(LightHdl hdl, Vec3* sunDir) {
+Boolean world_get_sky_light_sun_direction(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3* sunDir) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
-	const lights::Background* background = s_world.get_background(hdl.index);
+	const lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
 		logError("[", FUNCTION_NAME, "] The background is not a sky light");
 		return false;
@@ -3258,26 +3471,30 @@ Boolean world_get_sky_light_sun_direction(LightHdl hdl, Vec3* sunDir) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_sky_light_sun_direction(LightHdl hdl, Vec3 sunDir) {
+Boolean world_set_sky_light_sun_direction(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3 sunDir) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
-	lights::Background* background = s_world.get_background(hdl.index);
+	lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr || background->get_type() != lights::BackgroundType::SKY_HOSEK) {
 		logError("[", FUNCTION_NAME, "] The background is not a sky light");
 		return false;
 	}
 	CHECK_NULLPTR(background, "sky light handle", false);
 	background->set_sky_sun_direction(util::pun<ei::Vec3>(sunDir));
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_get_env_light_color(LightHdl hdl, Vec3* color) {
+Boolean world_get_env_light_color(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3* color) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be monochrom", false);
-	const lights::Background* background = s_world.get_background(hdl.index);
+	const lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr || background->get_type() != lights::BackgroundType::COLORED) {
 		logError("[", FUNCTION_NAME, "] The background is not a monochrom light");
 		return false;
@@ -3289,149 +3506,169 @@ Boolean world_get_env_light_color(LightHdl hdl, Vec3* color) {
 	CATCH_ALL(false)
 }
 
-Boolean world_set_env_light_color(LightHdl hdl, Vec3 color) {
+Boolean world_set_env_light_color(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3 color) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be sky", false);
-	lights::Background* background = s_world.get_background(hdl.index);
+	lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr || background->get_type() != lights::BackgroundType::COLORED) {
 		logError("[", FUNCTION_NAME, "] The background is not a monochrom light");
 		return false;
 	}
 	CHECK_NULLPTR(background, "background light handle", false);
 	background->set_monochrom_color(util::pun<ei::Vec3>(color));
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_set_env_light_map(LightHdl hdl, TextureHdl tex) {
+Boolean world_set_env_light_map(MufflonInstanceHdl instHdl, LightHdl hdl, TextureHdl tex) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(tex, "texture handle", false);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", false);
-	auto lock = std::scoped_lock(s_iterationMutex);
-	s_world.replace_envlight_texture(hdl.index, reinterpret_cast<TextureHandle>(tex));
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	muffInst.world.replace_envlight_texture(hdl.index, reinterpret_cast<TextureHandle>(tex));
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean world_set_env_light_scale(LightHdl hdl, Vec3 color) {
+Boolean world_set_env_light_scale(MufflonInstanceHdl instHdl, LightHdl hdl, Vec3 color) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", false);
-	auto lock = std::scoped_lock(s_iterationMutex);
-	lights::Background* background = s_world.get_background(hdl.index);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	lights::Background* background = muffInst.world.get_background(hdl.index);
 	if(background == nullptr) {
 		logError("[", FUNCTION_NAME, "] The background is not an environment-mapped light");
 		return false;
 	}
 	background->set_scale(util::pun<Spectrum>(color));
-	if(s_world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && s_currentRenderer != nullptr)
-		s_currentRenderer->on_light_changed();
+	if(muffInst.world.mark_light_dirty(hdl.index, lights::LightType::ENVMAP_LIGHT) && muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_light_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-uint32_t render_get_renderer_count() {
-	return static_cast<uint32_t>(s_renderers.size());
+uint32_t render_get_renderer_count(MufflonInstanceHdl instHdl) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	return static_cast<uint32_t>(muffInst.renderers.size());
 }
 
-uint32_t render_get_renderer_variations(uint32_t index) {
+uint32_t render_get_renderer_variations(MufflonInstanceHdl instHdl, uint32_t index) {
 	TRY
-	CHECK(index < s_renderers.size(), "renderer index out of bounds", 0);
-	return static_cast<uint32_t>(s_renderers.get(index).size());
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	CHECK(index < muffInst.renderers.size(), "renderer index out of bounds", 0);
+	return static_cast<uint32_t>(muffInst.renderers.get(index).size());
 	CATCH_ALL(0)
 }
 
-const char* render_get_renderer_name(uint32_t index) {
+const char* render_get_renderer_name(MufflonInstanceHdl instHdl, uint32_t index) {
 	TRY
-	CHECK(index < s_renderers.size(), "renderer index out of bounds", nullptr);
-	return &s_renderers.get_key(index)[0u];
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	CHECK(index < muffInst.renderers.size(), "renderer index out of bounds", nullptr);
+	return &muffInst.renderers.get_key(index)[0u];
 	CATCH_ALL(nullptr)
 }
 
-const char* render_get_renderer_short_name(uint32_t index) {
+const char* render_get_renderer_short_name(MufflonInstanceHdl instHdl, uint32_t index) {
 	TRY
-	CHECK(index < s_renderers.size(), "renderer index out of bounds", nullptr);
-	return &s_renderers.get(index).front()->get_short_name()[0u];
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	CHECK(index < muffInst.renderers.size(), "renderer index out of bounds", nullptr);
+	return &muffInst.renderers.get(index).front()->get_short_name()[0u];
 	CATCH_ALL(nullptr)
 }
 
-RenderDevice render_get_renderer_devices(uint32_t index, uint32_t variation) {
+RenderDevice render_get_renderer_devices(MufflonInstanceHdl instHdl, uint32_t index, uint32_t variation) {
 	TRY
-	CHECK(index < s_renderers.size(), "renderer index out of bounds", RenderDevice::DEVICE_NONE);
-	CHECK(variation < s_renderers.get(index).size(), "renderer index out of bounds", RenderDevice::DEVICE_NONE);
-	const renderer::IRenderer& renderer = *s_renderers.get(index)[variation];
+	CHECK_NULLPTR(instHdl, "mufflon instance", RenderDevice::DEVICE_NONE);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	CHECK(index < muffInst.renderers.size(), "renderer index out of bounds", RenderDevice::DEVICE_NONE);
+	CHECK(variation < muffInst.renderers.get(index).size(), "renderer index out of bounds", RenderDevice::DEVICE_NONE);
+	const renderer::IRenderer& renderer = *muffInst.renderers.get(index)[variation];
 	return static_cast<RenderDevice>((renderer.uses_device(Device::CPU) ? RenderDevice::DEVICE_CPU : 0)
 									 | (renderer.uses_device(Device::CUDA) ? RenderDevice::DEVICE_CUDA : 0)
 									 | (renderer.uses_device(Device::OPENGL) ? RenderDevice::DEVICE_OPENGL : 0));
 	CATCH_ALL(RenderDevice::DEVICE_NONE)
 }
 
-Boolean render_enable_renderer(uint32_t index, uint32_t variation) {
+Boolean render_enable_renderer(MufflonInstanceHdl instHdl, uint32_t index, uint32_t variation) {
 	TRY
-	CHECK(index < s_renderers.size(), "renderer index out of bounds", false);
-	CHECK(variation < s_renderers.get(index).size(), "renderer index out of bounds", false);
-	auto lock = std::scoped_lock(s_iterationMutex);
-	s_currentRenderer = s_renderers.get(index)[variation].get();
-	if(s_world.get_current_scenario() != nullptr) {
-		s_currentRenderer->load_scene(s_world.get_current_scene());
-		s_imageOutput = s_currentRenderer->create_output_handler(s_world.get_current_scenario()->get_resolution().x,
-																 s_world.get_current_scenario()->get_resolution().y);
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	CHECK(index < muffInst.renderers.size(), "renderer index out of bounds", false);
+	CHECK(variation < muffInst.renderers.get(index).size(), "renderer index out of bounds", false);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	muffInst.currentRenderer = muffInst.renderers.get(index)[variation].get();
+	if(muffInst.world.get_current_scenario() != nullptr) {
+		muffInst.currentRenderer->load_scene(muffInst.world.get_current_scene());
+		muffInst.imageOutput = muffInst.currentRenderer->create_output_handler(muffInst.world.get_current_scenario()->get_resolution().x,
+																 muffInst.world.get_current_scenario()->get_resolution().y);
 	} else {
 		// Placeholder output handler
-		s_imageOutput = s_currentRenderer->create_output_handler(1, 1);
+		muffInst.imageOutput = muffInst.currentRenderer->create_output_handler(1, 1);
 	}
-	s_currentRenderer->on_renderer_enable();
+	muffInst.currentRenderer->on_renderer_enable();
 
-	s_targetsToEnable.clear();
-	s_targetsToDisable.clear();
+	muffInst.targetsToEnable.clear();
+	muffInst.targetsToDisable.clear();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean render_iterate(ProcessTime* iterateTime, ProcessTime* preTime, ProcessTime* postTime) {
+Boolean render_iterate(MufflonInstanceHdl instHdl, ProcessTime* time, ProcessTime* preTime, ProcessTime* postTime) {
 	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
 	}
-	if(s_imageOutput == nullptr) {
+	if(muffInst.imageOutput == nullptr) {
 		logError("[", FUNCTION_NAME, "] No rendertarget is currently set");
 		return false;
 	}
 
 	// First update the requested render targets
-	for(const auto& target : s_targetsToDisable)
-		s_imageOutput->disable_render_target(target.first, target.second);
-	for(const auto& target : s_targetsToEnable)
-		s_imageOutput->enable_render_target(target.first, target.second);
+	for(const auto& target : muffInst.targetsToDisable)
+		muffInst.imageOutput->disable_render_target(target.first, target.second);
+	for(const auto& target : muffInst.targetsToEnable)
+		muffInst.imageOutput->enable_render_target(target.first, target.second);
 
-	if(!(s_targetsToDisable.empty() && s_targetsToEnable.empty()))
-		s_currentRenderer->on_render_target_changed();
+	if(!(muffInst.targetsToDisable.empty() && muffInst.targetsToEnable.empty()))
+		muffInst.currentRenderer->on_render_target_changed();
 
-	s_targetsToEnable.clear();
-	s_targetsToDisable.clear();
+	muffInst.targetsToEnable.clear();
+	muffInst.targetsToDisable.clear();
 
 	// Check if the scene needed a reload -> reset
-	if(!s_world.is_current_scene_valid()) {
-		if(s_world.get_current_scenario() == nullptr) {
+	if(!muffInst.world.is_current_scene_valid()) {
+		if(muffInst.world.get_current_scenario() == nullptr) {
 			logError("[", FUNCTION_NAME, "] Failed to load scenario");
 			return false;
 		}
-		SceneHandle hdl = s_world.load_scene(static_cast<ScenarioHandle>(s_world.get_current_scenario()), s_currentRenderer);
-		ei::IVec2 res = s_world.get_current_scenario()->get_resolution();
-		if(s_currentRenderer != nullptr) {
-			s_currentRenderer->load_scene(hdl);
-			s_imageOutput->resize(res.x, res.y);
+		SceneHandle hdl = muffInst.world.load_scene(static_cast<ScenarioHandle>(muffInst.world.get_current_scenario()), muffInst.currentRenderer);
+		ei::IVec2 res = muffInst.world.get_current_scenario()->get_resolution();
+		if(muffInst.currentRenderer != nullptr) {
+			muffInst.currentRenderer->load_scene(hdl);
+			muffInst.imageOutput->resize(res.x, res.y);
 		}
-		s_screenTexture = nullptr;
+		muffInst.screenTexture = nullptr;
 	} else {
-		s_world.reload_scene(s_currentRenderer);
+		muffInst.world.reload_scene(muffInst.currentRenderer);
 	}
-	if(!s_currentRenderer->has_scene()) {
+	if(!muffInst.currentRenderer->has_scene()) {
 		logError("[", FUNCTION_NAME, "] Scene not yet set for renderer");
 		return false;
 	}
@@ -3439,7 +3676,7 @@ Boolean render_iterate(ProcessTime* iterateTime, ProcessTime* preTime, ProcessTi
 		preTime->cycles = CpuProfileState::get_cpu_cycle();
 		preTime->microseconds = CpuProfileState::get_process_time().count();
 	}
-	s_currentRenderer->pre_iteration(*s_imageOutput);
+	muffInst.s_currentRenderer->pre_iteration(*muffInst.s_imageOutput);
 	if(preTime != nullptr) {
 		preTime->cycles = CpuProfileState::get_cpu_cycle() - preTime->cycles;
 		preTime->microseconds = CpuProfileState::get_process_time().count() - preTime->microseconds;
@@ -3448,7 +3685,7 @@ Boolean render_iterate(ProcessTime* iterateTime, ProcessTime* preTime, ProcessTi
 		iterateTime->cycles = CpuProfileState::get_cpu_cycle();
 		iterateTime->microseconds = CpuProfileState::get_process_time().count();
 	}
-	s_currentRenderer->iterate();
+	muffInst.s_currentRenderer->iterate();
 	if(iterateTime != nullptr) {
 		iterateTime->cycles = CpuProfileState::get_cpu_cycle() - iterateTime->cycles;
 		iterateTime->microseconds = CpuProfileState::get_process_time().count() - iterateTime->microseconds;
@@ -3457,31 +3694,37 @@ Boolean render_iterate(ProcessTime* iterateTime, ProcessTime* preTime, ProcessTi
 		postTime->cycles = CpuProfileState::get_cpu_cycle();
 		postTime->microseconds = CpuProfileState::get_process_time().count();
 	}
-	s_currentRenderer->post_iteration(*s_imageOutput);
+	muffInst.currentRenderer->post_iteration(*muffInst.imageOutput);
 	Profiler::core().create_snapshot_all();
 	return true;
 	CATCH_ALL(false)
 }
 
-uint32_t render_get_current_iteration() {
-	if(s_imageOutput == nullptr)
+uint32_t render_get_current_iteration(ConstMufflonInstanceHdl instHdl) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	const MufflonInstance& muffInst = *static_cast<const MufflonInstance*>(instHdl);
+	if(muffInst.imageOutput == nullptr)
 		return 0u;
-	return static_cast<uint32_t>(s_imageOutput->get_current_iteration() + 1);
+	return static_cast<uint32_t>(muffInst.imageOutput->get_current_iteration() + 1);
 }
 
-Boolean render_reset() {
+Boolean render_reset(MufflonInstanceHdl instHdl) {
 	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_currentRenderer != nullptr)
-		s_currentRenderer->on_manual_reset();
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	if(muffInst.currentRenderer != nullptr)
+		muffInst.currentRenderer->on_manual_reset();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean render_save_screenshot(const char* filename, const char* targetName, Boolean variance) {
+Boolean render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename, const char* targetName, Boolean variance) {
 	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
 	}
@@ -3494,7 +3737,7 @@ Boolean render_save_screenshot(const char* filename, const char* targetName, Boo
 		fileName = fs::absolute(fileName);
 
 	// Replace tags in the file name
-	const auto name = replace_screenshot_filename_tags(fileName.stem().string(), targetName, variance);
+	const auto name = replace_screenshot_filename_tags(muffInst, fileName.stem().string(), targetName, variance);
 	fileName = fileName.parent_path() / fs::path(name + fileName.extension().string());
 
 	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
@@ -3504,9 +3747,9 @@ Boolean render_save_screenshot(const char* filename, const char* targetName, Boo
 			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
 					   "; the screenshot possibly may not be created");
 
-	auto data = s_imageOutput->get_data(targetName, variance);
-	const int numChannels = s_imageOutput->get_num_channels(targetName);
-	ei::IVec2 res{ s_imageOutput->get_width(), s_imageOutput->get_height() };
+	auto data = muffInst.imageOutput->get_data(targetName, variance);
+	const int numChannels = muffInst.imageOutput->get_num_channels(targetName);
+	ei::IVec2 res{ muffInst.imageOutput->get_width(), muffInst.imageOutput->get_height() };
 
 	TextureData texData{};
 	texData.data = reinterpret_cast<uint8_t*>(data.get());
@@ -3531,21 +3774,23 @@ Boolean render_save_screenshot(const char* filename, const char* targetName, Boo
 	CATCH_ALL(false)
 }
 
-Boolean render_save_denoised_radiance(const char* filename) {
+Boolean render_save_denoised_radiance(MufflonInstanceHdl instHdl, const char* filename) {
 #ifdef MUFFLON_ENABLE_OPEN_DENOISE
 	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is currently set");
 		return false;
 	}
-	if(s_imageOutput->get_current_iteration() == 0) {
+	if(muffInst.imageOutput->get_current_iteration() == 0) {
 		logError("[", FUNCTION_NAME, "] At least a single iteration must have been rendered for denoising");
 		return false;
 	}
 
-	std::unique_ptr<float[]> radiance = s_imageOutput->get_data("Radiance", false);
-	std::unique_ptr<float[]> output = std::make_unique<float[]>(3 * s_imageOutput->get_width() * s_imageOutput->get_height());
+	std::unique_ptr<float[]> radiance = muffInst.imageOutput->get_data("Radiance", false);
+	std::unique_ptr<float[]> output = std::make_unique<float[]>(3 * muffInst.imageOutput->get_width() * muffInst.imageOutput->get_height());
 	std::unique_ptr<float[]> normals;
 	std::unique_ptr<float[]> albedo;
 
@@ -3553,22 +3798,22 @@ Boolean render_save_denoised_radiance(const char* filename) {
 	filterDevice.commit();
 
 	oidn::FilterRef filter = filterDevice.newFilter("RT");
-	filter.setImage("color", radiance.get(), oidn::Format::Float3, s_imageOutput->get_width(),
-					s_imageOutput->get_height());
-	filter.setImage("output", output.get(), oidn::Format::Float3, s_imageOutput->get_width(),
-					s_imageOutput->get_height());
+	filter.setImage("color", radiance.get(), oidn::Format::Float3, muffInst.imageOutput->get_width(),
+					muffInst.imageOutput->get_height());
+	filter.setImage("output", output.get(), oidn::Format::Float3, muffInst.imageOutput->get_width(),
+					muffInst.imageOutput->get_height());
 	// TODO: incorporate albedo/normals if present? But currently they're noisy,
 	// and OIDN wants (mostly) first-hit info (I think)
-	if(s_imageOutput->has_render_target("Normal") && s_imageOutput->is_render_target_enabled("Normal", false)) {
-		normals = s_imageOutput->get_data("Normal", false);
-		filter.setImage("normal", normals.get(), oidn::Format::Float3, s_imageOutput->get_width(),
-						s_imageOutput->get_height());
+	if(muffInst.imageOutput->has_render_target("Normal") && muffInst.imageOutput->is_render_target_enabled("Normal", false)) {
+		normals = muffInst.imageOutput->get_data("Normal", false);
+		filter.setImage("normal", normals.get(), oidn::Format::Float3, muffInst.imageOutput->get_width(),
+						muffInst.imageOutput->get_height());
 		logPedantic("[", FUNCTION_NAME, "] Using normal guidance");
 	}
-	if(s_imageOutput->has_render_target("Albedo") && s_imageOutput->is_render_target_enabled("Albedo", false)) {
-		albedo = s_imageOutput->get_data("Albedo", false);
-		filter.setImage("albedo", albedo.get(), oidn::Format::Float3, s_imageOutput->get_width(),
-						s_imageOutput->get_height());
+	if(muffInst.imageOutput->has_render_target("Albedo") && muffInst.imageOutput->is_render_target_enabled("Albedo", false)) {
+		albedo = muffInst.imageOutput->get_data("Albedo", false);
+		filter.setImage("albedo", albedo.get(), oidn::Format::Float3, muffInst.imageOutput->get_width(),
+						muffInst.imageOutput->get_height());
 		logPedantic("[", FUNCTION_NAME, "] Using albedo guidance");
 	}
 
@@ -3588,7 +3833,7 @@ Boolean render_save_denoised_radiance(const char* filename) {
 	if(!fileName.is_absolute())
 		fileName = fs::absolute(fileName);
 
-	const auto name = replace_screenshot_filename_tags(fileName.stem().string(), "Radiance(denoised)", false);
+	const auto name = replace_screenshot_filename_tags(muffInst, fileName.stem().string(), "Radiance(denoised)", false);
 	fileName = fileName.parent_path() / fs::path(name + fileName.extension().string());
 
 	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
@@ -3598,13 +3843,13 @@ Boolean render_save_denoised_radiance(const char* filename) {
 			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
 					   "; the screenshot possibly may not be created");
 
-	const int numChannels = s_imageOutput->get_num_channels("Radiance");
+	const int numChannels = muffInst.imageOutput->get_num_channels("Radiance");
 	TextureData texData{};
 	texData.data = reinterpret_cast<uint8_t*>(output.get());
 	texData.components = numChannels;
 	texData.format = numChannels == 1 ? FORMAT_R32F : FORMAT_RGB32F;
-	texData.width = s_imageOutput->get_width();
-	texData.height = s_imageOutput->get_height();
+	texData.width = muffInst.imageOutput->get_width();
+	texData.height = muffInst.imageOutput->get_height();
 	texData.sRgb = false;
 	texData.layers = 1;
 
@@ -3627,77 +3872,93 @@ Boolean render_save_denoised_radiance(const char* filename) {
 #endif // MUFFLON_ENABLE_OPEN_DENOISE
 }
 
-uint32_t render_get_render_target_count() {
-	if(s_imageOutput == nullptr)
+uint32_t render_get_render_target_count(MufflonInstanceHdl instHdl) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.imageOutput == nullptr)
 		return 0u;
-	return static_cast<uint32_t>(s_imageOutput->get_render_target_count());
+	return static_cast<uint32_t>(muffInst.imageOutput->get_render_target_count());
 }
 
-const char* render_get_render_target_name(uint32_t index) {
-	if(s_imageOutput == nullptr)
+const char* render_get_render_target_name(MufflonInstanceHdl instHdl, uint32_t index) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.imageOutput == nullptr)
 		return "";
-	return s_imageOutput->get_render_target_name(index).data();
+	return muffInst.imageOutput->get_render_target_name(index).data();
 }
 
-Boolean render_enable_render_target(const char* target, Boolean variance) {
+Boolean render_enable_render_target(MufflonInstanceHdl instHdl, const char* target, Boolean variance) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	const std::string targetName = target;
-	s_targetsToDisable.erase({ targetName, variance });
-	s_targetsToEnable.insert({ targetName, variance });
+	muffInst.targetsToDisable.erase({ targetName, variance });
+	muffInst.targetsToEnable.insert({ targetName, variance });
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean render_disable_render_target(const char* target, Boolean variance) {
+Boolean render_disable_render_target(MufflonInstanceHdl instHdl, const char* target, Boolean variance) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	const std::string targetName = target;
-	s_targetsToEnable.erase({ targetName, variance });
-	s_targetsToDisable.insert({ targetName, variance });
+	muffInst.targetsToEnable.erase({ targetName, variance });
+	muffInst.targetsToDisable.insert({ targetName, variance });
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean render_is_render_target_enabled(const char* name, Boolean variance) {
+Boolean render_is_render_target_enabled(MufflonInstanceHdl instHdl, const char* name, Boolean variance) {
 	TRY
-	if(s_imageOutput == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.imageOutput == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
 		return false;
 	}
 	const std::string targetName = name;
 	// Check if we're planning on enabling/disabling first
-	return (s_targetsToEnable.find({ std::string(name), variance }) != s_targetsToEnable.cend())
-		|| ((s_targetsToDisable.find({ std::string(name), variance }) == s_targetsToDisable.cend())
-			&& s_imageOutput->is_render_target_enabled(name, variance));
+	return (muffInst.targetsToEnable.find({ std::string(name), variance }) != muffInst.targetsToEnable.cend())
+		|| ((muffInst.targetsToDisable.find({ std::string(name), variance }) == muffInst.targetsToDisable.cend())
+			&& muffInst.imageOutput->is_render_target_enabled(name, variance));
 	CATCH_ALL(false)
 }
 
-Boolean render_is_render_target_required(const char* name, Boolean variance) {
+Boolean render_is_render_target_required(MufflonInstanceHdl instHdl, const char* name, Boolean variance) {
 	TRY
-	if(s_imageOutput == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.imageOutput == nullptr) {
 		logError("[", FUNCTION_NAME, "] No renderer is enabled yet");
 		return false;
 	}
-	return s_imageOutput->is_render_target_required(name, variance);
+	return muffInst.imageOutput->is_render_target_required(name, variance);
 	CATCH_ALL(false)
 }
 
-uint32_t renderer_get_num_parameters() {
+uint32_t renderer_get_num_parameters(MufflonInstanceHdl instHdl) {
 	TRY
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return 0u;
 	}
-	return s_currentRenderer->get_parameters().get_num_parameters();
+	return muffInst.currentRenderer->get_parameters().get_num_parameters();
 	CATCH_ALL(0u)
 }
 
-const char* renderer_get_parameter_desc(uint32_t idx, ParameterType* type) {
+const char* renderer_get_parameter_desc(MufflonInstanceHdl instHdl, uint32_t idx, ParameterType* type) {
 	TRY
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return nullptr;
 	}
-	renderer::ParamDesc rendererDesc = s_currentRenderer->get_parameters().get_param_desc(idx);
+	renderer::ParamDesc rendererDesc = muffInst.currentRenderer->get_parameters().get_param_desc(idx);
 
 	if(type != nullptr)
 		*type = static_cast<ParameterType>(rendererDesc.type);
@@ -3705,153 +3966,179 @@ const char* renderer_get_parameter_desc(uint32_t idx, ParameterType* type) {
 	CATCH_ALL(nullptr)
 }
 
-Boolean renderer_set_parameter_int(const char* name, int32_t value) {
+Boolean renderer_set_parameter_int(MufflonInstanceHdl instHdl, const char* name, int32_t value) {
 	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
-	s_currentRenderer->get_parameters().set_param(name, value);
-	s_currentRenderer->on_renderer_parameter_changed();
+	muffInst.currentRenderer->get_parameters().set_param(name, value);
+	muffInst.currentRenderer->on_renderer_parameter_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean renderer_get_parameter_int(const char* name, int32_t* value) {
+Boolean renderer_get_parameter_int(MufflonInstanceHdl instHdl, const char* name, int32_t* value) {
 	TRY
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
-	*value = s_currentRenderer->get_parameters().get_param_int(name);
+	*value = muffInst.currentRenderer->get_parameters().get_param_int(name);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean renderer_set_parameter_float(const char* name, float value) {
+Boolean renderer_set_parameter_float(MufflonInstanceHdl instHdl, const char* name, float value) {
 	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
-	s_currentRenderer->get_parameters().set_param(name, value);
-	s_currentRenderer->on_renderer_parameter_changed();
+	muffInst.currentRenderer->get_parameters().set_param(name, value);
+	muffInst.currentRenderer->on_renderer_parameter_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean renderer_get_parameter_float(const char* name, float* value) {
+Boolean renderer_get_parameter_float(MufflonInstanceHdl instHdl, const char* name, float* value) {
 	TRY
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
-	*value = s_currentRenderer->get_parameters().get_param_float(name);
+	*value = muffInst.currentRenderer->get_parameters().get_param_float(name);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean renderer_set_parameter_bool(const char* name, Boolean value) {
+Boolean renderer_set_parameter_bool(MufflonInstanceHdl instHdl, const char* name, Boolean value) {
 	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
-	s_currentRenderer->get_parameters().set_param(name, bool(value));
-	s_currentRenderer->on_renderer_parameter_changed();
+	muffInst.currentRenderer->get_parameters().set_param(name, bool(value));
+	muffInst.currentRenderer->on_renderer_parameter_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean renderer_get_parameter_bool(const char* name, Boolean* value) {
+Boolean renderer_get_parameter_bool(MufflonInstanceHdl instHdl, const char* name, Boolean* value) {
 	TRY
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
-	*value = s_currentRenderer->get_parameters().get_param_bool(name);
+	*value = muffInst.currentRenderer->get_parameters().get_param_bool(name);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean renderer_set_parameter_enum(const char* name, int value) {
+Boolean renderer_set_parameter_enum(MufflonInstanceHdl instHdl, const char* name, int value) {
 	TRY
-	auto lock = std::scoped_lock(s_iterationMutex);
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	auto lock = std::scoped_lock(muffInst.iterationMutex);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
-	s_currentRenderer->get_parameters().set_param_enum(name, int(value));
-	s_currentRenderer->on_renderer_parameter_changed();
+	muffInst.currentRenderer->get_parameters().set_param_enum(name, int(value));
+	muffInst.currentRenderer->on_renderer_parameter_changed();
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean renderer_get_parameter_enum(const char* name, int* value) {
+Boolean renderer_get_parameter_enum(MufflonInstanceHdl instHdl, const char* name, int* value) {
 	TRY
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
-	*value = s_currentRenderer->get_parameters().get_param_enum(name);
+	*value = muffInst.currentRenderer->get_parameters().get_param_enum(name);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean renderer_get_parameter_enum_count(const char* param, uint32_t* count) {
+Boolean renderer_get_parameter_enum_count(MufflonInstanceHdl instHdl, const char* param, uint32_t* count) {
 	TRY
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
-	*count = s_currentRenderer->get_parameters().get_enum_value_count(param);
+	*count = muffInst.currentRenderer->get_parameters().get_enum_value_count(param);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean renderer_get_parameter_enum_value_from_index(const char* param, uint32_t index, int* value) {
+Boolean renderer_get_parameter_enum_value_from_index(MufflonInstanceHdl instHdl, const char* param, uint32_t index, int* value) {
 	TRY
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
-	*value = s_currentRenderer->get_parameters().get_enum_value(param, index);
+	*value = muffInst.currentRenderer->get_parameters().get_enum_value(param, index);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean renderer_get_parameter_enum_value_from_name(const char* param, const char* valueName, int* value) {
+Boolean renderer_get_parameter_enum_value_from_name(MufflonInstanceHdl instHdl, const char* param, const char* valueName, int* value) {
 	TRY
-		if(s_currentRenderer == nullptr) {
-			logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
-			return false;
-		}
-	*value = s_currentRenderer->get_parameters().get_enum_name_value(param, std::string(valueName));
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.currentRenderer == nullptr) {
+		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
+		return false;
+	}
+	*value = muffInst.currentRenderer->get_parameters().get_enum_name_value(param, std::string(valueName));
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean renderer_get_parameter_enum_index_from_value(const char* param, int value, uint32_t* index) {
+Boolean renderer_get_parameter_enum_index_from_value(MufflonInstanceHdl instHdl, const char* param, int value, uint32_t* index) {
 	TRY
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
-	*index = s_currentRenderer->get_parameters().get_enum_index(param, value);
+	*index = muffInst.currentRenderer->get_parameters().get_enum_index(param, value);
 	return true;
 	CATCH_ALL(false)
 }
 
-Boolean renderer_get_parameter_enum_name(const char* param, int value, const char** name) {
+Boolean renderer_get_parameter_enum_name(MufflonInstanceHdl instHdl, const char* param, int value, const char** name) {
 	TRY
-	if(s_currentRenderer == nullptr) {
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
+	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
 		return false;
 	}
-	*name = s_currentRenderer->get_parameters().get_enum_value_name(param, value).c_str();
+	*name = muffInst.currentRenderer->get_parameters().get_enum_value_name(param, value).c_str();
 	return true;
 	CATCH_ALL(false)
 }
@@ -3988,7 +4275,7 @@ size_t profiling_get_used_gpu_memory() {
 	CATCH_ALL(0u)
 }
 
-Boolean mufflon_set_logger(void(*logCallback)(const char*, int)) {
+Boolean core_set_logger(void(*logCallback)(const char*, int)) {
 	TRY
 	if(s_logCallback == nullptr) {
 		setMessageHandler(delegateLog);
@@ -4020,7 +4307,7 @@ Boolean mufflon_set_logger(void(*logCallback)(const char*, int)) {
 	CATCH_ALL(false)
 }
 
-Boolean mufflon_initialize() {
+MufflonInstanceHdl mufflon_initialize() {
 	TRY
 	// Only once per process do we register/unregister the message handler
 	static bool initialized = false;
@@ -4141,17 +4428,22 @@ Boolean mufflon_initialize() {
 			mufflon::g_hasCudaEnabled = false;
 		}
 
-		// Initialize renderers
-		init_renderers<false>();
-
 		initialized = true;
 	}
-	return initialized;
-	CATCH_ALL(false)
+
+	// To stay exception safe, create a unique ptr instead of a raw one and release it later
+	auto muffInst = std::make_unique<MufflonInstance>();
+	// Initialize renderers
+	init_renderers<false>(*muffInst);
+
+	return muffInst.release();
+	CATCH_ALL(nullptr)
 }
 
-Boolean mufflon_initialize_opengl() {
+Boolean mufflon_initialize_opengl(MufflonInstanceHdl instHdl) {
 	TRY
+	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	static bool initialized = false;
 
 	if(!initialized) {
@@ -4176,11 +4468,11 @@ Boolean mufflon_initialize_opengl() {
 
 		logInfo("[", FUNCTION_NAME, "] Initialized OpenGL context (version ", GLVersion.major, ".", GLVersion.minor, ")");
 
-        // initialize remaining opengl renderer
-		init_renderers<true>();
-
 		initialized = true;
 	}
+
+	// initialize remaining opengl renderer
+	init_renderers<true>(muffInst);
 	return true;
 	CATCH_ALL(false)
 }
@@ -4207,29 +4499,19 @@ Boolean mufflon_is_cuda_available() {
 	CATCH_ALL(false)
 }
 
-void mufflon_destroy_opengl() {
-    // destroy opengl renderers
-    TRY
-	for(std::size_t i = 0u; i < s_renderers.size(); ++i)
-		for(auto& renderer : s_renderers.get(i))
-			if (renderer->uses_device(Device::OPENGL))
-				renderer.reset();
-	CATCH_ALL(;)
-}
 
-
-void mufflon_destroy() {
+void mufflon_destroy(MufflonInstanceHdl instHdl) {
 	TRY
-	s_imageOutput.reset();
-	s_renderers.clear();
-	s_plugins.clear();
-	s_screenTexture.reset();
-	WorldContainer::clear_instance();
-	cudaDeviceReset();
+	CHECK_NULLPTR(instHdl, "mufflon instance", ;);
+	MufflonInstance* muffInst = static_cast<MufflonInstance*>(instHdl);
+	for(std::size_t i = 0u; i < muffInst->renderers.size(); ++i)
+		for(auto& renderer : muffInst->renderers.get(i))
+			if(renderer->uses_device(Device::OPENGL))
+				renderer.reset();
+	muffInst->imageOutput.reset();
+	muffInst->renderers.clear();
+	muffInst->screenTexture.reset();
+	muffInst->world = WorldContainer{};
+	delete muffInst;
 	CATCH_ALL(;)
 }
-
-/*const char* get_teststring() {
-	static const char* test = u8"müfflon ηρα Φ∞∡∧";
-	return test;
-}*/

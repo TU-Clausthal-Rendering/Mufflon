@@ -42,14 +42,14 @@ namespace gui.Model.Scene
             if(args.NewItems != null)
                 foreach (var lightHandle in args.NewItems)
                 {
-                    if(!Core.scenario_add_light(Handle, (IntPtr)lightHandle))
+                    if(!Core.scenario_add_light(Handle, (UInt32)lightHandle))
                         throw new Exception(Core.core_get_dll_error());
                 }
 
             if(args.OldItems != null)
                 foreach (var lightHandle in args.OldItems)
                 {
-                    if(!Core.scenario_remove_light(Handle, (IntPtr)lightHandle))
+                    if(!Core.scenario_remove_light(Handle, (UInt32)lightHandle))
                         throw new Exception(Core.core_get_dll_error());
                 }
         }
@@ -57,13 +57,13 @@ namespace gui.Model.Scene
         private void LoadLights()
         {
             for (var i = 0u; i < Core.scenario_get_point_light_count(Handle); ++i)
-                Lights.Add(Core.scenario_get_light_handle(Handle, i, Core.LightType.Point));
+                Lights.Add(Core.scenario_get_light_handle(Handle, (int)i, Core.LightType.Point));
             for (var i = 0u; i < Core.scenario_get_spot_light_count(Handle); ++i)
-                Lights.Add(Core.scenario_get_light_handle(Handle, i, Core.LightType.Spot));
+                Lights.Add(Core.scenario_get_light_handle(Handle, (int)i, Core.LightType.Spot));
             for (var i = 0u; i < Core.scenario_get_dir_light_count(Handle); ++i)
-                Lights.Add(Core.scenario_get_light_handle(Handle, i, Core.LightType.Directional));
+                Lights.Add(Core.scenario_get_light_handle(Handle, (int)i, Core.LightType.Directional));
             if(Core.scenario_has_envmap_light(Handle))
-                Lights.Add(Core.scenario_get_light_handle(Handle, 0u, Core.LightType.Envmap));
+                Lights.Add(Core.scenario_get_light_handle(Handle, 0, Core.LightType.Envmap));
         }
 
         private void LoadCamera()
@@ -72,7 +72,7 @@ namespace gui.Model.Scene
             m_camera = m_parent.Cameras.Models.First((cam) => Equals(cam.Handle, handle));
         }
 
-        public ObservableHashSet<IntPtr> Lights { get; } = new ObservableHashSet<IntPtr>();
+        public ObservableHashSet<UInt32> Lights { get; } = new ObservableHashSet<UInt32>();
 
         private CameraModel m_camera;
 
@@ -93,7 +93,7 @@ namespace gui.Model.Scene
 
         public string Name => Core.scenario_get_name(Handle);
 
-        public ulong LodLevel
+        public uint LodLevel
         {
             get => Core.scenario_get_global_lod_level(Handle);
             set

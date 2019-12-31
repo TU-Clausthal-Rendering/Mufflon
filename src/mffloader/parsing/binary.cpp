@@ -719,7 +719,7 @@ void BinaryLoader::read_object() {
 				m_objects.back().animObjId);
 
 	// Create the object for direct writing
-	m_objects.back().objHdl = world_create_object(m_objects.back().name.data(), m_objects.back().flags);
+	m_objects.back().objHdl = world_create_object(m_mffInstHdl, m_objects.back().name.data(), m_objects.back().flags);
 	if(m_objects.back().objHdl == nullptr)
 		throw std::runtime_error("Failed to create object '" + std::string(m_objects.back().name));
 }
@@ -727,11 +727,11 @@ void BinaryLoader::read_object() {
 void BinaryLoader::read_bone_animation_data() {
 	const u32 numBones = read<u32>();
 	const u32 frameCount = read<u32>();
-	world_reserve_animation(numBones, frameCount);
+	world_reserve_animation(m_mffInstHdl, numBones, frameCount);
 	for(u32 f = 0u; f < frameCount; ++f)
 		for(u32 i = 0u; i < numBones; ++i) {
 			DualQuaternion t = read<DualQuaternion>();
-			world_set_bone(i, f, &t);
+			world_set_bone(m_mffInstHdl, i, f, &t);
 		}
 }
 
@@ -767,7 +767,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 		// Only log below a certain threshold
 		logPedantic("[BinaryLoader::read_instances] Creating given instance (keyframe ", keyframe,
 					", animInstId ", animInstId, ") for object '", name, "\'");
-		InstanceHdl instHdl = world_create_instance(m_objects[objId].objHdl, keyframe);
+		InstanceHdl instHdl = world_create_instance(m_mffInstHdl, m_objects[objId].objHdl, keyframe);
 		if(instHdl == nullptr)
 			throw std::runtime_error("Failed to create instance for object ID "
 									 + std::to_string(objId));
@@ -781,13 +781,13 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			lod = read_lod(m_objects[objId], lod);
 		}
 
-		if(!instance_set_transformation_matrix(instHdl, &transMat, m_loadWorldToInstTrans))
+		if(!instance_set_transformation_matrix(m_mffInstHdl, instHdl, &transMat, m_loadWorldToInstTrans))
 			throw std::runtime_error("Failed to set transformation matrix for instance of object ID "
 									 + std::to_string(objId));
 
 		if(m_keepTrackOfAabb) {
 			ei::Box instanceAabb;
-			if(!instance_get_bounding_box(instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
+			if(!instance_get_bounding_box(m_mffInstHdl, instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
 				throw std::runtime_error("Failed to get bounding box for instance of object ID "
 										 + std::to_string(objId));
 			m_aabb = ei::Box(m_aabb, instanceAabb);
@@ -821,7 +821,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 				u32 lod = globalLod;
 				if(auto iter = objectLods.find(objName); iter != objectLods.end())
 					lod = iter->second;
-				InstanceHdl instHdl = world_create_instance(m_objects[i].objHdl, 0xFFFFFFFF);
+				InstanceHdl instHdl = world_create_instance(m_mffInstHdl, m_objects[i].objHdl, 0xFFFFFFFF);
 				if(instHdl == nullptr)
 					throw std::runtime_error("Failed to create instance for object ID "
 											 + std::to_string(i));
@@ -834,7 +834,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 
 				if(m_keepTrackOfAabb) {
 					ei::Box instanceAabb;
-					if(!instance_get_bounding_box(instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
+					if(!instance_get_bounding_box(m_mffInstHdl, instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
 						throw std::runtime_error("Failed to get bounding box for instance of object ID "
 												 + std::to_string(i));
 					m_aabb = ei::Box(m_aabb, instanceAabb);
@@ -851,15 +851,15 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 void BinaryLoader::deinstance() {
 	sprintf(m_loadingStage.data(), "Performing deinstancing%c", '\0');
 	// Both animated and not animated instances
-	auto applyTranformation = [](const u32 frame) {
-		const u32 numInstances = world_get_instance_count(frame);
+	auto applyTranformation = [this](const u32 frame) {
+		const u32 numInstances = world_get_instance_count(m_mffInstHdl, frame);
 		for(u32 i = 0u; i < numInstances; ++i) {
-			InstanceHdl hdl = world_get_instance_by_index(i, frame);
-			world_apply_instance_transformation(hdl);
+			InstanceHdl hdl = world_get_instance_by_index(m_mffInstHdl, i, frame);
+			world_apply_instance_transformation(m_mffInstHdl, hdl);
 		}
 	};
 
-	const u32 frames = world_get_highest_instance_frame();
+	const u32 frames = world_get_highest_instance_frame(m_mffInstHdl);
 	applyTranformation(0xFFFFFFFF);
 	for(u32 i = 0u; i < frames; ++i)
 		applyTranformation(frames);
@@ -925,7 +925,7 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 		object.keyframe = read<u32>();
 		object.animObjId = read<u32>();
 		object.aabb = read<ei::Box>();
-		object.objHdl = world_get_object(object.name.data());
+		object.objHdl = world_get_object(m_mffInstHdl, object.name.data());
 		if(object.objHdl == nullptr)
 			throw std::runtime_error("Unknown object '" + std::string(object.name) + ")");
 		// Read the LoD
@@ -1012,7 +1012,7 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 			// Since there may be implicit (default) instances, add object count to be sure
 			// If we're using deinstancing, the number of objects increases by the number of instances
 			// (conservative estimate)
-			world_reserve_objects_instances(static_cast<u32>(m_objJumpTable.size() + (deinstance ? instanceCount : 0u)),
+			world_reserve_objects_instances(m_mffInstHdl, static_cast<u32>(m_objJumpTable.size() + (deinstance ? instanceCount : 0u)),
 											static_cast<u32>(instanceCount + m_objJumpTable.size()));
 		}
 
