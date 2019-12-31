@@ -12,16 +12,16 @@
 		return EXIT_FAILURE;									\
 	}
 	
-bool enable_renderer(const char* name, RenderDevice device) {
-	const uint32_t count = render_get_renderer_count();
+bool enable_renderer(MufflonInstanceHdl mffInst, const char* name, RenderDevice device) {
+	const uint32_t count = render_get_renderer_count(mffInst);
 	for(uint32_t i = 0; i < count; ++i) {
-		const char* currName = render_get_renderer_name(i);
-		const char* currShortName = render_get_renderer_short_name(i);
+		const char* currName = render_get_renderer_name(mffInst, i);
+		const char* currShortName = render_get_renderer_short_name(mffInst, i);
 		if(strcmp(name, currName) == 0 || strcmp(name, currShortName) == 0) {
-			const uint32_t variations = render_get_renderer_variations(i);
+			const uint32_t variations = render_get_renderer_variations(mffInst, i);
 			for(uint32_t v = 0; v < variations; ++v)
-				if(device == render_get_renderer_devices(i, v))
-					return render_enable_renderer(i, v);
+				if(device == render_get_renderer_devices(mffInst, i, v))
+					return render_enable_renderer(mffInst, i, v);
 		}
 	}
 	return false;
@@ -43,28 +43,32 @@ int main(int argc, const char* argv[]) {
 	else
 		filename = filename + 1;
 	const long iterations = strtol(argv[4], NULL, 10);
-
-	CHECK_ERROR(mufflon_initialize());
 	
-	if(loader_load_json(filepath) != LOADER_SUCCESS) {
+	MufflonInstanceHdl mffInst;
+	CHECK_ERROR(mffInst = mufflon_initialize());
+	
+	MufflonLoaderInstanceHdl mffLoaderInst;
+	CHECK_ERROR(mffLoaderInst = loader_initialize(mffInst));
+	if(loader_load_json(mffLoaderInst, filepath) != LOADER_SUCCESS) {
 		fprintf(stderr, "Failed to load scene file '%s'\n", filepath);
 		return EXIT_FAILURE;
 	}
 	
-	if(!enable_renderer(renderer, DEVICE_CPU)) {
+	if(!enable_renderer(mffInst, renderer, DEVICE_CPU)) {
 		fprintf(stderr, "Could not find renderer with the name '%s'\n", renderer);
 		return EXIT_FAILURE;
 	}
-	CHECK_ERROR(render_enable_render_target(target, false));
+	CHECK_ERROR(render_enable_render_target(mffInst, target, false));
 	
 	for(long i = 0; i < iterations; ++i)
-		CHECK_ERROR(render_iterate(NULL));
+		CHECK_ERROR(render_iterate(mffInst, NULL));
 	
 	const size_t bufferLen = strlen(renderer) + strlen(target) + strlen(filename) + 7u;
 	char* buffer = (char*)malloc(bufferLen);
 	sprintf(buffer, "%s-%s-%s.pfm", renderer, target, filename);
-	CHECK_ERROR(render_save_screenshot(buffer, target, false));
+	CHECK_ERROR(render_save_screenshot(mffInst, buffer, target, false));
 	free(buffer);
-	mufflon_destroy();
+	loader_destroy(mffLoaderInst);
+	mufflon_destroy(mffInst);
 	return EXIT_SUCCESS;
 }

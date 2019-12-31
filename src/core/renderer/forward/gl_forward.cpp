@@ -6,8 +6,9 @@
 
 namespace mufflon::renderer
 {
-	GlForward::GlForward() :
-		GlRendererBase(true, false)
+	GlForward::GlForward(void* mufflonInstanceHdl) :
+		GlRendererBase(true, false),
+		m_mufflonInstanceHdl{ mufflonInstanceHdl }
 	{
 	}
 
@@ -30,24 +31,28 @@ namespace mufflon::renderer
 	void GlForward::init()
 	{
 		auto ltcGGX1 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
+			m_mufflonInstanceHdl,
 			"resources/ltc/ltc_ggx_1.dds",
 			TextureSampling::SAMPLING_LINEAR,
 			MipmapType::MIPMAP_NONE,
 			nullptr, nullptr
 		));
 		auto ltcGGX2 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
+			m_mufflonInstanceHdl,
 			"resources/ltc/ltc_ggx_2.dds",
 			TextureSampling::SAMPLING_LINEAR,
 			MipmapType::MIPMAP_NONE,
 			nullptr, nullptr
 		));
 		auto ltcBeckmann1 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
+			m_mufflonInstanceHdl,
 			"resources/ltc/ltc_beckmann_1.dds",
 			TextureSampling::SAMPLING_LINEAR,
 			MipmapType::MIPMAP_NONE,
 			nullptr, nullptr
 		));
 		auto ltcBeckmann2 = reinterpret_cast<scene::textures::Texture*>(world_add_texture(
+			m_mufflonInstanceHdl,
 			"resources/ltc/ltc_beckmann_2.dds",
 			TextureSampling::SAMPLING_LINEAR,
 			MipmapType::MIPMAP_NONE,

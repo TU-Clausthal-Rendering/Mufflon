@@ -193,7 +193,7 @@ namespace gui.Controller.Renderer
 
                 // Renew the display texture (we don't really care)
                 IntPtr targetTexture = IntPtr.Zero;
-                if (!Core.core_get_target_image(m_renderTarget.Name, m_varianceTarget, out targetTexture))
+                if (!Core.mufflon_get_target_image(m_renderTarget.Name, m_varianceTarget, out targetTexture))
                     throw new Exception(Core.core_get_dll_error());
                 m_models.Display.Repaint(!m_repaint);
 

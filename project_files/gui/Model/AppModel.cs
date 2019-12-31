@@ -40,13 +40,15 @@ namespace gui.Model
             if (!Core.mufflon_initialize())
                 throw new Exception(Core.core_get_dll_error());
             Core.profiling_enable();
+            if (!Loader.loader_initialize())
+                throw new Exception(Loader.loader_get_dll_error());
             Loader.loader_profiling_enable();
         }
 
         private void OnWindowLoaded(object sender, EventArgs args)
         {
             Window.RenderDisplay.BorderHost.Child = GlHost;
-            if (!Core.mufflon_set_logger(m_logCallbackPointer))
+            if (!Core.core_set_logger(m_logCallbackPointer))
                 throw new Exception(Core.core_get_dll_error());
             GlHost.StartRenderLoop();
             Loaded(this, null);

@@ -80,9 +80,10 @@ public:
 	static constexpr float DEFAULT_NEAR_PLANE = 0.01f;
 	static constexpr float DEFAULT_FAR_PLANE = 500.f;
 
-	JsonLoader(fs::path file) :
+	JsonLoader(MufflonInstanceHdl mffInstHdl, fs::path file) :
+		m_mffInstHdl{ mffInstHdl },
 		m_filePath(fs::canonical(file)),
-		m_binLoader{ m_loadingStage }
+		m_binLoader{ m_mffInstHdl, m_loadingStage }
 	{
 		if(!fs::exists(m_filePath))
 			throw std::runtime_error("JSON file '" + m_filePath.string() + "' doesn't exist");
@@ -115,6 +116,7 @@ private:
 	void selective_replace_keys(const rapidjson::Value& objectToCopy, rapidjson::Value& objectToCopyIn);
 
 
+	MufflonInstanceHdl m_mffInstHdl;
 	const fs::path m_filePath;
 	std::string m_jsonString;
 	rapidjson::Document m_document;

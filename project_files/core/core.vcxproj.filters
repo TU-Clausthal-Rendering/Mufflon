@@ -343,11 +343,11 @@
     <ClCompile Include="..\..\src\core\renderer\debug\debug_bvh_renderer.cpp">
       <Filter>Source Files\core\renderer\debug</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\core\scene\lights\hosek_sky_model.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\core\scene\attributes\attribute.cpp">
       <Filter>Source Files\core\scene\attributes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\lights\hosek_sky_model.cpp">
+      <Filter>Source Files\core\scene\lights</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1116,7 +1116,6 @@
     <ClInclude Include="..\..\src\core\renderer\debug\debug_bvh_renderer.hpp">
       <Filter>Source Files\core\renderer\debug</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\core\scene\lights\hosek_sky_model.hpp" />
     <ClInclude Include="..\..\src\util\fixed_hashmap.hpp">
       <Filter>Source Files\util</Filter>
     </ClInclude>
@@ -1134,6 +1133,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\core\export\core_api.h">
       <Filter>Source Files\core\export</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\lights\hosek_sky_model.hpp">
+      <Filter>Source Files\core\scene\lights</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

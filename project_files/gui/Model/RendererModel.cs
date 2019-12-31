@@ -53,11 +53,11 @@ namespace gui.Model
                 {
                     case Core.ParameterType.Bool:
                     {
-                        uint val;
+                        bool val;
                         if (!Core.renderer_get_parameter_bool(Name, out val))
                             throw new Exception(Core.core_get_dll_error());
                         m_value = val;
-                        return val != 0;
+                        return val;
                     }
                     case Core.ParameterType.Int:
                     {
@@ -96,7 +96,7 @@ namespace gui.Model
                 switch (Type)
                 {
                     case Core.ParameterType.Bool:
-                        if (!Core.renderer_set_parameter_bool(Name, ((bool) value) ? 1u : 0u))
+                        if (!Core.renderer_set_parameter_bool(Name, (bool) value))
                             throw new Exception(Core.core_get_dll_error());
                         m_value = value;
                         break;

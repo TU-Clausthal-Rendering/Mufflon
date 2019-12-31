@@ -10,19 +10,9 @@
 
 namespace mufflon::scene {
 
-WorldContainer WorldContainer::s_container{};
-
 WorldContainer::WorldContainer()
 {
 	m_envLights.insert("##DefaultBlack##", lights::Background::black());
-}
-
-WorldContainer& WorldContainer::instance() {
-	return s_container;
-}
-
-void WorldContainer::clear_instance() {
-	s_container = WorldContainer();
 }
 
 bool WorldContainer::set_frame_current(const u32 frameCurrent) {
@@ -713,7 +703,7 @@ void WorldContainer::unref_texture(TextureHandle hdl) {
 
 bool WorldContainer::load_lod(Object& obj, const u32 lodIndex) {
 	if(!obj.has_lod_available(lodIndex)) {
-		if(!m_load_lod(&obj, lodIndex))
+		if(!m_loadLod(m_loadLodUserParams, &obj, lodIndex))
 			return false;
 		// Update the flags for this LoD
 		std::unordered_set<MaterialIndex> uniqueMatIndices;
@@ -823,7 +813,7 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 			throw std::runtime_error("Failed to load LoD from disk while loading scene");
 	}
 
-	m_scene = std::make_unique<Scene>(scenario, m_frameCurrent,
+	m_scene = std::make_unique<Scene>(*this, scenario, m_frameCurrent,
 									  std::move(objInstRef), std::move(instanceHandles),
 									  m_worldToInstanceTrans, get_current_keyframe());
 
@@ -1009,8 +999,9 @@ bool WorldContainer::load_scene_lights() {
 	return reloaded;
 }
 
-void WorldContainer::set_lod_loader_function(LodLoadFuncPtr func) {
-	m_load_lod = func;
+void WorldContainer::set_lod_loader_function(LodLoadFuncPtr func, void* userParams) {
+	m_loadLod = func;
+	m_loadLodUserParams = userParams;
 }
 
 void WorldContainer::retessellate() {

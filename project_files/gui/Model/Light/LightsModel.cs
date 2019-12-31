@@ -33,7 +33,7 @@ namespace gui.Model.Light
 
         public void AddLight(string name, LightModel.LightType type)
         {
-            var handle = Core.world_add_light(name, Core.FromModelLightType(type));
+            var handle = Core.world_add_light(name, Core.FromModelLightType(type), 1);
             var lm = LightModel.MakeFromHandle(handle, type);
             m_list.Add(lm);
         }

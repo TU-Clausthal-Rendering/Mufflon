@@ -19,6 +19,7 @@ namespace mufflon { namespace scene {
 template < Device dev >
 struct SceneDescriptor;
 class Scenario;
+class WorldContainer;
 
 // Idea: On device side, Materials, Lights, and Cameras call their own functions in a switch statement
 
@@ -35,7 +36,7 @@ public:
 		u32 count;
 	};
 
-	Scene(const Scenario& scenario, const u32 frame,
+	Scene(WorldContainer& world, const Scenario& scenario, const u32 frame,
 		  util::FixedHashMap<ObjectHandle, InstanceRef>&& objects,
 		  std::vector<InstanceHandle>&& instances,
 		  const std::vector<ei::Mat3x4>& worldToInstanceTransformation,
@@ -185,6 +186,7 @@ private:
 	template < Device dev >
 	void update_camera_medium(SceneDescriptor<dev>& scene);
 
+	WorldContainer& m_world;
 	const Scenario& m_scenario;			// Reference to the scenario which is presented by this scene
 	const u32 m_frame;					// Frame used for this scene (also path index for camera animation)
 
