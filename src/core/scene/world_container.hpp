@@ -7,7 +7,6 @@
 #include "lights/lights.hpp"
 #include "lights/background.hpp"
 #include "core/memory/hashmap.hpp"
-#include "core/renderer/renderer.hpp"
 #include "core/scene/materials/medium.hpp"
 #include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/cputexture.hpp"
@@ -18,7 +17,13 @@
 #include <memory>
 #include <vector>
 
-namespace mufflon::scene {
+namespace mufflon {
+
+namespace renderer {
+class IRenderer;
+} // namespace renderer
+
+namespace scene {
 
 /**
  * Container for all things scene-related.
@@ -253,4 +258,4 @@ private:
 	float m_tessLevel = 0u;
 };
 
-} // namespace mufflon::scene
+}} // namespace mufflon::scene

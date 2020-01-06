@@ -17,7 +17,7 @@ struct RenderBuffer;
 class CpuShadowSilhouettesBPM final : public RendererBase<Device::CPU, bpm::SilhouetteTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuShadowSilhouettesBPM();
+	CpuShadowSilhouettesBPM(mufflon::scene::WorldContainer& world);
 	~CpuShadowSilhouettesBPM() = default;
 
 	void iterate() final;

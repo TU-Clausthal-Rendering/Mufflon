@@ -1323,6 +1323,9 @@
     <ClInclude Include="..\..\src\core\export\core_interface.h">
       <Filter>Source Files\core\export</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.hpp">
+      <Filter>Source Files\core\renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">

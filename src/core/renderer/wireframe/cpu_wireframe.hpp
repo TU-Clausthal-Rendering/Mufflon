@@ -10,7 +10,9 @@ namespace mufflon::renderer {
 class CpuWireframe final : public RendererBase<Device::CPU, WireframeTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuWireframe() = default;
+	CpuWireframe(mufflon::scene::WorldContainer& world) :
+		RendererBase<Device::CPU, WireframeTargets>{ world }
+	{}
 	~CpuWireframe() = default;
 
 	void iterate() final;

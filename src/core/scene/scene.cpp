@@ -2,6 +2,7 @@
 #include "descriptors.hpp"
 #include "scenario.hpp"
 #include "world_container.hpp"
+#include "util/parallel.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/cameras/pinhole.hpp"
 #include "core/cameras/focus.hpp"

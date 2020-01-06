@@ -138,16 +138,16 @@ inline void init_renderers(MufflonInstance& instance) {
 				renderers = &instance.renderers.get(instance.renderers.insert(std::string(RendererType::get_name_static()), {}));
 			// Special case: GlForward renderer needs to add textures...
 			if constexpr(std::is_same_v<RendererType, renderer::GlForward>)
-				renderers->push_back(std::make_unique<RendererType>(&instance));
+				renderers->push_back(std::make_unique<RendererType>(instance.world, &instance));
 			else
-				renderers->push_back(std::make_unique<RendererType>());
+				renderers->push_back(std::make_unique<RendererType>(instance.world));
 		}
 	}
 	// Only initialize CUDA renderers if CUDA is enabled
 	else if(!initOpenGL && (s_cudaDevIndex >= 0 || !RendererType::may_use_device(Device::CUDA))) {
 		if(renderers == nullptr)
 			renderers = &instance.renderers.get(instance.renderers.insert(std::string(RendererType::get_name_static()), {}));
-		renderers->push_back(std::make_unique<RendererType>());
+		renderers->push_back(std::make_unique<RendererType>(instance.world));
 	}
 	if constexpr(I + 1u < renderer::Renderers::size)
 		init_renderers<initOpenGL, I + 1u>(instance);
@@ -3626,7 +3626,7 @@ Boolean render_enable_renderer(MufflonInstanceHdl instHdl, uint32_t index, uint3
 	CATCH_ALL(false)
 }
 
-Boolean render_iterate(MufflonInstanceHdl instHdl, ProcessTime* time, ProcessTime* preTime, ProcessTime* postTime) {
+Boolean render_iterate(MufflonInstanceHdl instHdl, ProcessTime* iterateTime, ProcessTime* preTime, ProcessTime* postTime) {
 	TRY
 	CHECK_NULLPTR(instHdl, "mufflon instance", false);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
@@ -3676,7 +3676,7 @@ Boolean render_iterate(MufflonInstanceHdl instHdl, ProcessTime* time, ProcessTim
 		preTime->cycles = CpuProfileState::get_cpu_cycle();
 		preTime->microseconds = CpuProfileState::get_process_time().count();
 	}
-	muffInst.s_currentRenderer->pre_iteration(*muffInst.s_imageOutput);
+	muffInst.currentRenderer->pre_iteration(*muffInst.imageOutput);
 	if(preTime != nullptr) {
 		preTime->cycles = CpuProfileState::get_cpu_cycle() - preTime->cycles;
 		preTime->microseconds = CpuProfileState::get_process_time().count() - preTime->microseconds;
@@ -3685,7 +3685,7 @@ Boolean render_iterate(MufflonInstanceHdl instHdl, ProcessTime* time, ProcessTim
 		iterateTime->cycles = CpuProfileState::get_cpu_cycle();
 		iterateTime->microseconds = CpuProfileState::get_process_time().count();
 	}
-	muffInst.s_currentRenderer->iterate();
+	muffInst.currentRenderer->iterate();
 	if(iterateTime != nullptr) {
 		iterateTime->cycles = CpuProfileState::get_cpu_cycle() - iterateTime->cycles;
 		iterateTime->microseconds = CpuProfileState::get_process_time().count() - iterateTime->microseconds;

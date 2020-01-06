@@ -919,8 +919,8 @@ namespace gui.Dll
         private static extern Boolean render_enable_renderer_(IntPtr instHdl, UInt32 index, UInt32 variation);
         internal static Boolean render_enable_renderer(UInt32 index, UInt32 variation) { return render_enable_renderer_(muffInstHdl, index, variation); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_iterate")]
-        private static extern Boolean render_iterate_(IntPtr instHdl, out ProcessTime time);
-        internal static Boolean render_iterate(out ProcessTime time) { return render_iterate_(muffInstHdl, out time); }
+        private static extern Boolean render_iterate_(IntPtr instHdl, out ProcessTime iterateTime, out ProcessTime preTime, out ProcessTime postTime);
+        internal static Boolean render_iterate(out ProcessTime iterateTime, out ProcessTime preTime, out ProcessTime postTime) { return render_iterate_(muffInstHdl, out iterateTime, out preTime, out postTime); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_get_current_iteration")]
         private static extern UInt32 render_get_current_iteration_(IntPtr instHdl);
         internal static UInt32 render_get_current_iteration() { return render_get_current_iteration_(muffInstHdl); }

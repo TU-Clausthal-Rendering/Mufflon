@@ -37,67 +37,50 @@ float get_density(const std::unique_ptr<data_structs::DmOctree<>>& octree, const
 
 } // namespace ::
 
+CUDA_FUNCTION void NebVertexExt::init(const PathVertex<NebVertexExt>& /*thisVertex*/,
+									  const AreaPdf inAreaPdf,
+									  const AngularPdf inDirPdf,
+									  const float pChoice) {
+	this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+	this->throughput = Spectrum{ 1.0f };
+}
 
-struct NebVertexExt {
-	Spectrum throughput;
-	AngularPdf pdfBack;
-	AreaPdf incidentPdf { 0.0f };
-	union {
-		int pixelIndex;
-		float rnd;		// An additional input random value (first vertex of light paths only).
-	};
-	float density { -1.0f };
+CUDA_FUNCTION void NebVertexExt::update(const PathVertex<NebVertexExt>& prevVertex,
+										const PathVertex<NebVertexExt>& thisVertex,
+										const math::PdfPair pdf,
+										const Connection& incident,
+										const Spectrum& throughput,
+										const float /*continuationPropability*/,
+										const Spectrum& /*transmission*/) {
+	float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+	bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+	this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+	this->throughput = throughput;
+}
 
-	inline CUDA_FUNCTION void init(const PathVertex<NebVertexExt>& /*thisVertex*/,
-							const AreaPdf inAreaPdf,
-							const AngularPdf inDirPdf,
-							const float pChoice) {
-		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
-		this->throughput = Spectrum{1.0f};
-	}
+CUDA_FUNCTION void NebVertexExt::update(const PathVertex<NebVertexExt>& /*thisVertex*/,
+										const scene::Direction& /*excident*/,
+										const VertexSample& sample) {
+	pdfBack = sample.pdf.back;
+}
 
-	inline CUDA_FUNCTION void update(const PathVertex<NebVertexExt>& prevVertex,
-							  const PathVertex<NebVertexExt>& thisVertex,
-							  const math::PdfPair pdf,
-							  const Connection& incident,
-							  const Spectrum& throughput,
-							  const float /*continuationPropability*/,
-							  const Spectrum& /*transmission*/) {
-		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
-		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
-		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
-		this->throughput = throughput;
-	}
-
-	void update(const PathVertex<NebVertexExt>& /*thisVertex*/,
-				const scene::Direction& /*excident*/,
-				const VertexSample& sample) {
-		pdfBack = sample.pdf.back;
-	}
-};
-
-
-class NebPathVertex : public PathVertex<NebVertexExt> {
-public:
-	// Overload the vertex sample operator to have more RR control.
-	VertexSample sample(const ei::Box& sceneBounds,
-						const scene::materials::Medium* media,
-						const math::RndSet2_1& rndSet,
-						bool adjoint) const {
-		VertexSample s = PathVertex<NebVertexExt>::sample(sceneBounds, media, rndSet, adjoint);
-		// Conditionally kill the photon path tracing if we are on the
-		// NEE vertex. Goal: trace only photons which we cannot NEE.
-		if(adjoint && get_path_len() == 1) {
-			float keepChance = get_photon_path_chance(s.pdf.forw);
-			if(keepChance < ext().rnd) {
-				s.type = math::PathEventType::INVALID;
-			} else {
-				s.throughput /= keepChance;
-			}
+CUDA_FUNCTION VertexSample NebPathVertex::sample(const ei::Box& sceneBounds,
+												 const scene::materials::Medium* media,
+												 const math::RndSet2_1& rndSet,
+												 bool adjoint) const {
+	VertexSample s = PathVertex<NebVertexExt>::sample(sceneBounds, media, rndSet, adjoint);
+	// Conditionally kill the photon path tracing if we are on the
+	// NEE vertex. Goal: trace only photons which we cannot NEE.
+	if(adjoint && get_path_len() == 1) {
+		float keepChance = get_photon_path_chance(s.pdf.forw);
+		if(keepChance < ext().rnd) {
+			s.type = math::PathEventType::INVALID;
+		} else {
+			s.throughput /= keepChance;
 		}
-		return s;
 	}
-};
+	return s;
+}
 
 namespace {
 
@@ -484,9 +467,6 @@ Spectrum CpuNextEventBacktracking::finalize_emission(float photonMergeArea, cons
 		return emission.radiance * misWeight;
 	} else
 		return emission.radiance;
-}
-
-CpuNextEventBacktracking::CpuNextEventBacktracking() {
 }
 
 static int pairing(int a, int b) {

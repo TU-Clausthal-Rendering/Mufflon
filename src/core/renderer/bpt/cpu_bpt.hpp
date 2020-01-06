@@ -20,7 +20,9 @@ namespace { using BptPathVertex = PathVertex<struct BptVertexExt>; }
 class CpuBidirPathTracer final : public RendererBase<Device::CPU, BptTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuBidirPathTracer();
+	CpuBidirPathTracer(mufflon::scene::WorldContainer& world) :
+		RendererBase<Device::CPU, BptTargets>{ world }
+	{}
 	~CpuBidirPathTracer() = default;
 
 	void iterate() final;

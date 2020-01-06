@@ -19,7 +19,7 @@ struct RenderBuffer;
 class GpuShadowSilhouettes final : public RendererBase<Device::CUDA, bpm::SilhouetteTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	GpuShadowSilhouettes();
+	GpuShadowSilhouettes(mufflon::scene::WorldContainer& world);
 	~GpuShadowSilhouettes() = default;
 
 	void iterate() final;

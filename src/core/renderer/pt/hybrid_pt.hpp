@@ -22,7 +22,7 @@ public:
 	using OutputHandlerType = typename PtTargets::OutputHandlerType;
 
 	// Initialize all resources required by this renderer.
-	HybridPathTracer();
+	HybridPathTracer(mufflon::scene::WorldContainer& world);
 	~HybridPathTracer() = default;
 
 	void iterate() final;

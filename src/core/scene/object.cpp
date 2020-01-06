@@ -23,9 +23,9 @@ void Object::unload() {
 	}
 }
 
-Lod& Object::get_or_fetch_original_lod(u32 level) {
+Lod& Object::get_or_fetch_original_lod(WorldContainer& world, u32 level) {
 	if(!has_original_lod_available(level))
-		WorldContainer::instance().load_lod(*this, level);
+		world.load_lod(*this, level);
 	return get_original_lod(level);
 }
 

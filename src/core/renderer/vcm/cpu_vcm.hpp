@@ -1,8 +1,9 @@
 ﻿#pragma once
 
 #include "vcm_params.hpp"
-#include "core/scene/handles.hpp"
+#include "core/renderer/path_util.hpp"
 #include "core/renderer/renderer_base.hpp"
+#include "core/scene/handles.hpp"
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
 #include "core/data_structs/photon_map.hpp"
@@ -18,11 +19,46 @@ template < typename ExtensionT >
 class PathVertex;
 using VcmPathVertex = PathVertex<struct VcmVertexExt>;
 
+// Extension which stores a partial result of the MIS-weight computation for speed-up.
+struct VcmVertexExt {
+	AreaPdf incidentPdf;
+	Spectrum throughput;
+	// A cache to shorten the recursive evaluation of MIS (relative to connections).
+	// It is only possible to store the previous sum, as the current sum
+	// depends on the backward-pdf of the next vertex, which is only given in
+	// the moment of the full connection.
+	// Only valid after update().
+	float prevRelativeProbabilitySum{ 0.0f };
+	// Store 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
+	float prevConversionFactor{ 0.0f };
+
+	CUDA_FUNCTION void init(const VcmPathVertex& /*thisVertex*/,
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice);
+
+	CUDA_FUNCTION void update(const VcmPathVertex& prevVertex,
+							  const VcmPathVertex& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const Spectrum& throughput,
+							  const float/* continuationPropability*/,
+							  const Spectrum& /*transmission*/,
+							  int /*numPhotons*/, float /*area*/);
+
+	inline CUDA_FUNCTION void update(const VcmPathVertex& thisVertex,
+									 const scene::Direction& /*excident*/,
+									 const VertexSample& sample,
+									 int numPhotons, float area);
+};
+
 class CpuVcm final : public RendererBase<Device::CPU, VcmTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuVcm();
-	~CpuVcm();
+	CpuVcm(mufflon::scene::WorldContainer& world) :
+		RendererBase<Device::CPU, VcmTargets>{ world }
+	{}
+	~CpuVcm() = default;
 
 	void iterate() final;
 	IParameterHandler& get_parameters() final { return m_params; }

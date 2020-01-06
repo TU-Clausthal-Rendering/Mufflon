@@ -114,10 +114,6 @@ inline CUDA_FUNCTION float kernel(float dSq, float rSq) {
 
 } // namespace ::
 
-
-CpuBidirPhotonMapper::CpuBidirPhotonMapper() {
-}
-
 void CpuBidirPhotonMapper::iterate() {
 	auto scope = Profiler::core().start<CpuProfileState>("CPU BPM iteration", ProfileLevel::LOW);
 

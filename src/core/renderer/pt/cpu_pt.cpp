@@ -8,7 +8,9 @@
 
 namespace mufflon::renderer {
 
-CpuPathTracer::CpuPathTracer() {
+CpuPathTracer::CpuPathTracer(mufflon::scene::WorldContainer& world) :
+	RendererBase<Device::CPU, PtTargets>{ world }
+{
 	// The PT does not need additional memory resources like photon maps.
 	logInfo("[CpuPathTracer] Size of a vertex is ", sizeof(PtPathVertex));
 }

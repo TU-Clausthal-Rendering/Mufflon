@@ -7,8 +7,8 @@
 
 namespace mufflon::renderer {
 
-GlWireframe::GlWireframe() :
-    GlRendererBase(true, false)
+GlWireframe::GlWireframe(mufflon::scene::WorldContainer& world) :
+    GlRendererBase(world, true, false)
 {
     // shader
 	m_triangleProgram = gl::ProgramBuilder()

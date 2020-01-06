@@ -16,7 +16,9 @@ struct RenderBuffer;
 class CpuSsSilPT final : public RendererBase<Device::CPU, ss::SilhouetteTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuSsSilPT();
+	CpuSsSilPT(mufflon::scene::WorldContainer& world) :
+		RendererBase<Device::CPU, ss::SilhouetteTargets>{ world }
+	{}
 	~CpuSsSilPT() = default;
 
 	IParameterHandler& get_parameters() final { return m_params; }

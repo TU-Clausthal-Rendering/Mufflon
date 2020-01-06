@@ -104,7 +104,8 @@ inline bool operator&(GlRenderer::Attribute l, GlRenderer::Attribute r) {
 template < class TL >
 class GlRendererBase : public RendererBase<Device::OPENGL, TL>, protected GlRenderer {
 public:
-	GlRendererBase(bool useDepth, bool useStencil) :
+	GlRendererBase(mufflon::scene::WorldContainer& world, bool useDepth, bool useStencil) :
+		RendererBase<Device::OPENGL, TL>{ world },
 		GlRenderer(TL::TARGET_COUNT, useDepth, useStencil)
 	{}
 	virtual ~GlRendererBase() = default;

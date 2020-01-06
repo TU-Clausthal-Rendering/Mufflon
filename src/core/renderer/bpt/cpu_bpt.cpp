@@ -151,11 +151,6 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 
 } // namespace ::
 
-
-CpuBidirPathTracer::CpuBidirPathTracer() {
-	// The BPT does not need additional memory resources like photon maps.
-}
-
 void CpuBidirPathTracer::iterate() {
 	auto scope = Profiler::core().start<CpuProfileState>("CPU BPT iteration", ProfileLevel::HIGH);
 

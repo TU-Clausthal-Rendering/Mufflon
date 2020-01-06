@@ -14,7 +14,7 @@ namespace mufflon::renderer {
 class GlForward final : public GlRendererBase<ForwardTargets> {
 public:
 	// Initialize all resources required by this renderer
-	GlForward(void* mufflonInstanceHdl);
+	GlForward(mufflon::scene::WorldContainer& world, void* mufflonInstanceHdl);
 	~GlForward() override = default;
 
 	void iterate() final;

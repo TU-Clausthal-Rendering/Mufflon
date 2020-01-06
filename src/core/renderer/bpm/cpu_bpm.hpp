@@ -22,7 +22,9 @@ namespace { using BpmPathVertex = PathVertex<struct BpmVertexExt>; }
 class CpuBidirPhotonMapper final : public RendererBase<Device::CPU, BpmTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuBidirPhotonMapper();
+	CpuBidirPhotonMapper(mufflon::scene::WorldContainer& world) :
+		RendererBase<Device::CPU, BpmTargets>{ world }
+	{}
 	~CpuBidirPhotonMapper() = default;
 
 	void iterate() final;

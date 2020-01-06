@@ -21,9 +21,6 @@ namespace mufflon::renderer::decimaters::silhouette {
 
 using namespace ss;
 
-CpuSsSilPT::CpuSsSilPT() {
-}
-
 void CpuSsSilPT::iterate() {
 	auto scope = Profiler::core().start<CpuProfileState>("CPU PT iteration", ProfileLevel::HIGH);
 

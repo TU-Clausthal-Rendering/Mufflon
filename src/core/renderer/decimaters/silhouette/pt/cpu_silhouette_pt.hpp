@@ -17,7 +17,7 @@ struct RenderBuffer;
 class CpuShadowSilhouettesPT final : public RendererBase<Device::CPU, pt::SilhouetteTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuShadowSilhouettesPT();
+	CpuShadowSilhouettesPT(mufflon::scene::WorldContainer& world);
 	~CpuShadowSilhouettesPT() = default;
 
 	void iterate() final;

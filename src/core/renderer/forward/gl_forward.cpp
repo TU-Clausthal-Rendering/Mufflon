@@ -6,8 +6,8 @@
 
 namespace mufflon::renderer
 {
-	GlForward::GlForward(void* mufflonInstanceHdl) :
-		GlRendererBase(true, false),
+	GlForward::GlForward(mufflon::scene::WorldContainer& world, void* mufflonInstanceHdl) :
+		GlRendererBase(world, true, false),
 		m_mufflonInstanceHdl{ mufflonInstanceHdl }
 	{
 	}

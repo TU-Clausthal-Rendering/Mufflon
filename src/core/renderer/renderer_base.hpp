@@ -20,9 +20,11 @@ public:
 
 	static constexpr Device DEVICE = dev;
 
-	RendererBase(std::vector<::mufflon::scene::AttributeIdentifier> vertexAttribs = {},
+	RendererBase(mufflon::scene::WorldContainer& world,
+				 std::vector<::mufflon::scene::AttributeIdentifier> vertexAttribs = {},
 				 std::vector<::mufflon::scene::AttributeIdentifier> faceAttribs = {},
 				 std::vector<::mufflon::scene::AttributeIdentifier> sphereAttribs = {}) :
+		IRenderer{ world },
 		m_vertexAttribs(std::move(vertexAttribs)),
 		m_faceAttribs(std::move(faceAttribs)),
 		m_sphereAttribs(std::move(sphereAttribs))

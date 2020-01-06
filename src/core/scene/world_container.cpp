@@ -1,6 +1,7 @@
 ﻿#include "world_container.hpp"
 #include "util/log.hpp"
 #include "core/cameras/camera.hpp"
+#include "core/renderer/renderer.hpp"
 #include "core/scene/lod.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/materials/medium.hpp"

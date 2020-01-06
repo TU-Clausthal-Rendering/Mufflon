@@ -8,7 +8,7 @@ namespace mufflon::renderer {
 
 class GlWireframe final : public GlRendererBase<WireframeTargets> {
 public:
-	GlWireframe();
+	GlWireframe(mufflon::scene::WorldContainer& world);
 	~GlWireframe() = default;
 
 	void iterate() final;

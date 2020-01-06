@@ -18,7 +18,9 @@ void init_rngs(u32 num, int seed, math::Rng* rngs);
 
 } // namespace hybridpt_detail
 
-HybridPathTracer::HybridPathTracer() {
+HybridPathTracer::HybridPathTracer(mufflon::scene::WorldContainer& world) :
+	IRenderer{ world }
+{
 	m_sceneDescCuda = make_udevptr<Device::CUDA, mufflon::scene::SceneDescriptor<Device::CUDA>>();
 }
 

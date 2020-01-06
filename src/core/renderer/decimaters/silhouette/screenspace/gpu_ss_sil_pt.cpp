@@ -27,8 +27,6 @@ void init_rngs(u32 num, int seed, math::Rng* rngs);
 
 } // namespace gpusssil_detail
 
-GpuSsSilPT::GpuSsSilPT() {}
-
 void GpuSsSilPT::iterate() {
 	copy(&m_sceneDesc->lightTree.posGuide, &m_params.neeUsePositionGuide, sizeof(bool));
 	const auto NUM_PIXELS = m_outputBuffer.get_num_pixels();

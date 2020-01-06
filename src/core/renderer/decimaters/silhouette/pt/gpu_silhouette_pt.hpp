@@ -15,7 +15,7 @@ namespace mufflon::renderer::decimaters::silhouette {
 class GpuShadowSilhouettesPT final : public RendererBase<Device::CUDA, pt::SilhouetteTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	GpuShadowSilhouettesPT();
+	GpuShadowSilhouettesPT(mufflon::scene::WorldContainer& world);
 	~GpuShadowSilhouettesPT() = default;
 
 	void iterate() final;

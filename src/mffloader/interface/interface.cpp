@@ -48,16 +48,6 @@ std::string s_lastError;
 
 } // namespace
 
-Boolean loader_set_logger(void(*logCallback)(const char*, int)) {
-	TRY
-	if(s_logCallback == nullptr) {
-		setMessageHandler(delegateLog);
-		s_logCallback = logCallback;
-	}
-	return true;
-	CATCH_ALL(false)
-}
-
 Boolean loader_set_log_level(LogLevel level) {
 	switch(level) {
 		case LogLevel::LOG_PEDANTIC:

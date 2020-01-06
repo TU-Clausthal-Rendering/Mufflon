@@ -85,7 +85,7 @@ public:
 	}
 
 	// This is a potentially expensive operation as it may require a disk read!
-	Lod& get_or_fetch_original_lod(u32 level);
+	Lod& get_or_fetch_original_lod(class WorldContainer& world, u32 level);
 
 	// Gets the 'applicable' LoD, ie. reduced if present, else original if present
 	bool has_lod(u32 level) const noexcept {

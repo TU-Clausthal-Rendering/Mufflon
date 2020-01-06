@@ -112,7 +112,9 @@ u32 get_vertices_for_memory(const u32 memory) {
 
 } // namespace
 
-CpuImportanceDecimater::CpuImportanceDecimater() {
+CpuImportanceDecimater::CpuImportanceDecimater(mufflon::scene::WorldContainer& world) :
+	RendererBase<Device::CPU, importance::ImportanceTargets>{ world }
+{
 	// TODO: init one RNG per thread?
 	std::random_device rndDev;
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));
@@ -127,7 +129,7 @@ void CpuImportanceDecimater::pre_reset() {
 		for(auto& obj : m_currentScene->get_objects()) {
 			const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count() - 1u);
 			// TODO: this reeeeally breaks instancing
-			scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
+			m_world.get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 		}
 	}
 
@@ -418,7 +420,7 @@ void CpuImportanceDecimater::initialize_decimaters() {
 			++objIter;
 		auto& obj = *objIter;
 
-		const auto& scenario = *scene::WorldContainer::instance().get_current_scenario();
+		const auto& scenario = *m_world.get_current_scenario();
 		// Find the highest-res LoD referenced by an object's instances
 		u32 lowestLevel = scenario.get_custom_lod(obj.first);
 		for(u32 j = 0u; j < obj.second.count; ++j) {
@@ -430,7 +432,7 @@ void CpuImportanceDecimater::initialize_decimaters() {
 		// TODO: this only works if instances don't specify LoD levels
 		if(!obj.first->has_reduced_lod_available(lowestLevel))
 			obj.first->add_reduced_lod(lowestLevel);
-		auto& lod = obj.first->get_or_fetch_original_lod(lowestLevel);
+		auto& lod = obj.first->get_or_fetch_original_lod(m_world, lowestLevel);
 		auto& newLod = obj.first->get_reduced_lod(lowestLevel);
 		const auto& polygons = newLod.template get_geometry<scene::geometry::Polygons>();
 

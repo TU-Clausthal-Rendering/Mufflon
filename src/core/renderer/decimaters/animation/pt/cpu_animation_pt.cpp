@@ -30,7 +30,8 @@ inline float get_luminance(const ei::Vec3& vec) {
 
 } // namespace
 
-CpuShadowSilhouettesPT::CpuShadowSilhouettesPT()
+CpuShadowSilhouettesPT::CpuShadowSilhouettesPT(mufflon::scene::WorldContainer& world) :
+	RendererBase<Device::CPU, silhouette::pt::SilhouetteTargets>{ world }
 {
 	std::random_device rndDev;
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));
@@ -45,7 +46,7 @@ void CpuShadowSilhouettesPT::pre_reset() {
 		for(auto& obj : m_currentScene->get_objects()) {
 			const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count() - 1u);
 			// TODO: this reeeeally breaks instancing
-			scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
+			m_world.get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 		}
 	}
 
@@ -106,8 +107,8 @@ void CpuShadowSilhouettesPT::iterate() {
 		const auto processTime = CpuProfileState::get_process_time();
 		const auto cycles = CpuProfileState::get_cpu_cycle();
 
-		const auto currAnimationFrame = scene::WorldContainer::instance().get_frame_current();
-		const auto endAnimationFrame = scene::WorldContainer::instance().get_frame_count();
+		const auto currAnimationFrame = m_world.get_frame_current();
+		const auto endAnimationFrame = m_world.get_frame_count();
 		//const auto frameIndex = std::min<u32>(m_params.slidingWindowSize, currAnimationFrame - startAnimationFrame);
 		//const auto windowSize = std::min<u32>(std::min(endAnimationFrame - currAnimationFrame, frameIndex + 1u), m_params.slidingWindowSize);
 		
@@ -220,7 +221,7 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 			++objIter;
 		auto& obj = *objIter;
 
-		const auto& scenario = *scene::WorldContainer::instance().get_current_scenario();
+		const auto& scenario = *m_world.get_current_scenario();
 		// Find the highest-res LoD referenced by an object's instances
 		u32 lowestLevel = scenario.get_custom_lod(obj.first);
 		for(u32 j = 0u; j < obj.second.count; ++j) {
@@ -232,7 +233,7 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 		// TODO: this only works if instances don't specify LoD levels
 		if(!obj.first->has_reduced_lod_available(lowestLevel))
 			obj.first->add_reduced_lod(lowestLevel);
-		auto& lod = obj.first->get_or_fetch_original_lod(lowestLevel);
+		auto& lod = obj.first->get_or_fetch_original_lod(m_world, lowestLevel);
 		auto& newLod = obj.first->get_reduced_lod(lowestLevel);
 		const auto& polygons = newLod.template get_geometry<scene::geometry::Polygons>();
 
@@ -270,8 +271,8 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 	}
 
 	// Compute the total expected vertex count over all meshes
-	const auto currAnimationFrame = scene::WorldContainer::instance().get_frame_current();
-	const auto endAnimationFrame = scene::WorldContainer::instance().get_frame_count();
+	const auto currAnimationFrame = m_world.get_frame_current();
+	const auto endAnimationFrame = m_world.get_frame_count();
 	const auto end = std::min(currAnimationFrame + m_params.slidingWindowHalfWidth, endAnimationFrame);
 	double expectedVertexCount = 0.0;
 

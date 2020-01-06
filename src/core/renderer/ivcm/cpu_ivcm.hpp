@@ -2,6 +2,7 @@
 
 #include "ivcm_params.hpp"
 #include "core/scene/handles.hpp"
+#include "core/renderer/path_util.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include "core/renderer/footprint.hpp"
 #include "core/scene/scene.hpp"
@@ -21,12 +22,48 @@ namespace mufflon::renderer {
 template < typename ExtensionT >
 class PathVertex;
 using IvcmPathVertex = PathVertex<struct IvcmVertexExt>;
+
+// Extension which stores a partial result of the MIS-weight computation for speed-up.
+struct IvcmVertexExt {
+	AreaPdf incidentPdf;
+	Spectrum throughput;
+	AngularPdf pdfBack;
+	// Store 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
+	float prevConversionFactor{ 0.0f };
+	float density;
+	float curvature;
+	Footprint2D footprint;
+
+
+	CUDA_FUNCTION void init(const IvcmPathVertex& /*thisVertex*/,
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice);
+
+
+	CUDA_FUNCTION void update(const IvcmPathVertex& prevVertex,
+							  const IvcmPathVertex& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const Spectrum& throughput,
+							  const float /*continuationPropability*/,
+							  const Spectrum& /*transmission*/,
+							  const scene::SceneDescriptor<Device::CPU>& scene,
+							  int numPhotons);
+
+	CUDA_FUNCTION void update(const IvcmPathVertex& /*thisVertex*/,
+							  const scene::Direction& /*excident*/,
+							  const VertexSample& sample,
+							  const scene::SceneDescriptor<Device::CPU>& /*scene*/,
+							  int /*numPhotons*/);
+};
+
 class VertexWrapper;
 
 class CpuIvcm final : public RendererBase<Device::CPU, IvcmTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuIvcm();
+	CpuIvcm(mufflon::scene::WorldContainer& world);
 	~CpuIvcm();
 
 	void iterate() final;

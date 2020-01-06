@@ -35,8 +35,10 @@ using SpvPathVertex = PathVertex<SpvVertexExt>;
 
 class ShadowPhotonVisualizer final : public RendererBase<Device::CPU, ShadowPhotonTargets> {
 public:
-	ShadowPhotonVisualizer();
-	~ShadowPhotonVisualizer();
+	ShadowPhotonVisualizer(mufflon::scene::WorldContainer& world) :
+		RendererBase<Device::CPU, ShadowPhotonTargets>{ world }
+	{}
+	~ShadowPhotonVisualizer() = default;
 
 	IParameterHandler& get_parameters() final { return m_params; }
 	static constexpr StringView get_name_static() noexcept { return "Shadow Photon Visualizer"; }

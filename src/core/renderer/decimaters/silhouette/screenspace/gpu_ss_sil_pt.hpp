@@ -16,7 +16,9 @@ struct RenderBuffer;
 class GpuSsSilPT final : public RendererBase<Device::CUDA, ss::SilhouetteTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	GpuSsSilPT();
+	GpuSsSilPT(mufflon::scene::WorldContainer& world) :
+		RendererBase<Device::CUDA, ss::SilhouetteTargets>{ world }
+	{}
 	~GpuSsSilPT() = default;
 
 	IParameterHandler& get_parameters() final { return m_params; }

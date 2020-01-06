@@ -6,6 +6,7 @@
 #include "util/type_helpers.hpp"
 #include "core/renderer/targets/output_handler.hpp"
 #include "core/scene/handles.hpp"
+#include "core/scene/world_container.hpp"
 #include <ei/vector.hpp>
 
 namespace mufflon {
@@ -66,7 +67,12 @@ class IParameterHandler;
 
 class IRenderer {
 public:
-	IRenderer() = default;
+	IRenderer(mufflon::scene::WorldContainer& world) :
+		m_world{ world },
+		m_currentScene{ nullptr },
+		m_currentIteration{ 0 }
+	{}
+
 	virtual ~IRenderer() = default;
 
 	virtual void iterate() = 0;
@@ -170,8 +176,9 @@ protected:
 	// the new descriptor has been fetched
 	virtual void post_reset() {}
 
-	mufflon::scene::SceneHandle m_currentScene = nullptr;
-	int m_currentIteration = 0;
+	mufflon::scene::WorldContainer& m_world;
+	mufflon::scene::SceneHandle m_currentScene;
+	int m_currentIteration;
 
 private:
 	ResetEvent m_lastReset;

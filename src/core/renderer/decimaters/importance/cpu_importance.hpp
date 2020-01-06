@@ -17,7 +17,7 @@ struct RenderBuffer;
 class CpuImportanceDecimater final : public RendererBase<Device::CPU, importance::ImportanceTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuImportanceDecimater();
+	CpuImportanceDecimater(mufflon::scene::WorldContainer& world);
 	~CpuImportanceDecimater() = default;
 
 	void iterate() final;

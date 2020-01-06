@@ -27,14 +27,6 @@ inline float get_luminance(const ei::Vec3& vec) {
 
 } // namespace 
 
-ShadowPhotonVisualizer::ShadowPhotonVisualizer() {
-
-}
-
-ShadowPhotonVisualizer::~ShadowPhotonVisualizer() {
-
-}
-
 void ShadowPhotonVisualizer::post_reset() {
 	const auto resetFlags = get_reset_event();
 	init_rngs(m_outputBuffer.get_num_pixels());

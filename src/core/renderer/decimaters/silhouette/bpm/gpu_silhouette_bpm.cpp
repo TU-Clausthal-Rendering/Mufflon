@@ -39,7 +39,8 @@ cudaError_t call_impvis_kernel(const dim3& gridDims, const dim3& blockDims,
 
 } // namespace gpusil_details
 
-GpuShadowSilhouettes::GpuShadowSilhouettes() :
+GpuShadowSilhouettes::GpuShadowSilhouettes(mufflon::scene::WorldContainer& world) :
+	RendererBase<Device::CUDA, bpm::SilhouetteTargets>{ world },
 	m_params{}
 	//m_rng{ static_cast<u32>(std::random_device{}()) }
 {}
@@ -50,7 +51,7 @@ void GpuShadowSilhouettes::on_scene_load() {
 		for(auto& obj : m_currentScene->get_objects()) {
 			const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count() - 1u);
 			// TODO: this reeeeally breaks instancing
-			scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
+			m_world.get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 		}
 	}
 }
@@ -68,8 +69,8 @@ void GpuShadowSilhouettes::post_iteration(OutputHandler& outputBuffer) {
 		m_reset = true;
 
 		// Fix up all other scenarios too (TODO: not a wise choice to do so indiscriminately...)
-		for(std::size_t i = 0u; i < scene::WorldContainer::instance().get_scenario_count(); ++i) {
-			auto handle = scene::WorldContainer::instance().get_scenario(i);
+		for(std::size_t i = 0u; i < m_world.get_scenario_count(); ++i) {
+			auto handle = m_world.get_scenario(i);
 			for(const auto& obj : m_currentScene->get_objects()) {
 				const auto newLodLevel = obj.first->get_lod_slot_count() - 1u;
 				handle->set_custom_lod(obj.first, static_cast<u32>(newLodLevel));
@@ -215,7 +216,7 @@ void GpuShadowSilhouettes::initialize_decimaters() {
 																			  m_params.viewWeight, m_params.lightWeight,
 																			  m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 		// TODO: this reeeeally breaks instancing
-		scene::WorldContainer::instance().get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
+		m_world.get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
 	}
 
 	m_importances = make_udevptr_array<Device::CUDA, Importances<Device::CUDA>*, false>(m_decimaters.size());

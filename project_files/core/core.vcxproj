@@ -279,6 +279,7 @@
     <ClInclude Include="..\..\src\core\renderer\footprint.hpp" />
     <ClInclude Include="..\..\src\core\renderer\forward\box_pipeline.hpp" />
     <ClInclude Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.hpp" />
     <ClInclude Include="..\..\src\core\renderer\ivcm\cpu_ivcm.hpp" />
     <ClInclude Include="..\..\src\core\renderer\ivcm\ivcm_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\lt\cpu_lt.hpp" />

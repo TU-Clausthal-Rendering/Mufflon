@@ -15,7 +15,7 @@ namespace renderer {
 
 class GpuPathTracer final : public RendererBase<Device::CUDA, PtTargets> {
 public:
-	GpuPathTracer();
+	GpuPathTracer(mufflon::scene::WorldContainer& world);
 	~GpuPathTracer() = default;
 
 	// This is just a test method, don't use this as an actual interface
