@@ -497,6 +497,7 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 	//vertices.clear();
 	// Create a start for the path
 	(void)SilPathVertex::create_camera(&vertices[0], &vertices[0], scene.camera.get(), coord, rng.next());
+	vertices[0].ext().pathRadiance = ei::Vec3{ 0.f };
 
 	float sharpness = 1.f;
 
@@ -509,7 +510,6 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 
 	int pathLen = 0;
 	do {
-		vertices[pathLen].ext().pathRadiance = ei::Vec3{ 0.f };
 		// Add direct contribution as importance as well
 		if(pathLen > 0 && pathLen + 1 <= params.maxPathLength) {
 			u64 neeSeed = rng.next();
@@ -602,17 +602,15 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 		math::RndSet2_1 rnd{ rng.next(), rng.next() };
 		VertexSample sample;
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
-		if(walk(scene, vertices[pathLen], rnd, rndRoulette, false, throughput, vertices[pathLen + 1], sample) == WalkResult::CANCEL)
+		if(walk(scene, vertices[pathLen], rnd, rndRoulette, false, throughput, vertices[pathLen + 1], sample) != WalkResult::HIT)
 			break;
-
-		// Terminate on background
-		if(vertices[pathLen + 1].is_end_point()) break;
 
 		// Update old vertex with accumulated throughput
 		vertices[pathLen].ext().updateBxdf(sample, throughput);
 
 		// Don't update sharpness for camera vertex
 		if(pathLen > 0) {
+			// TODO: this seems to give the wrong result for dirac-delta BxDFs
 			const ei::Vec3 bxdf = sample.throughput * (float)sample.pdf.forw;
 			const float bxdfLum = get_luminance(bxdf);
 			if(isnan(bxdfLum))
@@ -630,16 +628,32 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 							  -ei::dot(vertices[pathLen + 1].get_incident_direction(), vertices[pathLen + 1].get_normal()),
 							  params.viewWeight * sharpness);
 		}
+
 		++pathLen;
+
+		vertices[pathLen].ext().pathRadiance = ei::Vec3{ 0.f };
+		if(pathLen >= params.minPathLength) {
+			EmissionValue emission = vertices[pathLen].get_emission(scene, lastPosition);
+			if(emission.value != 0.0f && pathLen > 1) {
+				// misWeight for pathLen==1 is always 1 -> skip computation
+				float misWeight = 1.0f / (1.0f + params.neeCount * (emission.connectPdf / vertices[pathLen].ext().incidentPdf));
+				emission.value *= misWeight;
+			}
+			vertices[pathLen].ext().pathRadiance = emission.value * throughput;
+		}
+		if(vertices[pathLen].is_end_point()) break;
 	} while(pathLen < params.maxPathLength);
 
 	// Go back over the path and add up the irradiance from indirect illumination
 	ei::Vec3 accumRadiance{ 0.f };
+	ei::Vec3 currThroughput = throughput;
 	for(int p = pathLen; p >= 1; --p) {
 		// Last vertex doesn't have indirect contribution
 		if(p < pathLen) {
-			accumRadiance = vertices[p].ext().throughput * accumRadiance + (vertices[p + 1].ext().shadowInstanceId == 0 ?
-																			vertices[p + 1].ext().pathRadiance : ei::Vec3{ 0.f });
+			// Compute the throughput at the target vertex by recursively removing later throughputs
+			currThroughput /= vertices[p].ext().throughput;
+			accumRadiance = currThroughput * (accumRadiance + (vertices[p + 1].ext().shadowInstanceId == -1 ?
+															   vertices[p + 1].ext().pathRadiance : ei::Vec3{ 0.f }));
 			const ei::Vec3 irradiance = vertices[p].ext().outCos * accumRadiance;
 
 			const auto& hitId = vertices[p].get_primitive_id();
@@ -742,8 +756,8 @@ inline CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBuf
 			importance += importances[lodIdx][vertexIndex].viewImportance;
 		}
 
-		outputBuffer.contribute<ImportanceTarget>(coord, importance / maxImportance);
-		outputBuffer.contribute<PolyShareTarget>(coord, sums[lodIdx].shadowImportance / static_cast<float>(lod.numPrimitives));
+		outputBuffer.template contribute<ImportanceTarget>(coord, importance / maxImportance);
+		outputBuffer.template contribute<PolyShareTarget>(coord, sums[lodIdx].shadowImportance / static_cast<float>(lod.numPrimitives));
 	}
 }
 

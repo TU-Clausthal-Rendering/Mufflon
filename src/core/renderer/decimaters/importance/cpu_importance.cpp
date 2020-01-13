@@ -217,10 +217,12 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 
 	Spectrum throughput{ ei::Vec3{1.0f} };
 	// We gotta keep track of our vertices
-	thread_local std::vector<ImpPathVertex> vertices(std::max(2, m_params.maxPathLength + 1));
+	thread_local std::vector<ImpPathVertex> vertices;
 	vertices.clear();
+	vertices.resize(std::max(2, m_params.maxPathLength + 1));
 	// Create a start for the path
 	(void)ImpPathVertex::create_camera(&vertices.front(), &vertices.front(), m_sceneDesc.camera.get(), coord, m_rngs[pixel].next());
+	vertices[0].ext().pathRadiance = ei::Vec3{ 0.f };
 
 	float sharpness = 1.f;
 
@@ -233,7 +235,6 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 
 	int pathLen = 0;
 	do {
-		vertices[pathLen].ext().pathRadiance = ei::Vec3{ 0.f };
 		// Add direct contribution as importance as well
 		if(pathLen > 0 && pathLen + 1 <= m_params.maxPathLength) {
 			u64 neeSeed = m_rngs[pixel].next();
@@ -276,7 +277,7 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 		math::RndSet2_1 rnd{ m_rngs[pixel].next(), m_rngs[pixel].next() };
 		VertexSample sample;
 		float rndRoulette = math::sample_uniform(u32(m_rngs[pixel].next()));
-		if(walk(m_sceneDesc, vertices[pathLen], rnd, rndRoulette, false, throughput, vertices[pathLen + 1], sample) == WalkResult::CANCEL)
+		if(walk(m_sceneDesc, vertices[pathLen], rnd, rndRoulette, false, throughput, vertices[pathLen + 1], sample) != WalkResult::HIT)
 			break;
 
 		// Update old vertex with accumulated throughput
@@ -304,13 +305,26 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 																				  sharpness);
 
 		++pathLen;
+
+		vertices[pathLen].ext().pathRadiance = ei::Vec3{ 0.f };
+		if(pathLen >= m_params.minPathLength) {
+			EmissionValue emission = vertices[pathLen].get_emission(m_sceneDesc, lastPosition);
+			if(emission.value != 0.0f && pathLen > 1) {
+				// misWeight for pathLen==1 is always 1 -> skip computation
+				float misWeight = 1.0f / (1.0f + m_params.neeCount * (emission.connectPdf / vertices[pathLen].ext().incidentPdf));
+				emission.value *= misWeight;
+			}
+			vertices[pathLen].ext().pathRadiance = emission.value * throughput;
+		}
+		if(vertices[pathLen].is_end_point()) break;
 	} while(pathLen < m_params.maxPathLength);
 
 	// Go back over the path and add up the irradiance from indirect illumination
 	ei::Vec3 accumRadiance{ 0.f };
-	float accumThroughout = 1.f;
+	ei::Vec3 currThroughput = throughput;
 	for(int p = pathLen - 2; p >= 1; --p) {
-		accumRadiance = vertices[p].ext().throughput * accumRadiance + vertices[p + 1].ext().pathRadiance;
+		currThroughput /= vertices[p].ext().throughput;
+		accumRadiance = currThroughput * (accumRadiance + vertices[p + 1].ext().pathRadiance);
 		const ei::Vec3 irradiance = vertices[p].ext().outCos * accumRadiance;
 
 		const auto& hitId = vertices[p].get_primitive_id();
@@ -373,8 +387,13 @@ void CpuImportanceDecimater::pt_sample(const Pixel coord) {
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd{ rng.next(), rng.next() };
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
-		if(walk(m_sceneDesc, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) != WalkResult::CANCEL)
+		if(walk(m_sceneDesc, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) != WalkResult::HIT)
 			break;
+		if(m_outputBuffer.template is_target_enabled<ImportanceTarget>() && pathLen == 0) {
+			const auto importance = query_importance(vertex.get_position(), vertex.get_primitive_id());
+			m_outputBuffer.template contribute<ImportanceTarget>(coord, importance / m_maxImportance);
+		}
+
 		++pathLen;
 		
 		// Evaluate direct hit of area ligths

@@ -28,14 +28,18 @@ struct ImpVertexExt {
 							  const Connection& incident,
 							  const Spectrum& throughput,
 							  const float continuationPropability,
-							  const Spectrum& transmission) {}
+							  const Spectrum& transmission) {
+		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+	}
 
 	CUDA_FUNCTION void update(const PathVertex<ImpVertexExt>& thisVertex,
 							  const scene::Direction& excident,
 							  const VertexSample& sample) {
 		this->excident = excident;
 		this->pdf = sample.pdf.forw;
-		this->outCos = -ei::dot(thisVertex.get_normal(), excident);
+		this->outCos = ei::dot(thisVertex.get_normal(), excident);
 	}
 
 	CUDA_FUNCTION void updateBxdf(const VertexSample& sample, const Spectrum& accum) {
