@@ -289,9 +289,12 @@ float ImportanceDecimater<dev>::get_current_max_importance() const {
 	float maxImp = 0.f;
 #pragma PARALLEL_FOR
 	for(i64 v = 0; v < static_cast<i64>(m_decimatedPoly->get_vertex_count()); ++v) {
+		const auto imp = cuda::atomic_load<dev, float>(m_importances[v].viewImportance);
+		if(!std::isinf(imp) && !std::isnan(imp)) {
 #pragma omp critical
-		if(m_importances[v].viewImportance > maxImp)
-			maxImp = m_importances[v].viewImportance;
+			if(m_importances[v].viewImportance > maxImp)
+				maxImp = m_importances[v].viewImportance;
+		}
 	}
 	return maxImp;
 }

@@ -128,6 +128,11 @@ inline CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
 		if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) == WalkResult::CANCEL)
 			break;
+
+		if(pathLen == 0) {
+			outputBuffer.template contribute<HitIdTarget>(coord, ei::Vec2{ vertex.get_primitive_id().instanceId,
+																		   vertex.get_primitive_id().primId });
+		}
 		++pathLen;
 
 		// Evaluate direct hit of area ligths
@@ -138,12 +143,12 @@ inline CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT
 				float misWeight = 1.0f / (1.0f + params.neeCount * (emission.connectPdf / vertex.ext().incidentPdf));
 				emission.value *= misWeight;
 			}
-			outputBuffer.contribute<RadianceTarget>(coord, throughput * emission.value);
-			outputBuffer.contribute<PositionTarget>(coord, guideWeight * vertex.get_position());
-			outputBuffer.contribute<DepthTarget>(coord, guideWeight * vertex.get_incident_dist());
-			outputBuffer.contribute<NormalTarget>(coord, guideWeight * vertex.get_normal());
-			outputBuffer.contribute<AlbedoTarget>(coord, guideWeight * vertex.get_albedo());
-			outputBuffer.contribute<LightnessTarget>(coord, guideWeight * ei::avg(emission.value));
+			outputBuffer.template contribute<RadianceTarget>(coord, throughput * emission.value);
+			outputBuffer.template contribute<PositionTarget>(coord, guideWeight * vertex.get_position());
+			outputBuffer.template contribute<DepthTarget>(coord, guideWeight * vertex.get_incident_dist());
+			outputBuffer.template contribute<NormalTarget>(coord, guideWeight * vertex.get_normal());
+			outputBuffer.template contribute<AlbedoTarget>(coord, guideWeight * vertex.get_albedo());
+			outputBuffer.template contribute<LightnessTarget>(coord, guideWeight * ei::avg(emission.value));
 		}
 		if(vertex.is_end_point()) break;
 	} while(pathLen < params.maxPathLength);

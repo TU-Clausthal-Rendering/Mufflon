@@ -318,8 +318,11 @@ ImportanceDecimater::Mesh::VertexHandle ImportanceDecimater::get_original_vertex
 
 float ImportanceDecimater::get_current_max_importance() const {
 	float maxImp = 0.f;
-	for(auto vertex : m_decimatedMesh->vertices())
-		maxImp = std::max(maxImp, m_originalMesh.property(m_importanceDensity, get_original_vertex_handle(vertex)));
+	for(auto vertex : m_decimatedMesh->vertices()) {
+		const auto imp = m_originalMesh.property(m_importanceDensity, get_original_vertex_handle(vertex));
+		if(!std::isinf(imp) && !std::isnan(imp))
+			maxImp = std::max(maxImp, imp);
+	}
 	return maxImp;
 }
 

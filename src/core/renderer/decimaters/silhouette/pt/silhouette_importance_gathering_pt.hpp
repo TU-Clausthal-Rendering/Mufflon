@@ -411,7 +411,7 @@ inline CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>
 	ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (firstShadowDistance + secondHit.distance), shadowRay.direction };
 	const auto thirdHit = scene::accel_struct::first_intersection(scene, silhouetteRay, secondHit.normal,
 																  lightDistance - firstShadowDistance - secondHit.distance + DIST_EPSILON);
-	//if(thirdHit.hitId == vertex.get_primitive_id()) {
+	if(thirdHit.hitId == vertex.get_primitive_id()) {
 		// Compute the (estimated) size of the shadow region
 		const ei::Plane neePlane{ shadowRay.direction, shadowRay.origin };
 		const float shadowRegionSizeEstimate = estimate_shadow_light_size(scene, lightType, lightOffset,
@@ -472,7 +472,8 @@ inline CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>
 		}
 
 		return true;
-	//}
+	}
+	return false;
 }
 
 } // namespace
@@ -654,7 +655,7 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 			currThroughput /= vertices[p].ext().throughput;
 			accumRadiance = currThroughput * (accumRadiance + (vertices[p + 1].ext().shadowInstanceId == -1 ?
 															   vertices[p + 1].ext().pathRadiance : ei::Vec3{ 0.f }));
-			const ei::Vec3 irradiance = vertices[p].ext().outCos * accumRadiance;
+			const ei::Vec3 irradiance = ei::abs(vertices[p].ext().outCos) * accumRadiance;
 
 			const auto& hitId = vertices[p].get_primitive_id();
 			const auto* lod = &scene.lods[scene.lodIndices[hitId.instanceId]];

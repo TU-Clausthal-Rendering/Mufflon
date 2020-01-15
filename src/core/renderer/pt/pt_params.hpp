@@ -13,9 +13,16 @@ using PtParameters = ParameterHandler<
 	PNeePositionGuide
 >;
 
+struct HitIdTarget {
+	static constexpr const char NAME[] = "Hit ID";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 2u;
+};
+
 using PtTargets = TargetList<
 	RadianceTarget, PositionTarget, DepthTarget,
-	NormalTarget, AlbedoTarget, LightnessTarget
+	NormalTarget, AlbedoTarget, LightnessTarget,
+	HitIdTarget
 >;
 
 }} // namespace mufflon::renderer
