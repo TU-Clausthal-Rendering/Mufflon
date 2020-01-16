@@ -590,6 +590,8 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 							 const bool parallelize,
 							 const u32 actualPrimCount
 ) {
+	// TODO: if we have one animated instance this does not trigger (for good reason),
+	// but the rest of the code will not work either
 	if(numPrimitives == 1) { // Not necessary to build anything - trace code will skip the BVH
 		m_primIds.resize(4); // Make sure there is some memory (needs_rebuild depends on that) TODO: store simple bool instead?
 		m_bvhNodes.resize(1);

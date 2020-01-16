@@ -653,8 +653,9 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 		if(p < pathLen) {
 			// Compute the throughput at the target vertex by recursively removing later throughputs
 			currThroughput /= vertices[p].ext().throughput;
-			accumRadiance = currThroughput * (accumRadiance + (vertices[p + 1].ext().shadowInstanceId == -1 ?
-															   vertices[p + 1].ext().pathRadiance : ei::Vec3{ 0.f }));
+			//accumRadiance = currThroughput * (accumRadiance + (vertices[p + 1].ext().shadowInstanceId == -1 ?
+			//												   vertices[p + 1].ext().pathRadiance : ei::Vec3{ 0.f }));
+			accumRadiance = currThroughput * (accumRadiance + vertices[p + 1].ext().pathRadiance);
 			const ei::Vec3 irradiance = ei::abs(vertices[p].ext().outCos) * accumRadiance;
 
 			const auto& hitId = vertices[p].get_primitive_id();
@@ -754,7 +755,7 @@ inline CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBuf
 		for(u32 i = 0u; i < vertexCount; ++i) {
 			const auto vertexIndex = polygon.vertexIndices[vertexOffset + vertexCount * primIdx + i];
 			const float distSqr = ei::lensq(hitpoint - polygon.vertices[vertexIndex]);
-			importance += importances[lodIdx][vertexIndex].viewImportance;
+			importance += importances[lodIdx][vertexIndex].viewImportance * distSqr / distSqrSum;
 		}
 
 		outputBuffer.template contribute<ImportanceTarget>(coord, importance / maxImportance);

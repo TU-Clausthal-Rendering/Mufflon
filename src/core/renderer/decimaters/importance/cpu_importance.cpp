@@ -192,6 +192,7 @@ void CpuImportanceDecimater::iterate() {
 	}
 
 	if(m_outputBuffer.template is_target_enabled<RadianceTarget>()
+	   || m_outputBuffer.template is_target_enabled<ImportanceTarget>()
 	   || (int)m_currentDecimationIteration >= m_params.decimationIterations) {
 		const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
@@ -322,10 +323,10 @@ void CpuImportanceDecimater::importance_sample(const Pixel coord) {
 	// Go back over the path and add up the irradiance from indirect illumination
 	ei::Vec3 accumRadiance{ 0.f };
 	ei::Vec3 currThroughput = throughput;
-	for(int p = pathLen - 2; p >= 1; --p) {
+	for(int p = pathLen - 1; p >= 1; --p) {
 		currThroughput /= vertices[p].ext().throughput;
 		accumRadiance = currThroughput * (accumRadiance + vertices[p + 1].ext().pathRadiance);
-		const ei::Vec3 irradiance = vertices[p].ext().outCos * accumRadiance;
+		const ei::Vec3 irradiance = ei::abs(vertices[p].ext().outCos) * accumRadiance;
 
 		const auto& hitId = vertices[p].get_primitive_id();
 		const auto* lod = &m_sceneDesc.lods[m_sceneDesc.lodIndices[hitId.instanceId]];

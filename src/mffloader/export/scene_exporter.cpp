@@ -325,7 +325,7 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const {
 
 		light.AddMember("type", "envmap", document.GetAllocator());
 
-		fs::path mapPath(world_get_env_light_map(m_mffInstHdl, lightHandle));
+		auto mapPath = fs::path(world_get_env_light_map(m_mffInstHdl, lightHandle));
 
 		light.AddMember("map", store_in_string_relative_to_destination_path(mapPath, document), document.GetAllocator());
 

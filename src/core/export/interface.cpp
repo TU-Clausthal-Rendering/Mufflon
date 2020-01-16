@@ -1836,7 +1836,7 @@ TextureHdl world_add_texture(MufflonInstanceHdl instHdl, const char* path, Textu
 	}
 
 	// Use the plugins to load the texture
-	fs::path filePath(path);
+	const auto filePath = fs::u8path(path);
 	TextureData texData{};
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
@@ -1898,7 +1898,7 @@ TextureHdl world_add_texture_converted(MufflonInstanceHdl instHdl, const char* p
 	}
 
 	// Use the plugins to load the texture
-	fs::path filePath(path);
+	const auto filePath = fs::u8path(path);
 	TextureData texData{};
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
@@ -2023,7 +2023,7 @@ Boolean world_add_displacement_map(MufflonInstanceHdl instHdl, const char* path,
 	}
 
 	// Use the plugins to load the texture
-	fs::path filePath(path);
+	const auto filePath = fs::u8path(path);
 	TextureData texData{};
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
@@ -3730,7 +3730,7 @@ Boolean render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename,
 	}
 
 	// Make the image a PFM by default
-	fs::path fileName = std::string(filename);
+	auto fileName = fs::u8path(filename);
 	if(fileName.extension() != ".pfm")
 		fileName += ".pfm";
 	if(!fileName.is_absolute())
@@ -3738,7 +3738,7 @@ Boolean render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename,
 
 	// Replace tags in the file name
 	const auto name = replace_screenshot_filename_tags(muffInst, fileName.stem().string(), targetName, variance);
-	fileName = fileName.parent_path() / fs::path(name + fileName.extension().string());
+	fileName = fileName.parent_path() / fs::u8path(name + fileName.extension().string());
 
 	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
 	fs::path directory = fileName.parent_path();
@@ -3827,14 +3827,14 @@ Boolean render_save_denoised_radiance(MufflonInstanceHdl instHdl, const char* fi
 	}
 
 	// Make the image a PFM by default
-	fs::path fileName = std::string(filename);
+	auto fileName = fs::u8path(filename);
 	if(fileName.extension() != ".pfm")
 		fileName += ".pfm";
 	if(!fileName.is_absolute())
 		fileName = fs::absolute(fileName);
 
 	const auto name = replace_screenshot_filename_tags(muffInst, fileName.stem().string(), "Radiance(denoised)", false);
-	fileName = fileName.parent_path() / fs::path(name + fileName.extension().string());
+	fileName = fileName.parent_path() / fs::u8path(name + fileName.extension().string());
 
 	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
 	fs::path directory = fileName.parent_path();

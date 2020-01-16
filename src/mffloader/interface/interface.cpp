@@ -102,7 +102,7 @@ LoaderStatus loader_load_json(MufflonLoaderInstanceHdl hdl, const char* path) {
 	TRY
 	CHECK_NULLPTR(hdl, "loader instance handle", LoaderStatus::LOADER_ERROR);
 	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
-	fs::path filePath(path);
+	const auto filePath = fs::u8path(path);
 
 	// Perform some error checking
 	if (!fs::exists(filePath)) {
@@ -139,7 +139,7 @@ LoaderStatus loader_save_scene(MufflonLoaderInstanceHdl hdl, const char* path) {
 	TRY
 	CHECK_NULLPTR(hdl, "loader instance handle", LoaderStatus::LOADER_ERROR);
 	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
-	fs::path filePath(path);
+	auto filePath = fs::u8path(path);
 
 	// Perform some error checking
 	if (fs::exists(filePath)) {

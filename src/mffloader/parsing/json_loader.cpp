@@ -123,7 +123,7 @@ TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, 
 	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
 	logPedantic("[JsonLoader::load_texture] Loading texture '", name, "'");
 	// Make the path relative to the file
-	fs::path path(name);
+	auto path = fs::u8path(name);
 	if (!path.is_absolute())
 		path = m_filePath.parent_path() / name;
 	if (!fs::exists(path))
@@ -142,7 +142,7 @@ TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, 
 std::pair<TextureHdl, TextureHdl> JsonLoader::load_displacement_map(const char* name) {
 	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_displacement_map", ProfileLevel::HIGH);
 	// Make the path relative to the file
-	fs::path path(name);
+	auto path = fs::u8path(name);
 	if(!path.is_absolute())
 		path = m_filePath.parent_path() / name;
 	if(!fs::exists(path))

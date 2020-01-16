@@ -41,6 +41,8 @@ if("${MUFFLON_CUDA_ARCH}" STREQUAL "Auto")
 endif()
 # For whatever reason the arch flags may be in the wrong format, so we gotta fix that
 string(REGEX REPLACE "gencode;" "gencode=" ARCH_FLAGS "${ARCH_FLAGS}")
+string(REGEX REPLACE ";code" ",code" ARCH_FLAGS "${ARCH_FLAGS}")
+string(REGEX REPLACE ";-gencode" " -gencode" ARCH_FLAGS "${ARCH_FLAGS}")
 # Since CMake's target_link_options does not pass options to nvlink yet, we have to set them globally to the NVCC flags...
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${ARCH_FLAGS}")
 

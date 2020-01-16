@@ -5,6 +5,24 @@
 
 namespace mufflon { namespace scene {
 
+bool starts_with(std::string_view str, std::string_view begin) {
+	return str.rfind(begin.data(), 0u) != std::string_view::npos;
+}
+
+template < bool face >
+bool is_ignored_property(const std::string& name) {
+	// Ignore all standard properties as well as status
+	// TODO: there are more of these
+	if constexpr(face) {
+		if(name == "<fprop>" || starts_with(name, "f:st")) // short for f:status
+			return true;
+	} else {
+		if(name == "<vprop>" || starts_with(name, "v:st")) // short for v:status
+			return true;
+	}
+	return false;
+}
+
 template < bool face >
 OpenMeshAttributePool<face>::OpenMeshAttributePool(geometry::PolygonMeshType &mesh) :
 	m_mesh(mesh)
@@ -110,16 +128,8 @@ void OpenMeshAttributePool<face>::reserve(std::size_t capacity) {
 	// Compute the new pool size
 	std::size_t currOffset = 0u;
 	for(auto& prop : *this) {
-		if(prop != nullptr) {
-			if constexpr(face) {
-				if(prop->name() == "<fprop>")
-					continue;
-			} else {
-				if(prop->name() == "<vprop>")
-					continue;
-			}
+		if(prop != nullptr && !is_ignored_property<face>(prop->name()))
 			currOffset += capacity * prop->element_size();
-		}
 	}
 
 	m_poolSize = currOffset;
@@ -154,6 +164,8 @@ void OpenMeshAttributePool<face>::shrink_to_fit() {
 
 	if(m_attribElemCount != 0) {
 		std::size_t bytes = m_attribElemCount * m_poolSize / m_attribElemCapacity;
+		printf("%zu\n", bytes);
+		fflush(stdout);
 		if(m_cudaPool != nullptr)
 			m_cudaPool = Allocator<Device::CUDA>::realloc(m_cudaPool, m_poolSize, bytes);
 		if(m_openglPool != nullptr)
@@ -184,39 +196,23 @@ void OpenMeshAttributePool<face>::synchronize() {
 			if(m_cudaPool != nullptr) {
 				std::size_t currOffset = 0u;
 				for(auto& prop : *this) {
-					if(prop == nullptr)
-						continue;
-					// Skip default properties
-					if constexpr(face) {
-						if(prop->name() == "<fprop>")
-							continue;
-					} else {
-						if(prop->name() == "<vprop>")
-							continue;
+					if(prop != nullptr && !is_ignored_property<face>(prop->name())) {
+						char* cpuData = get_attribute_cpu_data(*prop);
+						const std::size_t elemSize = get_attribute_element_size(*prop);
+						::mufflon::copy(cpuData, m_cudaPool + currOffset, elemSize * m_attribElemCount);
+						currOffset += elemSize * m_attribElemCapacity;
 					}
-					char* cpuData = get_attribute_cpu_data(*prop);
-					const std::size_t elemSize = get_attribute_element_size(*prop);
-					::mufflon::copy(cpuData, m_cudaPool + currOffset, elemSize * m_attribElemCount);
-					currOffset += elemSize * m_attribElemCapacity;
 				}
 				m_openMeshSynced = true;
 			} else if(m_openglPool != nullptr) {
 				std::size_t currOffset = 0u;
 				for(auto& prop : *this) {
-					if(prop == nullptr)
-						continue;
-					// Skip default properties
-					if constexpr(face) {
-						if(prop->name() == "<fprop>")
-							continue;
-					} else {
-						if(prop->name() == "<vprop>")
-							continue;
+					if(prop != nullptr && !is_ignored_property<face>(prop->name())) {
+						char* cpuData = get_attribute_cpu_data(*prop);
+						const std::size_t elemSize = get_attribute_element_size(*prop);
+						::mufflon::copy(cpuData, m_openglPool + currOffset, elemSize * m_attribElemCount);
+						currOffset += elemSize * m_attribElemCapacity;
 					}
-					char* cpuData = get_attribute_cpu_data(*prop);
-					const std::size_t elemSize = get_attribute_element_size(*prop);
-					::mufflon::copy(cpuData, m_openglPool + currOffset, elemSize * m_attribElemCount);
-					currOffset += elemSize * m_attribElemCapacity;
 				}
 				m_openMeshSynced = true;
 			}
@@ -228,39 +224,23 @@ void OpenMeshAttributePool<face>::synchronize() {
 				m_cudaPool = Allocator<Device::CUDA>::alloc_array<char, false>(m_poolSize);
 				std::size_t currOffset = 0u;
 				for(auto& prop : *this) {
-					if(prop == nullptr)
-						continue;
-					// Skip default properties
-					if constexpr(face) {
-						if(prop->name() == "<fprop>")
-							continue;
-					} else {
-						if(prop->name() == "<vprop>")
-							continue;
+					if(prop != nullptr && !is_ignored_property<face>(prop->name())) {
+						char* cpuData = get_attribute_cpu_data(*prop);
+						const std::size_t elemSize = get_attribute_element_size(*prop);
+						::mufflon::copy(m_cudaPool + currOffset, cpuData, elemSize * m_attribElemCount);
+						currOffset += elemSize * m_attribElemCapacity;
 					}
-					char* cpuData = get_attribute_cpu_data(*prop);
-					const std::size_t elemSize = get_attribute_element_size(*prop);
-					::mufflon::copy(m_cudaPool + currOffset, cpuData, elemSize * m_attribElemCount);
-					currOffset += elemSize * m_attribElemCapacity;
 				}
 			} else if(m_openglPool != nullptr) {
 				m_cudaPool = Allocator<Device::CUDA>::alloc_array<char, false>(m_poolSize);
 				std::size_t currOffset = 0u;
 				for(auto& prop : *this) {
-					if(prop == nullptr)
-						continue;
-					// Skip default properties
-					if constexpr(face) {
-						if(prop->name() == "<fprop>")
-							continue;
-					} else {
-						if(prop->name() == "<vprop>")
-							continue;
+					if(prop != nullptr && !is_ignored_property<face>(prop->name())) {
+						const std::size_t elemSize = get_attribute_element_size(*prop);
+						::mufflon::copy_cuda_opengl(m_cudaPool + currOffset, m_openglPool.id, currOffset,
+													elemSize * m_attribElemCount);
+						currOffset += elemSize * m_attribElemCapacity;
 					}
-					const std::size_t elemSize = get_attribute_element_size(*prop);
-					::mufflon::copy_cuda_opengl(m_cudaPool + currOffset, m_openglPool.id, currOffset,
-												elemSize * m_attribElemCount);
-					currOffset += elemSize * m_attribElemCapacity;
 				}
 			}
 		}	break;
@@ -271,39 +251,23 @@ void OpenMeshAttributePool<face>::synchronize() {
 				m_openglPool = Allocator<Device::OPENGL>::alloc_array<char, false>(m_poolSize);
 				std::size_t currOffset = 0u;
 				for(auto& prop : *this) {
-					if(prop == nullptr)
-						continue;
-					// Skip default properties
-					if constexpr(face) {
-						if(prop->name() == "<fprop>")
-							continue;
-					} else {
-						if(prop->name() == "<vprop>")
-							continue;
+					if(prop != nullptr && !is_ignored_property<face>(prop->name())) {
+						char* cpuData = get_attribute_cpu_data(*prop);
+						const std::size_t elemSize = get_attribute_element_size(*prop);
+						::mufflon::copy(m_openglPool + currOffset, cpuData, elemSize * m_attribElemCount);
+						currOffset += elemSize * m_attribElemCapacity;
 					}
-					char* cpuData = get_attribute_cpu_data(*prop);
-					const std::size_t elemSize = get_attribute_element_size(*prop);
-					::mufflon::copy(m_openglPool + currOffset, cpuData, elemSize * m_attribElemCount);
-					currOffset += elemSize * m_attribElemCapacity;
 				}
 			} else if(m_cudaPool != nullptr) {
 				m_openglPool = Allocator<Device::OPENGL>::alloc_array<char, false>(m_poolSize);
 				std::size_t currOffset = 0u;
 				for(auto& prop : *this) {
-					if(prop == nullptr)
-						continue;
-					// Skip default properties
-					if constexpr(face) {
-						if(prop->name() == "<fprop>")
-							continue;
-					} else {
-						if(prop->name() == "<vprop>")
-							continue;
+					if(prop != nullptr && !is_ignored_property<face>(prop->name())) {
+						const std::size_t elemSize = get_attribute_element_size(*prop);
+						::mufflon::copy_cuda_opengl(m_openglPool.id, currOffset, m_cudaPool + currOffset,
+													elemSize * m_attribElemCount);
+						currOffset += elemSize * m_attribElemCapacity;
 					}
-					const std::size_t elemSize = get_attribute_element_size(*prop);
-					::mufflon::copy_cuda_opengl(m_openglPool.id, currOffset, m_cudaPool + currOffset,
-												elemSize * m_attribElemCount);
-					currOffset += elemSize * m_attribElemCapacity;
 				}
 			}
 			break;
@@ -390,19 +354,11 @@ template < bool face >
 std::size_t OpenMeshAttributePool<face>::get_attribute_pool_offset(const AttrHandle& handle) {
 	std::size_t offset = 0u;
 	for(const auto& prop : *this) {
-		if(prop == nullptr)
-			continue;
-		// Skip default properties
-		if constexpr(face) {
-			if(prop->name() == "<fprop>")
-				continue;
-		} else {
-			if(prop->name() == "<vprop>")
-				continue;
+		if(prop != nullptr && !is_ignored_property<face>(prop->name())) {
+			if(handle.identifier.name.compare(prop->name()) == 0)
+				break;
+			offset += get_attribute_element_size(*prop) * m_attribElemCapacity;
 		}
-		if(handle.identifier.name.compare(prop->name()) == 0)
-			break;
-		offset += get_attribute_element_size(*prop) * m_attribElemCapacity;
 	}
 	return offset;
 }
