@@ -3,6 +3,8 @@
 #include "decimation_common_pt.hpp"
 #include "silhouette_pt_common.hpp"
 #include "silhouette_pt_params.hpp"
+#include "core/data_structs/dm_hashgrid.hpp"
+#include "core/data_structs/dm_octree.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include <OpenMesh/Core/Utils/Property.hh>
@@ -49,6 +51,16 @@ private:
 	unique_device_ptr<Device::CPU, ArrayDevHandle_t<Device::CPU, pt::Importances<Device::CPU>>[]> m_importances;
 	unique_device_ptr<Device::CPU, pt::DeviceImportanceSums<Device::CPU>[]> m_importanceSums;
 	std::vector<double> m_remainingVertexFactor;
+
+#ifdef SIL_SS_PT_USE_OCTREE
+	std::unique_ptr<data_structs::DmOctree<float>> m_viewGrid{};
+	std::unique_ptr<data_structs::DmOctree<float>> m_irradianceGrid{ };
+	std::unique_ptr<data_structs::DmOctree<i32>> m_irradianceCount{};
+#else // SIL_SS_PT_USE_OCTREE
+	data_structs::DmHashGrid<float> m_viewGrid{ 1024 * 1024 * 4 };
+	data_structs::DmHashGrid<float> m_irradianceGrid{ 1024 * 1024 * 4 };
+	data_structs::DmHashGrid<i32> m_irradianceCount{ 1024 * 1024 * 4 };
+#endif // SIL_SS_PT_USE_OCTREE
 
 	// Superfluous
 	u32 m_currentDecimationIteration = 0u;

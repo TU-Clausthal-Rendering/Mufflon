@@ -177,9 +177,9 @@ void CpuShadowSilhouettesPT::gather_importance() {
 		for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 			const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 			scene::PrimitiveHandle shadowPrim;
-			silhouette::pt::sample_importance(m_outputBuffer, m_sceneDesc, reinterpret_cast<silhouette::pt::SilhouetteParameters&>(m_params),
+			/*silhouette::pt::sample_importance(m_outputBuffer, m_sceneDesc, reinterpret_cast<silhouette::pt::SilhouetteParameters&>(m_params),
 											  coord, m_rngs[pixel], m_importances.get(),
-											  m_perFrameData.back().importanceSums.get());
+											  m_perFrameData.back().importanceSums.get());*/
 		}
 		logPedantic("Finished importance iteration (", iter + 1, " of ", m_params.importanceIterations, ")");
 	}
@@ -191,9 +191,9 @@ void CpuShadowSilhouettesPT::display_importance() {
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		silhouette::pt::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
+		/*silhouette::pt::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
 											  m_importances.get(), m_perFrameData.back().importanceSums.get(),
-											  m_perFrameData.back().maxImportance == 0.f ? 1.f : m_perFrameData.back().maxImportance);
+											  m_perFrameData.back().maxImportance == 0.f ? 1.f : m_perFrameData.back().maxImportance);*/
 	}
 }
 

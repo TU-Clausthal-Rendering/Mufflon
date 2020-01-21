@@ -2,6 +2,8 @@
 
 #include "silhouette_pt_common.hpp"
 #include "silhouette_pt_params.hpp"
+#include "core/data_structs/dm_hashgrid.hpp"
+#include "core/data_structs/dm_octree.hpp"
 #include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
@@ -306,8 +308,8 @@ inline CUDA_FUNCTION constexpr float get_luminance(const ei::Vec3& vec) {
 }
 
 inline CUDA_FUNCTION void record_silhouette_vertex_contribution(Importances<CURRENT_DEV>* importances,
-														 DeviceImportanceSums<CURRENT_DEV>& sums,
-														 const u32 vertexIndex, const float importance) {
+																DeviceImportanceSums<CURRENT_DEV>& sums,
+																const u32 vertexIndex, const float importance) {
 	// Reminder: local index will refer to the decimated mesh
 	cuda::atomic_add<CURRENT_DEV>(importances[vertexIndex].viewImportance, importance);
 	cuda::atomic_add<CURRENT_DEV>(sums.shadowSilhouetteImportance, importance);
@@ -318,8 +320,13 @@ inline CUDA_FUNCTION void record_shadow(DeviceImportanceSums<CURRENT_DEV>& sums,
 }
 
 inline CUDA_FUNCTION void record_direct_hit(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
-									 const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
-									 const float cosAngle, const float sharpness) {
+#ifdef SIL_SS_PT_USE_OCTREE
+											data_structs::DmOctree<float>& viewGrid,
+#else // SIL_SS_PT_USE_OCTREE
+											data_structs::DmHashGrid<float>& viewGrid,
+#endif // SIL_SS_PT_USE_OCTREE
+											const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
+											const float cosAngle, const float sharpness) {
 	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
 	const u32 primIdx = vertexCount == 3u ? primId : (primId - polygon.numTriangles);
 
@@ -334,12 +341,25 @@ inline CUDA_FUNCTION void record_direct_hit(const scene::PolygonsDescriptor<CURR
 		}
 	}
 
-	if(!isnan(cosAngle))
+	if(!isnan(cosAngle)) {
+#ifdef SIL_SS_PT_USE_OCTREE
+		viewGrid.increase_count(polygon.vertices[min], polygon.normals[min], sharpness * (1.f - ei::abs(cosAngle)));
+#else // SIL_SS_PT_USE_OCTREE
+		viewGrid.increase_count(polygon.vertices[min], sharpness * (1.f - ei::abs(cosAngle)));
+#endif // SIL_SS_PT_USE_OCTREE
 		cuda::atomic_add<CURRENT_DEV>(importances[min].viewImportance, sharpness * (1.f - ei::abs(cosAngle)));
+	}
 }
 
 inline CUDA_FUNCTION void record_direct_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
-											const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint, const float irradiance) {
+#ifdef SIL_SS_PT_USE_OCTREE
+												   data_structs::DmOctree<float>& irradianceGrid,
+												   data_structs::DmOctree<i32>& irradianceCount,
+#else // SIL_SS_PT_USE_OCTREE
+												   data_structs::DmHashGrid<float>& irradianceGrid,
+												   data_structs::DmHashGrid<i32>& irradianceCount,
+#endif // SIL_SS_PT_USE_OCTREE
+												   const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint, const float irradiance) {
 	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
 	const u32 primIdx = vertexCount == 3u ? primId : (primId - polygon.numTriangles);
 
@@ -355,13 +375,25 @@ inline CUDA_FUNCTION void record_direct_irradiance(const scene::PolygonsDescript
 	}
 
 	if(!isnan(irradiance)) {
+#ifdef SIL_SS_PT_USE_OCTREE
+		irradianceGrid.increase_count(polygon.vertices[min], polygon.normals[min], irradiance);
+		irradianceCount.increase_count(polygon.vertices[min], polygon.normals[min], 1);
+#else // SIL_SS_PT_USE_OCTREE
+		irradianceGrid.increase_count(polygon.vertices[min], irradiance);
+		irradianceCount.increase_count(polygon.vertices[min], 1u);
+#endif // SIL_SS_PT_USE_OCTREE
 		cuda::atomic_add<CURRENT_DEV>(importances[min].irradiance, irradiance);
 		cuda::atomic_add<CURRENT_DEV>(importances[min].hitCounter, 1u);
 	}
 }
 
 inline CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
-											  const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint, const float irradiance) {
+#ifdef SIL_SS_PT_USE_OCTREE
+													 data_structs::DmOctree<float>& irradianceGrid,
+#else // SIL_SS_PT_USE_OCTREE
+													 data_structs::DmHashGrid<float>& irradianceGrid,
+#endif // SIL_SS_PT_USE_OCTREE
+													 const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint, const float irradiance) {
 	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
 	const u32 primIdx = vertexCount == 3u ? primId : (primId - polygon.numTriangles);
 
@@ -376,8 +408,14 @@ inline CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescri
 		}
 	}
 
-	if(!isnan(irradiance))
+	if(!isnan(irradiance)) {
+#ifdef SIL_SS_PT_USE_OCTREE
+		irradianceGrid.increase_count(polygon.vertices[min], polygon.normals[min], irradiance);
+#else // SIL_SS_PT_USE_OCTREE
+		irradianceGrid.increase_count(polygon.vertices[min], irradiance);
+#endif // SIL_SS_PT_USE_OCTREE
 		cuda::atomic_add<CURRENT_DEV>(importances[min].irradiance, irradiance);
+	}
 }
 
 inline CUDA_FUNCTION float weight_shadow(const float importance, const SilhouetteParameters& params) {
@@ -483,7 +521,16 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 											const SilhouetteParameters& params,
 											const Pixel& coord, math::Rng& rng,
 											Importances<CURRENT_DEV>** importances,
-											DeviceImportanceSums<CURRENT_DEV>* sums) {
+											DeviceImportanceSums<CURRENT_DEV>* sums,
+#ifdef SIL_SS_PT_USE_OCTREE
+											data_structs::DmOctree<float>& viewGrid,
+											data_structs::DmOctree<float>& irradianceGrid,
+											data_structs::DmOctree<i32>& irradianceCount) {
+#else // SIL_SS_PT_USE_OCTREE
+											data_structs::DmHashGrid<float>& viewGrid,
+											data_structs::DmHashGrid<float>& irradianceGrid,
+											data_structs::DmHashGrid<i32>& irradianceCount) {
+#endif // SIL_SS_PT_USE_OCTREE
 	Spectrum throughput{ ei::Vec3{1.0f} };
 	// We gotta keep track of our vertices
 	// TODO: flexible length!
@@ -550,8 +597,9 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 						const auto& hitId = vertices[pathLen].get_primitive_id();
 						const auto& lod = scene.lods[scene.lodIndices[hitId.instanceId]];
 						const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
-						record_direct_irradiance(lod.polygon, importances[scene.lodIndices[hitId.instanceId]], hitId.primId,
-													numVertices, vertices[pathLen].get_position(), params.lightWeight * weightedIrradianceLuminance);
+						record_direct_irradiance(lod.polygon, importances[scene.lodIndices[hitId.instanceId]], irradianceGrid,
+												 irradianceCount, hitId.primId, numVertices, vertices[pathLen].get_position(),
+												 params.lightWeight * weightedIrradianceLuminance);
 					}
 				} else if(pathLen == 1) {
 					//m_decimaters[scene.lodIndices[shadowHit.hitId.instanceId]]->record_shadow(get_luminance(throughput.weight * irradiance));
@@ -625,8 +673,10 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 		const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
 
 		if(params.show_view()) {
-			record_direct_hit(lod.polygon, importances[scene.lodIndices[hitId.instanceId]], hitId.primId, numVertices, vertices[pathLen].get_position(),
-							  -ei::dot(vertices[pathLen + 1].get_incident_direction(), vertices[pathLen + 1].get_normal()),
+			record_direct_hit(lod.polygon, importances[scene.lodIndices[hitId.instanceId]], viewGrid,
+							  hitId.primId, numVertices, vertices[pathLen + 1].get_position(),
+							  -ei::dot(vertices[pathLen + 1].get_incident_direction(),
+									   vertices[pathLen + 1].get_normal()),
 							  params.viewWeight * sharpness);
 		}
 
@@ -664,7 +714,7 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 
 			const float importance = get_luminance(irradiance) * (1.f - ei::abs(vertices[p].ext().outCos));
 			if(params.show_indirect()) {
-				record_indirect_irradiance(lod->polygon, importances[scene.lodIndices[hitId.instanceId]], hitId.primId,
+				record_indirect_irradiance(lod->polygon, importances[scene.lodIndices[hitId.instanceId]], irradianceGrid, hitId.primId,
 										   numVertices, vertices[p].get_position(), params.lightWeight * importance);
 			}
 		}
@@ -705,11 +755,25 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 						record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx],
 															  ext.silhouetteVerticesFirst[i],
 															  silhouetteImportance);
+#ifdef SIL_SS_PT_USE_OCTREE
+						viewGrid.increase_count(scene.lods[lodIdx].polygon.vertices[ext.silhouetteVerticesFirst[i]],
+												scene.lods[lodIdx].polygon.normals[ext.silhouetteVerticesFirst[i]],
+												silhouetteImportance);
+#else // SIL_SS_PT_USE_OCTREE
+						viewGrid.increase_count(scene.lods[lodIdx].polygon.vertices[ext.silhouetteVerticesFirst[i]], silhouetteImportance);
+#endif // SIL_SS_PT_USE_OCTREE
 						if(ext.silhouetteVerticesSecond[i] >= 0 && ext.silhouetteVerticesFirst[i] != ext.silhouetteVerticesSecond[i]) {
 							mAssert(static_cast<u32>(ext.silhouetteVerticesSecond[i]) < scene.lods[lodIdx].polygon.numVertices);
 							record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx],
 																  ext.silhouetteVerticesSecond[i],
 																  silhouetteImportance);
+#ifdef SIL_SS_PT_USE_OCTREE
+							viewGrid.increase_count(scene.lods[lodIdx].polygon.vertices[ext.silhouetteVerticesSecond[i]],
+													scene.lods[lodIdx].polygon.normals[ext.silhouetteVerticesSecond[i]],
+													silhouetteImportance);
+#else // SIL_SS_PT_USE_OCTREE
+							viewGrid.increase_count(scene.lods[lodIdx].polygon.vertices[ext.silhouetteVerticesSecond[i]], silhouetteImportance);
+#endif // SIL_SS_PT_USE_OCTREE
 						}
 					}
 				}
@@ -723,11 +787,11 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 }
 
 inline CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
-										 const scene::SceneDescriptor<CURRENT_DEV>& scene,
-										 const Pixel& coord, math::Rng& rng,
-										 Importances<CURRENT_DEV>** importances,
-										 DeviceImportanceSums<CURRENT_DEV>* sums,
-										 const float maxImportance) {
+												const scene::SceneDescriptor<CURRENT_DEV>& scene,
+												const Pixel& coord, math::Rng& rng,
+												Importances<CURRENT_DEV>** importances,
+												DeviceImportanceSums<CURRENT_DEV>* sums,
+												const float maxImportance) {
 	Spectrum throughput{ ei::Vec3{1.0f} };
 	float guideWeight = 1.0f;
 	PtPathVertex vertex;

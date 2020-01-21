@@ -2,6 +2,8 @@
 
 #include "silhouette_pt_common.hpp"
 #include "util/string_view.hpp"
+#include "core/data_structs/dm_hashgrid.hpp"
+#include "core/data_structs/dm_octree.hpp"
 #include "core/memory/residency.hpp"
 #include "core/scene/lod.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
@@ -32,6 +34,14 @@ public:
 	ArrayDevHandle_t<dev, Importances<dev>> start_iteration();
 	// Updates the importance densities of the decimated mesh
 	void update_importance_density(const ImportanceSums& impSums);
+	void update_importance_density(const ImportanceSums& impSums,
+								   const data_structs::DmOctree<float>& viewGrid,
+								   const data_structs::DmOctree<float>& irradianceGrid,
+								   const data_structs::DmOctree<i32>& irradianceCount);
+	void update_importance_density(const ImportanceSums& impSums,
+								   const data_structs::DmHashGrid<float>& viewGrid,
+								   const data_structs::DmHashGrid<float>& irradianceGrid,
+								   const data_structs::DmHashGrid<i32>& irradianceCount);
 	/* Updates the decimated mesh by collapsing and uncollapsing vertices.
 	 * The specified threshold determines when a vertex collapses or gets restored
 	 */

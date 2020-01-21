@@ -3,6 +3,8 @@
 #include "core/renderer/path_util.hpp"
 #include "core/cuda/cuda_utils.hpp"
 
+#define SIL_SS_PT_USE_OCTREE
+
 namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette { namespace pt {
 
 template < Device dev >

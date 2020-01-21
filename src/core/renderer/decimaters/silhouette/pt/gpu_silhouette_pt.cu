@@ -22,7 +22,7 @@ __global__ static void silhouette_kernel(pt::SilhouetteTargets::RenderBufferType
 
 	math::Rng rng(seeds[pixel]);
 #ifdef __CUDA_ARCH__
-	sample_importance(outputBuffer, *scene, params, coord, rng, importances, sums);
+	//sample_importance(outputBuffer, *scene, params, coord, rng, importances, sums, impGrid);
 #endif // __CUDA_ARCH__
 }
 
@@ -42,7 +42,7 @@ __global__ static void impvis_kernel(pt::SilhouetteTargets::RenderBufferType<Dev
 
 	math::Rng rng(seeds[pixel]);
 #ifdef __CUDA_ARCH__
-	sample_vis_importance(outputBuffer, *scene, coord, rng, importances, sums, maxImportance);
+	//sample_vis_importance(outputBuffer, *scene, coord, rng, importances, sums, maxImportance, impGrid);
 #endif // __CUDA_ARCH__
 }
 

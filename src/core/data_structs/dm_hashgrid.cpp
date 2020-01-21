@@ -143,8 +143,11 @@ T DmHashGrid<T>::get_count(const ei::UVec3& gridPos) const {
 	return c;
 }
 
+template class DmHashGrid<i32>;
 template class DmHashGrid<u32>;
 template class DmHashGrid<float>;
+template float DmHashGrid<i32>::get_density_interpolated<true>(const ei::Vec3&, const ei::Vec3&, ei::Vec3*) const;
+template float DmHashGrid<i32>::get_density_interpolated<false>(const ei::Vec3&, const ei::Vec3&, ei::Vec3*) const;
 template float DmHashGrid<u32>::get_density_interpolated<true>(const ei::Vec3&, const ei::Vec3&, ei::Vec3*) const;
 template float DmHashGrid<u32>::get_density_interpolated<false>(const ei::Vec3&, const ei::Vec3&, ei::Vec3*) const;
 template float DmHashGrid<float>::get_density_interpolated<true>(const ei::Vec3&, const ei::Vec3&, ei::Vec3*) const;

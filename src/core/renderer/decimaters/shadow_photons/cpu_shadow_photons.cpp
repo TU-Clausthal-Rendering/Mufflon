@@ -415,7 +415,7 @@ bool ShadowPhotonVisualizer::trace_shadow_silhouette(const ei::Ray& shadowRay, c
 float ShadowPhotonVisualizer::query_photon_density(const SpvPathVertex& vertex, const std::size_t lightIndex,
 												   ei::Vec3* gradient) const {
 	switch(m_params.interpolation) {
-		case PInterpolate::Values::LINEAR:
+		/*case PInterpolate::Values::LINEAR:
 			if(m_params.mode == PSpvMode::Values::HASHGRID)
 				return m_densityPhotonsHashgrid[lightIndex].get_density_interpolated<false>(vertex.get_position(),
 																							vertex.get_normal(), gradient);
@@ -432,7 +432,7 @@ float ShadowPhotonVisualizer::query_photon_density(const SpvPathVertex& vertex, 
 				return m_densityPhotonsOctree[lightIndex].get_density_interpolated<true>(vertex.get_position(),
 																						 vertex.get_normal(), gradient);
 			else
-				return 0.f;
+				return 0.f;*/
 		default:
 			if(m_params.mode == PSpvMode::Values::HASHGRID)
 				return m_densityPhotonsHashgrid[lightIndex].get_density(vertex.get_position(),
@@ -448,7 +448,7 @@ float ShadowPhotonVisualizer::query_photon_density(const SpvPathVertex& vertex, 
 float ShadowPhotonVisualizer::query_shadow_photon_density(const SpvPathVertex& vertex, const std::size_t lightIndex,
 														  ei::Vec3* gradient) const {
 	switch(m_params.interpolation) {
-		case PInterpolate::Values::LINEAR:
+		/*case PInterpolate::Values::LINEAR:
 			if(m_params.mode == PSpvMode::Values::HASHGRID)
 				return m_densityShadowPhotonsHashgrid[lightIndex].get_density_interpolated<false>(vertex.get_position(),
 																								  vertex.get_normal(), gradient);
@@ -465,7 +465,7 @@ float ShadowPhotonVisualizer::query_shadow_photon_density(const SpvPathVertex& v
 				return m_densityShadowPhotonsOctree[lightIndex].get_density_interpolated<true>(vertex.get_position(),
 																							   vertex.get_normal(), gradient);
 			else
-				return 0.f;
+				return 0.f;*/
 		default:
 			if(m_params.mode == PSpvMode::Values::HASHGRID)
 				return m_densityShadowPhotonsHashgrid[lightIndex].get_density(vertex.get_position(),
