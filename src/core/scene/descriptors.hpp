@@ -131,6 +131,7 @@ struct SceneDescriptor : public InstanceData<dev> {
 	CameraDescriptor camera;
 	u32 numLods;
 	i32 numInstances;
+	i32 activeInstances;
 	u32 validInstanceIndex;	// An index of a valid instance which should be used for eg. medium checks
 	float diagSize;	// len(aabb.max - aabb.min)
 	ei::Box aabb;	// Scene-wide bounding box

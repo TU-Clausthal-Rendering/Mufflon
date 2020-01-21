@@ -394,7 +394,7 @@ RayIntersectionResult first_intersection(
 	i32 primOffset = 0;//TODO: can be removed by simply increasing nodeAddr
 
 	// No Scene-BVH => got to object-space directly
-	if(scene.numInstances == 1) {
+	if(scene.activeInstances == 1) {
 		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, hitT, obj, currentBvh))
 			primCount = 0; // No hit of the entire scene, skip the upcoming loop
 		currentInstanceId = 0;
@@ -497,7 +497,7 @@ RayIntersectionResult first_intersection(
 	mAssert((hitInstanceId != IGNORE_ID && hitPrimId != IGNORE_ID) || ei::approx(hitT, tmax));
 
 	/* TEST CODE WHICH MAKES A LINEAR TEST (without the BVH)
-	for(int i = 0; i < scene.numInstances; ++i) {
+	for(int i = 0; i < scene.activeInstances; ++i) {
 		auto& obj = scene.lods[ scene.lodIndices[i] ];
 		ei::Ray transRay = { transform(ray.origin, scene.worldToInstance[i]),
 							 normalize(transformDir(ray.direction, scene.worldToInstance[i])) };
@@ -653,7 +653,7 @@ bool any_intersection(
 	i32 primOffset = 0;//TODO: can be removed by simply increasing nodeAddr
 
 	// No Scene-BVH => got to object-space directly
-	if(scene.numInstances == 1) {
+	if(scene.activeInstances == 1) {
 		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, tmax, obj, currentBvh))
 			return false; // No hit of the entire scene
 		currentInstanceId = 0;
