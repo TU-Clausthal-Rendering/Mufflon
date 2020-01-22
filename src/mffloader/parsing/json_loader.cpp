@@ -21,7 +21,7 @@ namespace {
 // Reads a file completely and returns the string containing all bytes
 std::string read_file(fs::path path) {
 	auto scope = Profiler::loader().start<CpuProfileState>("JSON read_file", ProfileLevel::HIGH);
-	logPedantic("[read_file] Loading JSON file '", path.string(), "' into RAM");
+	logPedantic("[read_file] Loading JSON file '", path.u8string(), "' into RAM");
 	const std::uintmax_t fileSize = fs::file_size(path);
 	std::string fileString;
 	fileString.resize(fileSize);
@@ -29,7 +29,7 @@ std::string read_file(fs::path path) {
 	std::ifstream file(path, std::ios::binary);
 	file.read(&fileString[0u], fileSize);
 	if(file.gcount() != static_cast<std::streamsize>(fileSize))
-		logWarning("[read_file] File '", path.string(), "'not read completely");
+		logWarning("[read_file] File '", path.u8string(), "'not read completely");
 	// Finalize the string
 	fileString[file.gcount()] = '\0';
 	return fileString;
@@ -127,13 +127,13 @@ TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, 
 	if (!path.is_absolute())
 		path = m_filePath.parent_path() / name;
 	if (!fs::exists(path))
-		throw std::runtime_error("Cannot find texture file '" + path.string() + "'");
+		throw std::runtime_error("Cannot find texture file '" + path.u8string() + "'");
 	path = fs::canonical(path);
 	TextureHdl tex;
 	if(targetFormat.has_value())
-		tex = world_add_texture_converted(m_mffInstHdl, path.string().c_str(), sampling, targetFormat.value(), mipmapType, callback, userParams);
+		tex = world_add_texture_converted(m_mffInstHdl, path.u8string().c_str(), sampling, targetFormat.value(), mipmapType, callback, userParams);
 	else
-		tex = world_add_texture(m_mffInstHdl, path.string().c_str(), sampling, mipmapType, callback, userParams);
+		tex = world_add_texture(m_mffInstHdl, path.u8string().c_str(), sampling, mipmapType, callback, userParams);
 	if(tex == nullptr)
 		throw std::runtime_error("Failed to load texture '" + std::string(name) + "'");
 	return tex;
@@ -146,11 +146,11 @@ std::pair<TextureHdl, TextureHdl> JsonLoader::load_displacement_map(const char* 
 	if(!path.is_absolute())
 		path = m_filePath.parent_path() / name;
 	if(!fs::exists(path))
-		throw std::runtime_error("Cannot find texture file '" + path.string() + "'");
+		throw std::runtime_error("Cannot find texture file '" + path.u8string() + "'");
 	path = fs::canonical(path);
 	TextureHdl tex = nullptr;
 	TextureHdl texMips = nullptr;
-	if(!world_add_displacement_map(m_mffInstHdl, path.string().c_str(), &tex, &texMips) || tex == nullptr || texMips == nullptr)
+	if(!world_add_displacement_map(m_mffInstHdl, path.u8string().c_str(), &tex, &texMips) || tex == nullptr || texMips == nullptr)
 		throw std::runtime_error("Failed to add displacement map '" + std::string(name) + "'");
 	return { tex, texMips };
 }
@@ -995,7 +995,7 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_file");
 
 	this->clear_state();
-	logInfo("[JsonLoader::load_file] Parsing scene file '", m_filePath.string(), "'");
+	logInfo("[JsonLoader::load_file] Parsing scene file '", m_filePath.u8string(), "'");
 
 	sprintf(m_loadingStage.data(), "Loading JSON%c", '\0');
 	// JSON text
@@ -1027,14 +1027,14 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 	binaryFile = read<const char*>(m_state, get(m_state, document, "binary"));
 	if(binaryFile.empty())
 		throw std::runtime_error("Scene file has an empty binary file path");
-	logInfo("[JsonLoader::load_file] Detected binary file path '", binaryFile.string(), "'");
+	logInfo("[JsonLoader::load_file] Detected binary file path '", binaryFile.u8string(), "'");
 	// Make the file path absolute
 	if(binaryFile.is_relative())
 		binaryFile = fs::canonical(m_filePath.parent_path() / binaryFile);
 	if(!fs::exists(binaryFile)) {
 		logError("[JsonLoader::load_file] Scene file: specifies a binary file that doesn't exist ('",
-				 binaryFile.string(), "'");
-		throw std::runtime_error("Binary file '" + binaryFile.string() + "' does not exist");
+				 binaryFile.u8string(), "'");
+		throw std::runtime_error("Binary file '" + binaryFile.u8string() + "' does not exist");
 	}
 	// Tessellation level
 	const float initTessLevel = read_opt<float>(m_state, document, "initTessellationLevel", 0u);

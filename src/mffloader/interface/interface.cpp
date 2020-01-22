@@ -106,11 +106,11 @@ LoaderStatus loader_load_json(MufflonLoaderInstanceHdl hdl, const char* path) {
 
 	// Perform some error checking
 	if (!fs::exists(filePath)) {
-		logError("[", FUNCTION_NAME, "] File '", fs::canonical(filePath).string(), "' does not exist");
+		logError("[", FUNCTION_NAME, "] File '", fs::canonical(filePath).u8string(), "' does not exist");
 		return LoaderStatus::LOADER_ERROR;
 	}
 	if (fs::is_directory(filePath)) {
-		logError("[", FUNCTION_NAME, "] Path '", fs::canonical(filePath).string(), "' is a directory, not a file");
+		logError("[", FUNCTION_NAME, "] Path '", fs::canonical(filePath).u8string(), "' is a directory, not a file");
 		return LoaderStatus::LOADER_ERROR;
 	}
 	if (filePath.extension() != ".json")
@@ -145,12 +145,12 @@ LoaderStatus loader_save_scene(MufflonLoaderInstanceHdl hdl, const char* path) {
 	if (fs::exists(filePath)) {
 		filePath.replace_extension(".mff");
 		if (fs::is_directory(filePath)) {
-			logError("[", FUNCTION_NAME, "] Path '", filePath.string(), "' is already a directory");
+			logError("[", FUNCTION_NAME, "] Path '", filePath.u8string(), "' is already a directory");
 			return LoaderStatus::LOADER_ERROR;
 		}
 		filePath.replace_extension(".json");
 		if (fs::is_directory(filePath)) {
-			logError("[", FUNCTION_NAME, "] Path '", filePath.string(), "' is already a directory");
+			logError("[", FUNCTION_NAME, "] Path '", filePath.u8string(), "' is already a directory");
 			return LoaderStatus::LOADER_ERROR;
 		}
 	}

@@ -15,7 +15,7 @@ public:
 
 	SceneExporter(MufflonInstanceHdl mffInstHdl, fs::path fileDestinationPath, fs::path mffPath) :
 		m_mffInstHdl{ mffInstHdl },
-		m_fileDestinationPath(fs::canonical(fileDestinationPath)),
+		m_fileDestinationPath(fileDestinationPath),
 		m_mffPath(mffPath)
 	{}
 

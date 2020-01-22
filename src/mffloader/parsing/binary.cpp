@@ -13,11 +13,16 @@ namespace mff_loader::binary {
 
 using namespace mufflon;
 
-BinaryLoader::FileDescriptor::FileDescriptor(fs::path file, const char* mode) :
-	m_desc(std::fopen(file.string().c_str(), mode)) {
+BinaryLoader::FileDescriptor::FileDescriptor(fs::path file) :
+#ifdef _WIN32
+	m_desc(_wfopen(file.wstring().c_str(), L"rb"))
+#else // _WIN32
+	m_desc(std::fopen(file.u8string().c_str(), "rb"))
+#endif // _WIN32
+{
 	if(m_desc == nullptr)
-		throw std::ios_base::failure("Failed to open file '" + file.string()
-									 + "' with mode '" + mode + "'");
+		throw std::ios_base::failure("Failed to open file '" + file.u8string()
+									 + "' with mode 'rb'");
 }
 
 BinaryLoader::FileDescriptor::FileDescriptor(FileDescriptor&& other) :
@@ -870,19 +875,19 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 	m_filePath = file;
 
 	for(u32 i = 0u; i < 3u; ++i)
-		m_fileDescs[i] = FileDescriptor{ m_filePath, "rb" };
+		m_fileDescs[i] = FileDescriptor{ m_filePath };
 
 	if(!fs::exists(m_filePath))
-		throw std::runtime_error("Binary file '" + m_filePath.string() + "' doesn't exist");
+		throw std::runtime_error("Binary file '" + m_filePath.u8string() + "' doesn't exist");
 
 	logPedantic("[BinaryLoader::load_lod] Loading LoD ", lod, " for object ID ", objId,
-			" from file '", m_filePath.string(), "'");
+			" from file '", m_filePath.u8string(), "'");
 
 	try {
 		// Open the binary file and enable exception management
 		m_fileStream = std::ifstream(m_filePath, std::ios_base::binary);
 		if(m_fileStream.bad() || m_fileStream.fail())
-			throw std::runtime_error("Failed to open binary file '" + m_filePath.string() + "\'");
+			throw std::runtime_error("Failed to open binary file '" + m_filePath.u8string() + "\'");
 		m_fileStream.exceptions(std::ifstream::failbit);
 		m_fileStart = m_fileStream.tellg();
 
@@ -950,21 +955,21 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 	m_keepTrackOfAabb = keepTrackOfAabb;
 	m_filePath = std::move(file);
 	if(!fs::exists(m_filePath))
-		throw std::runtime_error("Binary file '" + m_filePath.string() + "' doesn't exist");
+		throw std::runtime_error("Binary file '" + m_filePath.u8string() + "' doesn't exist");
 	m_aabb.min = ei::Vec3{ 1e30f };
 	m_aabb.max = ei::Vec3{ -1e30f };
 	sprintf(m_loadingStage.data(), "Loading binary file%c", '\0');
-	logInfo("[BinaryLoader::load_file] Loading binary file '", m_filePath.string(), "'");
+	logInfo("[BinaryLoader::load_file] Loading binary file '", m_filePath.u8string(), "'");
 	try {
 		// Open the binary file and enable exception management
 		m_fileStream = std::ifstream(m_filePath, std::ios_base::binary);
 		if(m_fileStream.bad() || m_fileStream.fail())
-			throw std::runtime_error("Failed to open binary file '" + m_filePath.string() + "\'");
+			throw std::runtime_error("Failed to open binary file '" + m_filePath.u8string() + "\'");
 		m_fileStream.exceptions(std::ifstream::failbit);
 		// Needed to get a C file descriptor offset
 		m_fileStart = m_fileStream.tellg();
 		for(u32 i = 0u; i < 3u; ++i)
-			m_fileDescs[i] = FileDescriptor{ m_filePath, "rb" };
+			m_fileDescs[i] = FileDescriptor{ m_filePath };
 
 		if(m_abort)
 			return false;

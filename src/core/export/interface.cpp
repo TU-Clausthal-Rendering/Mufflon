@@ -1840,15 +1840,15 @@ TextureHdl world_add_texture(MufflonInstanceHdl instHdl, const char* path, Textu
 	TextureData texData{};
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
-			if(plugin.can_load_format(filePath.extension().string())) {
-				if(plugin.load(filePath.string(), &texData))
+			if(plugin.can_load_format(filePath.extension().u8string())) {
+				if(plugin.load(filePath.u8string(), &texData))
 					break;
 			}
 		}
 	}
 	if(texData.data == nullptr) {
 		logError("[", FUNCTION_NAME, "] No plugin could load texture '",
-				 filePath.string(), "'");
+				 filePath.u8string(), "'");
 		return nullptr;
 	}
 
@@ -1902,15 +1902,15 @@ TextureHdl world_add_texture_converted(MufflonInstanceHdl instHdl, const char* p
 	TextureData texData{};
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
-			if(plugin.can_load_format(filePath.extension().string())) {
-				if(plugin.load(filePath.string(), &texData))
+			if(plugin.can_load_format(filePath.extension().u8string())) {
+				if(plugin.load(filePath.u8string(), &texData))
 					break;
 			}
 		}
 	}
 	if(texData.data == nullptr) {
 		logError("[", FUNCTION_NAME, "] No plugin could load texture '",
-				 filePath.string(), "'");
+				 filePath.u8string(), "'");
 		return nullptr;
 	}
 
@@ -2027,15 +2027,15 @@ Boolean world_add_displacement_map(MufflonInstanceHdl instHdl, const char* path,
 	TextureData texData{};
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
-			if(plugin.can_load_format(filePath.extension().string())) {
-				if(plugin.load(filePath.string(), &texData))
+			if(plugin.can_load_format(filePath.extension().u8string())) {
+				if(plugin.load(filePath.u8string(), &texData))
 					break;
 			}
 		}
 	}
 	if(texData.data == nullptr) {
 		logError("[", FUNCTION_NAME, "] No plugin could load texture '",
-				 filePath.string(), "'");
+				 filePath.u8string(), "'");
 		return false;
 	}
 
@@ -3737,14 +3737,14 @@ Boolean render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename,
 		fileName = fs::absolute(fileName);
 
 	// Replace tags in the file name
-	const auto name = replace_screenshot_filename_tags(muffInst, fileName.stem().string(), targetName, variance);
-	fileName = fileName.parent_path() / fs::u8path(name + fileName.extension().string());
+	const auto name = replace_screenshot_filename_tags(muffInst, fileName.stem().u8string(), targetName, variance);
+	fileName = fileName.parent_path() / fs::u8path(name + fileName.extension().u8string());
 
 	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
 	fs::path directory = fileName.parent_path();
 	if(!fs::exists(directory))
 		if(!fs::create_directories(directory))
-			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
+			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.u8string(),
 					   "; the screenshot possibly may not be created");
 
 	auto data = muffInst.imageOutput->get_data(targetName, variance);
@@ -3762,13 +3762,13 @@ Boolean render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename,
 
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
-			if(plugin.can_store_format(fileName.extension().string())) {
-				if(plugin.store(fileName.string(), &texData))
+			if(plugin.can_store_format(fileName.extension().u8string())) {
+				if(plugin.store(fileName.u8string(), &texData))
 					break;
 			}
 		}
 	}
-	logInfo("[", FUNCTION_NAME, "] Saved screenshot '", fileName.string(), "'");
+	logInfo("[", FUNCTION_NAME, "] Saved screenshot '", fileName.u8string(), "'");
 
 	return true;
 	CATCH_ALL(false)
@@ -3833,14 +3833,14 @@ Boolean render_save_denoised_radiance(MufflonInstanceHdl instHdl, const char* fi
 	if(!fileName.is_absolute())
 		fileName = fs::absolute(fileName);
 
-	const auto name = replace_screenshot_filename_tags(muffInst, fileName.stem().string(), "Radiance(denoised)", false);
-	fileName = fileName.parent_path() / fs::u8path(name + fileName.extension().string());
+	const auto name = replace_screenshot_filename_tags(muffInst, fileName.stem().u8string(), "Radiance(denoised)", false);
+	fileName = fileName.parent_path() / fs::u8path(name + fileName.extension().u8string());
 
 	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
 	fs::path directory = fileName.parent_path();
 	if(!fs::exists(directory))
 		if(!fs::create_directories(directory))
-			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
+			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.u8string(),
 					   "; the screenshot possibly may not be created");
 
 	const int numChannels = muffInst.imageOutput->get_num_channels("Radiance");
@@ -3855,14 +3855,14 @@ Boolean render_save_denoised_radiance(MufflonInstanceHdl instHdl, const char* fi
 
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
-			if(plugin.can_store_format(fileName.extension().string())) {
-				if(plugin.store(fileName.string(), &texData))
+			if(plugin.can_store_format(fileName.extension().u8string())) {
+				if(plugin.store(fileName.u8string(), &texData))
 					break;
 			}
 		}
 	}
 
-	logInfo("[", FUNCTION_NAME, "] Finished denoising '", fileName.string(), "'");
+	logInfo("[", FUNCTION_NAME, "] Finished denoising '", fileName.u8string(), "'");
 
 	return true;
 	CATCH_ALL(false)
@@ -4284,7 +4284,7 @@ Boolean core_set_logger(void(*logCallback)(const char*, int)) {
 		// Give the new logger a status report and set the plugin loggers
 		for(auto& plugin : s_plugins) {
 			logInfo("[", FUNCTION_NAME, "] Loaded texture plugin '",
-					plugin.get_path().string(), "'");
+					plugin.get_path().u8string(), "'");
 		}
 		int count = 0;
 		cuda::check_error(cudaGetDeviceCount(&count));
@@ -4357,7 +4357,7 @@ MufflonInstanceHdl mufflon_initialize() {
 					// add it as a usable plugin
 					if(plugin.is_loaded()) {
 						logInfo("[", FUNCTION_NAME, "] Loaded texture plugin '",
-								plugin.get_path().string(), "'");
+								plugin.get_path().u8string(), "'");
 						s_plugins.push_back(std::move(plugin));
 					}
 				}

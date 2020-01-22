@@ -26,7 +26,7 @@ Plugin::Plugin(fs::path path) :
 #endif // _WIN32
 		if(!is_loaded())
 			logError("[Plugin::Plugin] Failed to load plugin '",
-					 m_pluginPath.string(), "': ", get_last_error_message());
+					 m_pluginPath.u8string(), "': ", get_last_error_message());
 	}
 }
 
@@ -54,7 +54,7 @@ void Plugin::close() {
 		if(::dlclose(static_cast<HandleType>(m_handle)) != 0) {
 #endif // _WIN32
 			logError("[Plugin::close] Failed to free plugin '",
-					 m_pluginPath.string(), "': ", get_last_error_message());
+					 m_pluginPath.u8string(), "': ", get_last_error_message());
 		}
 		m_handle = nullptr;
 	}

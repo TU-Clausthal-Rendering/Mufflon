@@ -86,7 +86,7 @@ public:
 		m_binLoader{ m_mffInstHdl, m_loadingStage }
 	{
 		if(!fs::exists(m_filePath))
-			throw std::runtime_error("JSON file '" + m_filePath.string() + "' doesn't exist");
+			throw std::runtime_error("JSON file '" + m_filePath.u8string() + "' doesn't exist");
 		m_loadingStage.resize(1024);
 	}
 

@@ -181,7 +181,7 @@ void Profiler::save_current_state(StringView path) const {
 	std::ofstream fileStream(file);
 	if(fileStream.bad()) {
 		logError("[Profiler::save_current_state] could not open output file '",
-				 file.string(), "'");
+				 file.u8string(), "'");
 		return;
 	}
 	fileStream.exceptions(std::ios::failbit);
@@ -202,7 +202,7 @@ void Profiler::save_snapshots(StringView path) const {
 	std::ofstream fileStream(file);
 	if(fileStream.bad()) {
 		logError("[Profiler::save_snapshots] could not open output file '",
-				 file.string(), "'");
+				 file.u8string(), "'");
 		return;
 	}
 	fileStream.exceptions(std::ios::failbit);
@@ -223,7 +223,7 @@ void Profiler::save_total_and_snapshots(StringView path) const {
 	std::ofstream fileStream(file);
 	if(fileStream.bad()) {
 		logError("[Profiler::save_snapshots] could not open output file '",
-				 file.string(), "'");
+				 file.u8string(), "'");
 		return;
 	}
 	fileStream.exceptions(std::ios::failbit);

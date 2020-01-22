@@ -66,7 +66,7 @@ private:
 	class FileDescriptor {
 	public:
 		FileDescriptor() = default;
-		FileDescriptor(fs::path file, const char* mode);
+		FileDescriptor(fs::path file);
 		FileDescriptor(const FileDescriptor&) = delete;
 		FileDescriptor(FileDescriptor&&);
 		FileDescriptor& operator=(const FileDescriptor&) = delete;
