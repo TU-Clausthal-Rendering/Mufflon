@@ -395,11 +395,12 @@ RayIntersectionResult first_intersection(
 
 	// No Scene-BVH => got to object-space directly
 	if(scene.activeInstances == 1) {
-		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, hitT, obj, currentBvh))
+		if(!world_to_object_space(scene, scene.validInstanceIndex, fray, currentRay, currentTScale, hitT, obj, currentBvh))
 			primCount = 0; // No hit of the entire scene, skip the upcoming loop
-		currentInstanceId = 0;
-		if(obj && obj->numPrimitives == 1)
+		currentInstanceId = scene.validInstanceIndex;
+		if(obj && obj->numPrimitives == 1) {
 			primCount = 1;
+		}
 	}
 
 	// Traversal loop.
@@ -654,7 +655,7 @@ bool any_intersection(
 
 	// No Scene-BVH => got to object-space directly
 	if(scene.activeInstances == 1) {
-		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, tmax, obj, currentBvh))
+		if(!world_to_object_space(scene, scene.validInstanceIndex, fray, currentRay, currentTScale, tmax, obj, currentBvh))
 			return false; // No hit of the entire scene
 		currentInstanceId = 0;
 		if(obj != nullptr && obj->numPrimitives == 1)
