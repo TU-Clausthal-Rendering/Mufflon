@@ -39,24 +39,33 @@ private:
 		float maxImportance = 0.f;
 	};
 
+	enum class Stage {
+		NONE,
+		INITIALIZED,
+		IMPORTANCE_GATHERED
+	};
+
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 	void gather_importance();
 	void update_reduction_factors();
 	void initialize_decimaters();
 	void compute_max_importance();
-	void display_importance();
+	void display_importance(const bool accumulated = false);
 
 	pt::SilhouetteParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
 
-	std::vector<std::unique_ptr<pt::ImportanceDecimater<Device::CPU>>> m_decimaters;
+	unique_device_ptr<Device::CPU, silhouette::pt::Importances<Device::CPU>[]> m_importanceBuffer;
+	unique_device_ptr<Device::CPU, silhouette::pt::Importances<Device::CPU>[]> m_accumImportanceBuffer;
+	std::vector<std::unique_ptr<pt::ImportanceDecimater>> m_decimaters;
 	unique_device_ptr<Device::CPU, ArrayDevHandle_t<Device::CPU, silhouette::pt::Importances<Device::CPU>>[]> m_importances;
+	unique_device_ptr<Device::CPU, ArrayDevHandle_t<Device::CPU, silhouette::pt::Importances<Device::CPU>>[]> m_accumImportances;
 	std::vector<PerFrameData> m_perFrameData;
 	std::vector<double> m_remainingVertexFactor;
 
-	// Superfluous
-	u32 m_currentDecimationIteration = 0u;
+	Stage m_stage = Stage::NONE;
+	std::vector<bool> m_reduced;
 };
 
 } // namespace mufflon::renderer::decimaters::animation

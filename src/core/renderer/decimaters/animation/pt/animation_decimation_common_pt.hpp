@@ -10,14 +10,13 @@
 
 namespace mufflon::renderer::decimaters::animation::pt {
 
-template < Device dev >
 class ImportanceDecimater {
 public:
 	using Mesh = scene::geometry::PolygonMeshType;
 	using VertexHandle = typename Mesh::VertexHandle;
-	static constexpr Device DEVICE = dev;
+	static constexpr Device DEVICE = Device::CPU;
 
-	ImportanceDecimater(StringView objectName,
+	ImportanceDecimater(StringView objectName, ArrayDevHandle_t<DEVICE, silhouette::pt::Importances<DEVICE>> impBuffer,
 						scene::Lod& original, scene::Lod& decimated,
 						const std::size_t initialCollapses,
 						const u32 windowSize,
@@ -29,10 +28,8 @@ public:
 	ImportanceDecimater& operator=(ImportanceDecimater&&) = delete;
 	~ImportanceDecimater();
 
-	void copy_back_normalized_importance();
-
 	// Resizes the buffers properly
-	ArrayDevHandle_t<dev, silhouette::pt::Importances<dev>> start_iteration();
+	ArrayDevHandle_t<DEVICE, silhouette::pt::Importances<DEVICE>> start_iteration();
 	// Updates the importance densities of the decimated mesh
 	void update_importance_density(const silhouette::pt::ImportanceSums& impSums);
 	// Uploads the importance with a given function for inter-frame coherency
@@ -45,6 +42,9 @@ public:
 	// Functions for querying internal state
 	float get_current_max_importance() const;
 	double get_importance_sum(const std::size_t index) const noexcept { return m_importanceSum[index]; }
+	float get_accumulated_importance(const scene::geometry::PolygonMeshType::VertexHandle vertex) {
+		return m_originalMesh.property(m_accumulatedImportanceDensity, vertex);
+	}
 
 	std::size_t get_original_vertex_count() const noexcept;
 	std::size_t get_decimated_vertex_count() const noexcept;
@@ -53,7 +53,6 @@ private:
 	// Returns the vertex handle in the original mesh
 	VertexHandle get_original_vertex_handle(const VertexHandle decimatedHandle) const;
 	void decimate_with_error_quadrics(const std::size_t collapses);
-	void pull_importance_from_device();
 
 	// Recomputes normals for decimated mesh
 	void recompute_geometric_vertex_normals();
@@ -71,8 +70,8 @@ private:
 
 	// General stuff
 	// Each mesh requires an importance buffer per animation frame in the sliding window
-	std::vector<unique_device_ptr<dev, silhouette::pt::Importances<dev>[]>> m_devImportances;	// Buffer on the device
-	std::vector<std::unique_ptr<silhouette::pt::Importances<dev>[]>> m_importances;							// Buffer for copying from device
+	ArrayDevHandle_t<DEVICE, silhouette::pt::Importances<DEVICE>> m_importanceBuffer;
+	ArrayDevHandle_t<DEVICE, silhouette::pt::Importances<DEVICE>> m_currImpBuffer;		// Slice within importanceBuffer for current iteration
 	// Decimated mesh properties
 	OpenMesh::VPropHandleT<VertexHandle> m_originalVertex;			// Vertex handle in the original mesh
 	// Original mesh properties

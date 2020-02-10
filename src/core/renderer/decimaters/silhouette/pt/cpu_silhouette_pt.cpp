@@ -105,17 +105,6 @@ void CpuShadowSilhouettesPT::iterate() {
 			m_importanceSums[i].shadowSilhouetteImportance.store(0.f);
 		}
 
-#ifdef SIL_SS_PT_USE_OCTREE
-		m_viewGrid = std::make_unique<data_structs::DmOctree<float>>(m_sceneDesc.aabb, 1024 * 1024 * 4, 8.0f, true);
-		m_irradianceGrid = std::make_unique<data_structs::DmOctree<float>>(m_sceneDesc.aabb, 1024 * 1024 * 4, 8.0f, true);
-		m_irradianceCount = std::make_unique<data_structs::DmOctree<i32>>(m_sceneDesc.aabb, 1024 * 1024 * 4, 8.0f, true);
-#else // SIL_SS_PT_USE_OCTREE
-		const auto cell_size = 0.0005f * m_sceneDesc.diagSize;
-		m_viewGrid.set_cell_size(cell_size);
-		m_irradianceGrid.set_cell_size(cell_size);
-		m_irradianceCount.set_cell_size(cell_size);
-#endif // SIL_SS_PT_USE_OCTREE
-
 		gather_importance();
 
 		if(m_decimaters.size() == 0u)
@@ -159,12 +148,7 @@ void CpuShadowSilhouettesPT::gather_importance() {
 			const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 			scene::PrimitiveHandle shadowPrim;
 			silhouette::sample_importance(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel],
-										  m_importances.get(), m_importanceSums.get(),
-#ifdef SIL_SS_PT_USE_OCTREE
-										  *m_viewGrid, *m_irradianceGrid, *m_irradianceCount);
-#else // SIL_SS_PT_USE_OCTREE
-										  m_viewGrid, m_irradianceGrid, m_irradianceCount);
-#endif // SIL_SS_PT_USE_OCTREE
+										  m_importances.get(), m_importanceSums.get());
 		}
 		logPedantic("Finished importance iteration (", iter + 1, " of ", m_params.importanceIterations, ")");
 	}
@@ -246,12 +230,7 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 		// Do not reduce anything
 		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 			ImportanceSums sums{ m_importanceSums[i].shadowImportance, m_importanceSums[i].shadowSilhouetteImportance };
-			m_decimaters[i]->update_importance_density(sums,
-#ifdef SIL_SS_PT_USE_OCTREE
-													   *m_viewGrid, *m_irradianceGrid, *m_irradianceCount);
-#else // SIL_SS_PT_USE_OCTREE
-													   m_viewGrid, m_irradianceGrid, m_irradianceCount);
-#endif // SIL_SS_PT_USE_OCTREE
+			m_decimaters[i]->update_importance_density(sums);
 			m_remainingVertexFactor.push_back(1.0);
 		}
 		return;
@@ -261,12 +240,7 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 	for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 		auto& decimater = m_decimaters[i];
 		ImportanceSums sums{ m_importanceSums[i].shadowImportance, m_importanceSums[i].shadowSilhouetteImportance };
-		m_decimaters[i]->update_importance_density(sums,
-#ifdef SIL_SS_PT_USE_OCTREE
-												   *m_viewGrid, *m_irradianceGrid, *m_irradianceCount);
-#else // SIL_SS_PT_USE_OCTREE
-												   m_viewGrid, m_irradianceGrid, m_irradianceCount);
-#endif // SIL_SS_PT_USE_OCTREE
+		m_decimaters[i]->update_importance_density(sums);
 		if(decimater->get_original_vertex_count() > m_params.threshold) {
 			m_remainingVertexFactor.push_back(decimater->get_importance_sum());
 			expectedVertexCount += (1.f - m_params.reduction) * decimater->get_original_vertex_count();

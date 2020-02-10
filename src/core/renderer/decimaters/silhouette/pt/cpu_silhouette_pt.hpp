@@ -52,16 +52,6 @@ private:
 	unique_device_ptr<Device::CPU, pt::DeviceImportanceSums<Device::CPU>[]> m_importanceSums;
 	std::vector<double> m_remainingVertexFactor;
 
-#ifdef SIL_SS_PT_USE_OCTREE
-	std::unique_ptr<data_structs::DmOctree<float>> m_viewGrid{};
-	std::unique_ptr<data_structs::DmOctree<float>> m_irradianceGrid{ };
-	std::unique_ptr<data_structs::DmOctree<i32>> m_irradianceCount{};
-#else // SIL_SS_PT_USE_OCTREE
-	data_structs::DmHashGrid<float> m_viewGrid{ 1024 * 1024 * 4 };
-	data_structs::DmHashGrid<float> m_irradianceGrid{ 1024 * 1024 * 4 };
-	data_structs::DmHashGrid<i32> m_irradianceCount{ 1024 * 1024 * 4 };
-#endif // SIL_SS_PT_USE_OCTREE
-
 	// Superfluous
 	u32 m_currentDecimationIteration = 0u;
 };

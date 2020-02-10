@@ -41,22 +41,23 @@ void CpuShadowSilhouettesPT::pre_reset() {
 	if((get_reset_event() & ResetEvent::CAMERA) != ResetEvent::NONE || get_reset_event().resolution_changed())
 		init_rngs(m_outputBuffer.get_num_pixels());
 
-	if((get_reset_event() & ResetEvent::SCENARIO) != ResetEvent::NONE && m_currentDecimationIteration != 0u) {
+	if((get_reset_event() & ResetEvent::SCENARIO) != ResetEvent::NONE && m_stage == Stage::IMPORTANCE_GATHERED) {
 		// At least activate the created LoDs
-		for(auto& obj : m_currentScene->get_objects()) {
+		/*for(auto& obj : m_currentScene->get_objects()) {
 			const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count() - 1u);
 			// TODO: this reeeeally breaks instancing
 			m_world.get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
-		}
+		}*/
 	}
 
-	if(get_reset_event() & ResetEvent::PARAMETER)
-		m_currentDecimationIteration = 0u;
+	if(get_reset_event() & ResetEvent::PARAMETER && !(get_reset_event() & ResetEvent::RENDERER_ENABLE))
+		m_stage = Stage::NONE;
 
 	// Initialize the decimaters
 	// TODO: how to deal with instancing
-	if(m_currentDecimationIteration == 0u) {
+	if(m_stage == Stage::NONE) {
 		this->initialize_decimaters();
+		m_stage = Stage::INITIALIZED;
 	}
 	
 	RendererBase<Device::CPU, silhouette::pt::SilhouetteTargets>::pre_reset();
@@ -64,20 +65,19 @@ void CpuShadowSilhouettesPT::pre_reset() {
 
 void CpuShadowSilhouettesPT::on_world_clearing() {
 	m_decimaters.clear();
-	m_currentDecimationIteration = 0u;
+	m_stage = Stage::NONE;
 }
 
 void CpuShadowSilhouettesPT::on_animation_frame_changed(const u32 from, const u32 to) {
-	m_currentDecimationIteration = std::numeric_limits<u32>::max();
+	//m_currentDecimationIteration = std::numeric_limits<u32>::max();
 }
 
 void CpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
-	if((int)m_currentDecimationIteration == m_params.decimationIterations) {
-		// Finalize the decimation process
-		logInfo("Finished decimation process");
-		++m_currentDecimationIteration;
-		this->on_manual_reset();
-	} else if((int)m_currentDecimationIteration < m_params.decimationIterations) {
+	if(m_stage == Stage::INITIALIZED && (m_world.get_frame_current() + 1u) == m_world.get_frame_count()) {
+		logInfo("Finished importance acquisition");
+		m_stage = Stage::IMPORTANCE_GATHERED;
+		m_reduced = std::vector<bool>(m_world.get_frame_count(), false);
+	} else if(m_stage == Stage::IMPORTANCE_GATHERED && !m_reduced[m_world.get_frame_current()]) {
 		logInfo("Performing decimation iteration...");
 		// Update the reduction factors
 		this->update_reduction_factors();
@@ -95,49 +95,36 @@ void CpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 				"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles)");
 
 		this->on_manual_reset();
-		++m_currentDecimationIteration;
+		m_reduced[m_world.get_frame_current()] = true;
 	}
 	RendererBase<Device::CPU, silhouette::pt::SilhouetteTargets>::post_iteration(outputBuffer);
 }
 
 void CpuShadowSilhouettesPT::iterate() {
-	if((int)m_currentDecimationIteration < m_params.decimationIterations) {
-		logInfo("Starting decimation iteration (", m_currentDecimationIteration + 1, " of ", m_params.decimationIterations, ")...");
+	if(m_stage == Stage::INITIALIZED) {
+		logInfo("Gathering importance for frame ", m_world.get_frame_current());
 
 		const auto processTime = CpuProfileState::get_process_time();
 		const auto cycles = CpuProfileState::get_cpu_cycle();
 
-		const auto currAnimationFrame = m_world.get_frame_current();
-		const auto endAnimationFrame = m_world.get_frame_count();
-		//const auto frameIndex = std::min<u32>(m_params.slidingWindowSize, currAnimationFrame - startAnimationFrame);
-		//const auto windowSize = std::min<u32>(std::min(endAnimationFrame - currAnimationFrame, frameIndex + 1u), m_params.slidingWindowSize);
-		
-		// TODO: put this in a more conventient place / discard it from profiling
-		// Gather all the importance we need
-		const auto upperFrameLimit = std::min(endAnimationFrame, currAnimationFrame + m_params.slidingWindowHalfWidth);
-		// Loop until we gathered importance for all necessary frames (half-width + 1 at the beginning, 1 normally, none towards the end)
-		while(m_perFrameData.size() < upperFrameLimit) {
-			logInfo("Acquiring importance for frame ", m_perFrameData.size());
-			// TODO: free data that is no longer needed
-			m_perFrameData.push_back({
+		m_perFrameData.push_back({
 				make_udevptr_array<Device::CPU, silhouette::pt::DeviceImportanceSums<Device::CPU>, false>(m_decimaters.size()),
 				0.f
-			});
-			// Set the current importance sums to zero
-			for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-				m_perFrameData.back().importanceSums[i].shadowImportance.store(0.f);
-				m_perFrameData.back().importanceSums[i].shadowSilhouetteImportance.store(0.f);
-			}
+		});
+		// Set the current importance sums to zero
+		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+			m_perFrameData.back().importanceSums[i].shadowImportance.store(0.f);
+			m_perFrameData.back().importanceSums[i].shadowSilhouetteImportance.store(0.f);
+		}
 
-			// Do the usual importance gathering
-			gather_importance();
+		// Do the usual importance gathering
+		gather_importance();
 
-			// Update the importance sums
-			for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-				silhouette::pt::ImportanceSums sums{ m_perFrameData.back().importanceSums[i].shadowImportance,
-					m_perFrameData.back().importanceSums[i].shadowSilhouetteImportance };
-				m_decimaters[i]->update_importance_density(sums);
-			}
+		// Update the importance sums
+		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+			silhouette::pt::ImportanceSums sums{ m_perFrameData.back().importanceSums[i].shadowImportance,
+				m_perFrameData.back().importanceSums[i].shadowSilhouetteImportance };
+			m_decimaters[i]->update_importance_density(sums);
 		}
 
 		if(m_decimaters.size() == 0u)
@@ -147,8 +134,23 @@ void CpuShadowSilhouettesPT::iterate() {
 		logInfo("Finished importance gathering (",
 					std::chrono::duration_cast<std::chrono::milliseconds>(processTime).count(),
 					"ms, ", cycles / 1'000'000, " MCycles)");
+		if(m_params.reduction == 0) {
+			compute_max_importance();
+			display_importance();
+		}
+	} else if(m_stage == Stage::IMPORTANCE_GATHERED && m_params.reduction == 0) {
+		auto* curr = m_accumImportanceBuffer.get();
+		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+			for(std::size_t v = 0u; v < m_decimaters[i]->get_original_vertex_count(); ++v) {
+				const scene::geometry::PolygonMeshType::VertexHandle vertex{ static_cast<int>(v) };
+				(curr++)->viewImportance = m_decimaters[i]->get_accumulated_importance(vertex);
+			}
+		}
 
-	} else {
+		compute_max_importance();
+		display_importance(true);
+	}
+	/* else {
 		if((int)m_currentDecimationIteration == m_params.decimationIterations && m_params.decimationIterations > 0) {
 			if(m_params.reduction == 0) {
 				for(auto& decimater : m_decimaters)
@@ -158,7 +160,7 @@ void CpuShadowSilhouettesPT::iterate() {
 		}
 		if(m_params.reduction == 0 && m_params.decimationIterations > 0)
 			display_importance();
-	}
+	}*/
 }
 
 void CpuShadowSilhouettesPT::gather_importance() {
@@ -177,23 +179,24 @@ void CpuShadowSilhouettesPT::gather_importance() {
 		for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 			const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 			scene::PrimitiveHandle shadowPrim;
-			/*silhouette::pt::sample_importance(m_outputBuffer, m_sceneDesc, reinterpret_cast<silhouette::pt::SilhouetteParameters&>(m_params),
+			silhouette::pt::sample_importance(m_outputBuffer, m_sceneDesc, reinterpret_cast<silhouette::pt::SilhouetteParameters&>(m_params),
 											  coord, m_rngs[pixel], m_importances.get(),
-											  m_perFrameData.back().importanceSums.get());*/
+											  m_perFrameData.back().importanceSums.get());
 		}
 		logPedantic("Finished importance iteration (", iter + 1, " of ", m_params.importanceIterations, ")");
 	}
 	// TODO: allow for this with proper reset "events"
 }
 
-void CpuShadowSilhouettesPT::display_importance() {
+void CpuShadowSilhouettesPT::display_importance(const bool accumulated) {
 	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		/*silhouette::pt::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
-											  m_importances.get(), m_perFrameData.back().importanceSums.get(),
-											  m_perFrameData.back().maxImportance == 0.f ? 1.f : m_perFrameData.back().maxImportance);*/
+		silhouette::pt::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
+											  accumulated ? m_accumImportances.get() : m_importances.get(),
+											  m_perFrameData.back().importanceSums.get(),
+											  m_perFrameData.back().maxImportance == 0.f ? 1.f : m_perFrameData.back().maxImportance);
 	}
 }
 
@@ -213,6 +216,32 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 	m_decimaters.resize(objects.size());
 
 	const auto timeBegin = CpuProfileState::get_process_time();
+
+	// First allocate the importance buffer for all objects and all frames
+	std::vector<std::size_t> vertexOffsets;
+	vertexOffsets.reserve(objects.size());
+	{
+		std::size_t vertices = 0u;
+		// TODO: there has to be a way to acquire the vertex count without loading all objects into memory
+		for(const auto& obj : objects) {
+			const auto& scenario = *m_world.get_current_scenario();
+			// Find the highest-res LoD referenced by an object's instances
+			u32 lowestLevel = scenario.get_custom_lod(obj.first);
+			for(u32 j = 0u; j < obj.second.count; ++j) {
+				scene::ConstInstanceHandle instance = instances[obj.second.offset + j];
+				if(const auto level = scenario.get_effective_lod(instance); level < lowestLevel)
+					lowestLevel = level;
+			}
+
+			// TODO: this only works if instances don't specify LoD levels
+			auto& lod = obj.first->get_or_fetch_original_lod(m_world, lowestLevel);
+			vertexOffsets.push_back(vertices);
+			vertices += lod.template get_geometry<scene::geometry::Polygons>().get_vertex_count();
+		}
+
+		m_importanceBuffer = make_udevptr_array<Device::CPU, silhouette::pt::Importances<Device::CPU>, false>(vertices * m_world.get_frame_count());
+		m_accumImportanceBuffer = make_udevptr_array<Device::CPU, silhouette::pt::Importances<Device::CPU>, false>(vertices);
+	}
 
 #pragma PARALLEL_FOR
 	for(i32 i = 0; i < static_cast<i32>(objects.size()); ++i) {
@@ -243,12 +272,18 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 			collapses = static_cast<std::size_t>(std::ceil(m_params.initialReduction * polygons.get_vertex_count()));
 			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
 		}
-		m_decimaters[i] = std::make_unique<pt::ImportanceDecimater<Device::CPU>>(obj.first->get_name(), lod, newLod, collapses,
-																				 1u + 2u * m_params.slidingWindowHalfWidth,
-																				 m_params.viewWeight, m_params.lightWeight,
-																				 m_params.shadowWeight, m_params.shadowSilhouetteWeight);
+		m_decimaters[i] = std::make_unique<pt::ImportanceDecimater>(obj.first->get_name(), &m_importanceBuffer[vertexOffsets[i] * m_world.get_frame_count()],
+																	lod, newLod, collapses, 1u + 2u * m_params.slidingWindowHalfWidth,
+																	m_params.viewWeight, m_params.lightWeight,
+																	m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 	}
 	m_importances = make_udevptr_array<Device::CPU, silhouette::pt::Importances<Device::CPU>*, false>(m_decimaters.size());
+	m_accumImportances = make_udevptr_array<Device::CPU, silhouette::pt::Importances<Device::CPU>*, false>(m_decimaters.size());
+	auto* curr = m_accumImportanceBuffer.get();
+	for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+		m_accumImportances[i] = curr;
+		curr += m_decimaters[i]->get_original_vertex_count();
+	}
 
 	m_currentScene->clear_accel_structure();
 	logInfo("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - timeBegin).count(), "ms");
