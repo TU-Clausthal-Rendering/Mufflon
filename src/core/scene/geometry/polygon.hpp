@@ -28,6 +28,10 @@ namespace OpenMesh::Decimater {
 template < class Mesh >
 class DecimaterT;
 } // namespace OpenMesh::Decimater
+namespace OpenMesh::Geometry {
+template < class >
+class QuadricT;
+}
 
 namespace mufflon::util {
 class IByteReader;
@@ -291,11 +295,16 @@ public:
 	// Returns wether there was an animation or not (in which case nothing was done).
 	bool apply_animation(u32 frame, const Bone* bones);
 
+	// Computes per-vertex error quadrics and stores them in the given property
+	template < class T >
+	void compute_error_quadrics(OpenMesh::VPropHandleT<OpenMesh::Geometry::QuadricT<T>>);
+
 	// Creates a decimater 
 	OpenMesh::Decimater::DecimaterT<PolygonMeshType> create_decimater();
 	// Implements decimation.
 	std::size_t decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 						 std::size_t targetVertices, bool garbageCollect);
+	std::size_t cluster(std::size_t gridRes, bool garbageCollect);
 
 	// Splits a vertex
 	std::pair<FaceHandle, FaceHandle> vertex_split(const VertexHandle v0, const VertexHandle v1,

@@ -37,7 +37,7 @@ inline float compute_area(const PolygonMeshType& mesh, const OpenMesh::VertexHan
 
 template < Device dev >
 ImportanceDecimater<dev>::ImportanceDecimater(StringView objectName, Lod& original, Lod& decimated,
-											  const std::size_t initialCollapses,
+											  const u32 clusterGridRes,
 											  const float viewWeight, const float lightWeight,
 											  const float shadowWeight, const float shadowSilhouetteWeight) :
 	m_objectName(objectName),
@@ -52,7 +52,9 @@ ImportanceDecimater<dev>::ImportanceDecimater(StringView objectName, Lod& origin
 	m_viewWeight(viewWeight),
 	m_lightWeight(lightWeight),
 	m_shadowWeight(shadowWeight),
-	m_shadowSilhouetteWeight(shadowSilhouetteWeight) {
+	m_shadowSilhouetteWeight(shadowSilhouetteWeight),
+	m_clusterGridRes{ clusterGridRes }
+{
 	// Add necessary properties
 	m_decimatedMesh->add_property(m_originalVertex);
 	m_originalMesh.add_property(m_accumulatedImportanceDensity);
@@ -73,7 +75,7 @@ ImportanceDecimater<dev>::ImportanceDecimater(StringView objectName, Lod& origin
 	}
 
 	// Perform initial decimation
-	this->decimate_with_error_quadrics(initialCollapses);
+	this->decimate_with_error_quadrics(m_clusterGridRes);
 }
 
 template < Device dev >
@@ -188,30 +190,41 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 
 template < Device dev >
 void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& sum,
-														 const data_structs::DmOctree<float>& viewGrid,
-														 const data_structs::DmOctree<float>& irradianceGrid,
-														 const data_structs::DmOctree<i32>& irradianceCount) {
+														 const data_structs::CountOctree& viewGrid,
+														 const data_structs::CountOctree& irradianceGrid) {
 	// First get the data off the GPU
 	this->pull_importance_from_device();
 
+	// TODO: proper reservation
+	std::vector<u32> vertexCount(viewGrid.capacity());
+
+	for(i64 i = 0; i < static_cast<i64>(m_decimatedMesh->n_vertices()); ++i) {
+		const auto vertex = m_decimatedMesh->vertex_handle(static_cast<u32>(i));
+		const auto pos = util::pun<ei::Vec3>(m_decimatedMesh->point(vertex));
+		const auto id = viewGrid.get_node_id(pos);
+		vertexCount[id.index] += 1u;
+	}
 
 	// Update our statistics: the importance density of each vertex
-	float importanceSum = 0.0;
-#pragma PARALLEL_REDUCTION(+, importanceSum)
+	const float importanceSum = viewGrid.sum().value;
+//#pragma PARALLEL_REDUCTION(+, importanceSum)
 	for(i64 i = 0; i < static_cast<i64>(m_decimatedMesh->n_vertices()); ++i) {
 		const auto vertex = m_decimatedMesh->vertex_handle(static_cast<u32>(i));
 		// Important: only works for triangles!
 		const float area = compute_area(*m_decimatedMesh, vertex);
 		const auto pos = util::pun<ei::Vec3>(m_decimatedMesh->point(vertex));
 		const auto normal = util::pun<ei::Vec3>(m_decimatedMesh->normal(vertex));
-		const auto flux = irradianceGrid.get_density(pos, normal)
-			/ std::max(1.f, static_cast<float>(irradianceCount.get_density(pos, normal)));
-		const auto viewImportance = viewGrid.get_density(pos, normal);
 
-		const float importance = viewImportance + m_lightWeight * flux;
+		// TODO
 
-		importanceSum += importance;
-		m_importances[vertex.idx()].viewImportance = importance / area;
+		// In contrast to saving importance per vertex, we have to divide by the sample count here
+		// because we have to distribute the value across many vertices
+		const auto id = viewGrid.get_node_id(pos);
+		const auto viewSample = viewGrid.get_density(pos, normal, id, true);
+		const auto sum = viewSample / area;// / static_cast<float>(vertexCount[id.index]);
+
+		//importanceSum += sum;
+		m_importances[vertex.idx()].viewImportance = sum;// / area;
 	}
 
 	// Subtract the shadow silhouette importance and use shadow importance instead
@@ -235,7 +248,7 @@ template < Device dev >
 void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& sum,
 														 const data_structs::DmHashGrid<float>& viewGrid,
 														 const data_structs::DmHashGrid<float>& irradianceGrid,
-														 const data_structs::DmHashGrid<i32>& irradianceCount) {
+														 const data_structs::DmHashGrid<u32>& irradianceCount) {
 	// First get the data off the GPU
 	this->pull_importance_from_device();
 
@@ -256,7 +269,7 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 		const float importance = viewImportance + m_lightWeight * flux;
 
 		importanceSum += importance;
-		m_importances[vertex.idx()].viewImportance = importance / area;
+		m_importances[vertex.idx()].viewImportance = importance;
 	}
 
 	// Subtract the shadow silhouette importance and use shadow importance instead
@@ -287,7 +300,8 @@ void ImportanceDecimater<dev>::recompute_geometric_vertex_normals() {
 #pragma warning(disable : 4244)
 		m_decimatedMesh->calc_vertex_normal_correct(vertex, normal);
 #pragma warning(pop)
-		m_decimatedMesh->set_normal(vertex, util::pun<typename Mesh::Normal>(ei::normalize(util::pun<ei::Vec3>(normal))));
+		const auto n = ei::normalize(util::pun<ei::Vec3>(normal));
+		m_decimatedMesh->set_normal(vertex, util::pun<typename Mesh::Normal>(n));
 	}
 }
 
@@ -400,8 +414,8 @@ std::size_t ImportanceDecimater<dev>::get_decimated_vertex_count() const noexcep
 }
 
 template < Device dev >
-void ImportanceDecimater<dev>::decimate_with_error_quadrics(const std::size_t collapses) {
-	if(collapses > 0u) {
+void ImportanceDecimater<dev>::decimate_with_error_quadrics(const u32 clusterGridRes) {
+	if(clusterGridRes > 0u) {
 		auto decimater = m_decimatedPoly->create_decimater();
 		OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
 		CollapseTrackerModule<>::Handle trackerHandle;
@@ -409,18 +423,19 @@ void ImportanceDecimater<dev>::decimate_with_error_quadrics(const std::size_t co
 		decimater.add(trackerHandle);
 		decimater.module(trackerHandle).set_properties(m_originalMesh, m_collapsed, m_collapsedTo);
 		// Possibly repeat until we reached the desired count
-		const std::size_t targetCollapses = std::min(collapses, m_originalPoly.get_vertex_count());
-		const std::size_t targetVertexCount = m_originalPoly.get_vertex_count() - targetCollapses;
-		std::size_t performedCollapses = m_decimatedPoly->decimate(decimater, targetVertexCount, false);
-		if(performedCollapses < targetCollapses)
-			logWarning("Not all decimations were performed: ", targetCollapses - performedCollapses, " missing");
+		//const std::size_t targetCollapses = std::min(collapses, m_originalPoly.get_vertex_count());
+		//const std::size_t targetVertexCount = m_originalPoly.get_vertex_count() - targetCollapses;
+		//std::size_t performedCollapses = m_decimatedPoly->decimate(decimater, targetVertexCount, false);
+		const auto performedCollapses = m_decimatedPoly->cluster(clusterGridRes, false);
+		/*if(performedCollapses < targetCollapses)
+			logWarning("Not all decimations were performed: ", targetCollapses - performedCollapses, " missing");*/
 		m_decimatedPoly->garbage_collect([this](Mesh::VertexHandle deletedVertex, Mesh::VertexHandle changedVertex) {
 			// Adjust the reference from original to decimated mesh
 			const auto originalVertex = this->get_original_vertex_handle(changedVertex);
 			if(!m_originalMesh.property(m_collapsed, originalVertex))
 				m_originalMesh.property(m_collapsedTo, originalVertex) = deletedVertex;
-										 });
-		this->recompute_geometric_vertex_normals();
+		});
+		//this->recompute_geometric_vertex_normals();
 
 		m_decimated.clear_accel_structure();
 	}

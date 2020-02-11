@@ -164,8 +164,6 @@ void OpenMeshAttributePool<face>::shrink_to_fit() {
 
 	if(m_attribElemCount != 0) {
 		std::size_t bytes = m_attribElemCount * m_poolSize / m_attribElemCapacity;
-		printf("%zu\n", bytes);
-		fflush(stdout);
 		if(m_cudaPool != nullptr)
 			m_cudaPool = Allocator<Device::CUDA>::realloc(m_cudaPool, m_poolSize, bytes);
 		if(m_openglPool != nullptr)

@@ -3,7 +3,20 @@
 #include "core/renderer/path_util.hpp"
 #include "core/cuda/cuda_utils.hpp"
 
+#include "core/data_structs/count_octree.hpp"
+#include "core/data_structs/dm_hashgrid.hpp"
+
 namespace mufflon { namespace renderer { namespace decimaters { namespace silhouette { namespace pt {
+
+struct Octrees {
+	data_structs::CountOctree& view;
+	data_structs::CountOctree& irradiance;
+};
+struct Hashgrids {
+	data_structs::DmHashGrid<float>& view;
+	data_structs::DmHashGrid<float>& irradiance;
+	data_structs::DmHashGrid<u32>& irradianceCount;
+};
 
 template < Device dev >
 struct Importances {

@@ -2,6 +2,8 @@
 
 #include "silhouette_pt_common.hpp"
 #include "silhouette_pt_params.hpp"
+#include "core/data_structs/dm_hashgrid.hpp"
+#include "core/data_structs/count_octree.hpp"
 #include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
@@ -300,16 +302,65 @@ inline CUDA_FUNCTION float estimate_shadow_light_size(const scene::SceneDescript
 	return size * occluderShadowDistance / occluderLightDistance;
 }
 
-inline CUDA_FUNCTION constexpr float get_luminance(const ei::Vec3& vec) {
+__forceinline__  CUDA_FUNCTION constexpr float get_luminance(const ei::Vec3& vec) {
 	constexpr ei::Vec3 LUM_WEIGHT{ 0.212671f, 0.715160f, 0.072169f };
 	return ei::dot(LUM_WEIGHT, vec);
 }
 
-inline CUDA_FUNCTION void record_silhouette_vertex_contribution(Importances<CURRENT_DEV>* importances,
+__forceinline__ CUDA_FUNCTION Importances<CURRENT_DEV>* get_imp_struct(const u32 lodIndex, Importances<CURRENT_DEV>** importances) {
+	return importances[lodIndex];
+}
+__forceinline__ CUDA_FUNCTION Octrees get_imp_struct(const u32 lodIndex,
+													 data_structs::CountOctreeManager& view,
+													 data_structs::CountOctreeManager& irradiance) {
+	return Octrees{ view[lodIndex], irradiance[lodIndex] };
+}
+__forceinline__ CUDA_FUNCTION Hashgrids get_imp_struct(const u32, data_structs::DmHashGrid<float>& view,
+													   data_structs::DmHashGrid<float>& irradiance,
+													   data_structs::DmHashGrid<u32>& irradianceCount) {
+	return Hashgrids{ view, irradiance, irradianceCount };
+}
+
+inline CUDA_FUNCTION i32 get_closest_vertex_index(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+												  const u32 vertexCount, const i32 primId,
+												  const ei::Vec3& objSpacePoint) {
+	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
+	const u32 primIdx = vertexCount == 3u ? primId : (primId - polygon.numTriangles);
+
+	i32 min = 0;
+	float minDist = std::numeric_limits<float>::max();
+	for(u32 v = 0u; v < vertexCount; ++v) {
+		const i32 vertexIndex = polygon.vertexIndices[vertexOffset + vertexCount * primIdx + v];
+		const float dist = ei::lensq(objSpacePoint - polygon.vertices[vertexIndex]);
+		if(dist < minDist) {
+			minDist = dist;
+			min = vertexIndex;
+		}
+	}
+	return min;
+}
+
+inline CUDA_FUNCTION void record_silhouette_vertex_contribution(const scene::PolygonsDescriptor<CURRENT_DEV>&,
 																DeviceImportanceSums<CURRENT_DEV>& sums,
-																const u32 vertexIndex, const float importance) {
+																const u32 vertexIndex, const float importance,
+																Importances<CURRENT_DEV>* importances) {
 	// Reminder: local index will refer to the decimated mesh
 	cuda::atomic_add<CURRENT_DEV>(importances[vertexIndex].viewImportance, importance);
+	cuda::atomic_add<CURRENT_DEV>(sums.shadowSilhouetteImportance, importance);
+}
+inline CUDA_FUNCTION void record_silhouette_vertex_contribution(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+																DeviceImportanceSums<CURRENT_DEV>& sums,
+																const u32 vertexIndex, const float importance,
+																Octrees octrees) {
+	//octrees.view.add_sample(polygon.vertices[vertexIndex], polygon.normals[vertexIndex], importance);
+	octrees.view.add_sample(polygon.vertices[vertexIndex], polygon.normals[vertexIndex], importance);
+	cuda::atomic_add<CURRENT_DEV>(sums.shadowSilhouetteImportance, importance);
+}
+inline CUDA_FUNCTION void record_silhouette_vertex_contribution(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+																DeviceImportanceSums<CURRENT_DEV>& sums,
+																const u32 vertexIndex, const float importance,
+																Hashgrids hashgrids) {
+	hashgrids.view.increase_count(polygon.vertices[vertexIndex], importance);
 	cuda::atomic_add<CURRENT_DEV>(sums.shadowSilhouetteImportance, importance);
 }
 
@@ -317,67 +368,73 @@ inline CUDA_FUNCTION void record_shadow(DeviceImportanceSums<CURRENT_DEV>& sums,
 	cuda::atomic_add<CURRENT_DEV>(sums.shadowImportance, irradiance);
 }
 
-inline CUDA_FUNCTION void record_direct_hit(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
+inline CUDA_FUNCTION void record_direct_hit(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
 											const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
-											const float cosAngle, const float sharpness) {
-	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
-	const u32 primIdx = vertexCount == 3u ? primId : (primId - polygon.numTriangles);
-
-	i32 min;
-	float minDist = std::numeric_limits<float>::max();
-	for(u32 v = 0u; v < vertexCount; ++v) {
-		const i32 vertexIndex = polygon.vertexIndices[vertexOffset + vertexCount * primIdx + v];
-		const float dist = ei::lensq(hitpoint - polygon.vertices[vertexIndex]);
-		if(dist < minDist) {
-			minDist = dist;
-			min = vertexIndex;
-		}
-	}
-
+											const ei::Vec3&, const float cosAngle, const float sharpness,
+											Importances<CURRENT_DEV>* importances) {
+	const auto closest = get_closest_vertex_index(polygon, vertexCount, primId, hitpoint);
 	if(!isnan(cosAngle))
-		cuda::atomic_add<CURRENT_DEV>(importances[min].viewImportance, sharpness * (1.f - ei::abs(cosAngle)));
+		cuda::atomic_add<CURRENT_DEV>(importances[closest].viewImportance, sharpness * (1.f - ei::abs(cosAngle)));
+}
+inline CUDA_FUNCTION void record_direct_hit(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+											const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
+											const ei::Vec3& normal, const float cosAngle, const float sharpness,
+											Octrees octrees) {
+	if(!isnan(cosAngle))
+		octrees.view.add_sample(hitpoint, normal, sharpness* (1.f - ei::abs(cosAngle)));
+}
+inline CUDA_FUNCTION void record_direct_hit(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+											const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
+											const ei::Vec3&, const float cosAngle, const float sharpness,
+											Hashgrids hashgrids) {
+	if(!isnan(cosAngle))
+		hashgrids.view.increase_count(hitpoint, sharpness * (1.f - ei::abs(cosAngle)));
 }
 
-inline CUDA_FUNCTION void record_direct_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
-												   const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint, const float irradiance) {
-	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
-	const u32 primIdx = vertexCount == 3u ? primId : (primId - polygon.numTriangles);
-
-	i32 min;
-	float minDist = std::numeric_limits<float>::max();
-	for(u32 v = 0u; v < vertexCount; ++v) {
-		i32 vertexIndex = polygon.vertexIndices[vertexOffset + vertexCount * primIdx + v];
-		const float dist = ei::lensq(hitpoint - polygon.vertices[vertexIndex]);
-		if(dist < minDist) {
-			minDist = dist;
-			min = vertexIndex;
-		}
-	}
-
+inline CUDA_FUNCTION void record_direct_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+												   const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
+												   const ei::Vec3&, const float irradiance,
+												   Importances<CURRENT_DEV>* importances) {
+	const auto closest = get_closest_vertex_index(polygon, vertexCount, primId, hitpoint);
 	if(!isnan(irradiance)) {
-		cuda::atomic_add<CURRENT_DEV>(importances[min].irradiance, irradiance);
-		cuda::atomic_add<CURRENT_DEV>(importances[min].hitCounter, 1u);
+		cuda::atomic_add<CURRENT_DEV>(importances[closest].irradiance, irradiance);
+		cuda::atomic_add<CURRENT_DEV>(importances[closest].hitCounter, 1u);
+	}
+}
+inline CUDA_FUNCTION void record_direct_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+												   const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
+												   const ei::Vec3& normal, const float irradiance, Octrees octrees) {
+	if(!isnan(irradiance))
+		octrees.irradiance.add_sample(hitpoint, normal, irradiance);
+}
+inline CUDA_FUNCTION void record_direct_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+												   const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
+												   const ei::Vec3&, const float irradiance, Hashgrids hashgrids) {
+	if(!isnan(irradiance)) {
+		hashgrids.irradiance.increase_count(hitpoint, irradiance);
+		hashgrids.irradianceCount.increase_count(hitpoint, 1u);
 	}
 }
 
-inline CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon, Importances<CURRENT_DEV>* importances,
-													 const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint, const float irradiance) {
-	const u32 vertexOffset = vertexCount == 3u ? 0u : (polygon.numTriangles * 3u);
-	const u32 primIdx = vertexCount == 3u ? primId : (primId - polygon.numTriangles);
-
-	i32 min;
-	float minDist = std::numeric_limits<float>::max();
-	for(u32 v = 0u; v < vertexCount; ++v) {
-		i32 vertexIndex = polygon.vertexIndices[vertexOffset + vertexCount * primIdx + v];
-		const float dist = ei::lensq(hitpoint - polygon.vertices[vertexIndex]);
-		if(dist < minDist) {
-			minDist = dist;
-			min = vertexIndex;
-		}
-	}
-
+inline CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+													 const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
+													 const ei::Vec3&, const float irradiance,
+													 Importances<CURRENT_DEV>* importances) {
+	const auto closest = get_closest_vertex_index(polygon, vertexCount, primId, hitpoint);
 	if(!isnan(irradiance))
-		cuda::atomic_add<CURRENT_DEV>(importances[min].irradiance, irradiance);
+		cuda::atomic_add<CURRENT_DEV>(importances[closest].irradiance, irradiance);
+}
+inline CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+													 const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
+													 const ei::Vec3& normal, const float irradiance, Octrees& octrees) {
+	if(!isnan(irradiance))	// TODO: with or without increasing sample count?
+		octrees.irradiance.add_sample(hitpoint, normal, irradiance);
+}
+inline CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+													 const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
+													 const ei::Vec3&, const float irradiance, Hashgrids& hashgrids) {
+	if(!isnan(irradiance))
+		hashgrids.irradiance.increase_count(hitpoint, irradiance);
 }
 
 inline CUDA_FUNCTION float weight_shadow(const float importance, const SilhouetteParameters& params) {
@@ -393,10 +450,10 @@ inline CUDA_FUNCTION float weight_shadow(const float importance, const Silhouett
 }
 
 inline CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene, DeviceImportanceSums<CURRENT_DEV>* sums,
-								const ei::Ray& shadowRay, SilPathVertex& vertex, const float importance,
-								const scene::PrimitiveHandle& shadowHitId, const float lightDistance,
-								const float firstShadowDistance, const LightType lightType,
-								const u32 lightOffset, const ei::Vec3& otherNeeRad, const SilhouetteParameters& params) {
+									   const ei::Ray& shadowRay, SilPathVertex& vertex, const float importance,
+									   const scene::PrimitiveHandle& shadowHitId, const float lightDistance,
+									   const float firstShadowDistance, const LightType lightType,
+									   const u32 lightOffset, const ei::Vec3& otherNeeRad, const SilhouetteParameters& params) {
 	constexpr float DIST_EPSILON = 0.001f;
 
 	// TODO: worry about spheres?
@@ -478,12 +535,13 @@ inline CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>
 
 } // namespace
 
+template < class... Args >
 inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 											const scene::SceneDescriptor<CURRENT_DEV>& scene,
 											const SilhouetteParameters& params,
 											const Pixel& coord, math::Rng& rng,
-											Importances<CURRENT_DEV>** importances,
-											DeviceImportanceSums<CURRENT_DEV>* sums) {
+											DeviceImportanceSums<CURRENT_DEV>* sums,
+											Args&& ...impStruct) {
 	Spectrum throughput{ ei::Vec3{1.0f} };
 	// We gotta keep track of our vertices
 	// TODO: flexible length!
@@ -548,11 +606,15 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 						// Add the importance
 
 						const auto& hitId = vertices[pathLen].get_primitive_id();
+						const auto objSpacePos = ei::transform(vertices[pathLen].get_position(),
+															   scene.worldToInstance[hitId.instanceId]);
+						const auto objSpaceNormal = ei::transform(vertices[pathLen].get_normal(),
+																  ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
 						const auto& lod = scene.lods[scene.lodIndices[hitId.instanceId]];
 						const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
-						record_direct_irradiance(lod.polygon, importances[scene.lodIndices[hitId.instanceId]],
-												 hitId.primId, numVertices, vertices[pathLen].get_position(),
-												 params.lightWeight * weightedIrradianceLuminance);
+						record_direct_irradiance(lod.polygon, hitId.primId, numVertices, objSpacePos, objSpaceNormal,
+												 params.lightWeight * weightedIrradianceLuminance,
+												 get_imp_struct(scene.lodIndices[hitId.instanceId], impStruct...));
 					}
 				} else if(pathLen == 1) {
 					//m_decimaters[scene.lodIndices[shadowHit.hitId.instanceId]]->record_shadow(get_luminance(throughput.weight * irradiance));
@@ -625,15 +687,20 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 		const auto& lod = scene.lods[scene.lodIndices[hitId.instanceId]];
 		const u32 numVertices = hitId.primId < (i32)lod.polygon.numTriangles ? 3u : 4u;
 
-		if(params.show_view()) {
-			record_direct_hit(lod.polygon, importances[scene.lodIndices[hitId.instanceId]],
-							  hitId.primId, numVertices, vertices[pathLen + 1].get_position(),
-							  -ei::dot(vertices[pathLen + 1].get_incident_direction(),
-									   vertices[pathLen + 1].get_normal()),
-							  params.viewWeight * sharpness);
-		}
-
 		++pathLen;
+
+		// Don't record direct hit importance for last path segment - that is only for NEE MIS
+		if(params.show_view() && (pathLen < params.maxPathLength)) {
+			const auto cosAngle = -ei::dot(vertices[pathLen].get_incident_direction(),
+										   vertices[pathLen].get_normal());
+			const auto objSpacePos = ei::transform(vertices[pathLen].get_position(),
+												   scene.worldToInstance[hitId.instanceId]);
+			const auto objSpaceNormal = ei::transform(vertices[pathLen].get_normal(),
+													  ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
+			record_direct_hit(lod.polygon, hitId.primId, numVertices, objSpacePos,
+							  objSpaceNormal, cosAngle, params.viewWeight * sharpness,
+							  get_imp_struct(scene.lodIndices[hitId.instanceId], impStruct...));
+		}
 
 		vertices[pathLen].ext().pathRadiance = ei::Vec3{ 0.f };
 		if(pathLen >= params.minPathLength) {
@@ -667,8 +734,13 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 
 			const float importance = get_luminance(irradiance) * (1.f - ei::abs(vertices[p].ext().outCos));
 			if(params.show_indirect()) {
-				record_indirect_irradiance(lod->polygon, importances[scene.lodIndices[hitId.instanceId]], hitId.primId,
-										   numVertices, vertices[p].get_position(), params.lightWeight * importance);
+				const auto objSpacePos = ei::transform(vertices[p].get_position(),
+													   scene.worldToInstance[hitId.instanceId]);
+				const auto objSpaceNormal = ei::transform(vertices[pathLen].get_normal(),
+														  ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
+				record_indirect_irradiance(lod->polygon, hitId.primId, numVertices, objSpacePos,
+										   objSpaceNormal, params.lightWeight * importance,
+										   get_imp_struct(scene.lodIndices[hitId.instanceId], impStruct...));
 			}
 		}
 		// TODO: store accumulated sharpness
@@ -705,20 +777,22 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 
 					for(i32 i = 0; i < 2; ++i) {
 						mAssert(ext.silhouetteVerticesFirst[i] >= 0 && static_cast<u32>(ext.silhouetteVerticesFirst[i]) < scene.lods[lodIdx].polygon.numVertices);
-						record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx],
+						record_silhouette_vertex_contribution(scene.lods[lodIdx].polygon, sums[lodIdx],
 															  ext.silhouetteVerticesFirst[i],
-															  silhouetteImportance);
+															  silhouetteImportance,
+															  get_imp_struct(lodIdx, impStruct...));
 						if(ext.silhouetteVerticesSecond[i] >= 0 && ext.silhouetteVerticesFirst[i] != ext.silhouetteVerticesSecond[i]) {
 							mAssert(static_cast<u32>(ext.silhouetteVerticesSecond[i]) < scene.lods[lodIdx].polygon.numVertices);
-							record_silhouette_vertex_contribution(importances[lodIdx], sums[lodIdx],
+							record_silhouette_vertex_contribution(scene.lods[lodIdx].polygon, sums[lodIdx],
 																  ext.silhouetteVerticesSecond[i],
-																  silhouetteImportance);
+																  silhouetteImportance,
+																  get_imp_struct(lodIdx, impStruct...));
 						}
 					}
 				}
-				outputBuffer.template contribute<PShadowRecorded>(coord, 1.f);
+				outputBuffer.template contribute<ShadowRecorded>(coord, 1.f);
 			} else {
-				outputBuffer.template contribute<PShadowOmitted>(coord, 1.f);
+				outputBuffer.template contribute<ShadowOmitted>(coord, 1.f);
 			}
 		}
 		
@@ -729,6 +803,7 @@ inline CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBuf
 												const scene::SceneDescriptor<CURRENT_DEV>& scene,
 												const Pixel& coord, math::Rng& rng,
 												Importances<CURRENT_DEV>** importances,
+												data_structs::CountOctreeManager* view,
 												DeviceImportanceSums<CURRENT_DEV>* sums,
 												const float maxImportance) {
 	Spectrum throughput{ ei::Vec3{1.0f} };
@@ -761,7 +836,16 @@ inline CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBuf
 			importance += importances[lodIdx][vertexIndex].viewImportance * distSqr / distSqrSum;
 		}
 
-		outputBuffer.template contribute<ImportanceTarget>(coord, importance / maxImportance);
+		if(view != nullptr) {
+			const auto objSpacePos = ei::transform(vertex.get_position(),
+												   scene.worldToInstance[hitId.instanceId]);
+			const auto objSpaceNormal = ei::transform(vertex.get_normal(),
+													  ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
+			const auto data = (*view)[lodIdx].get_density(objSpacePos, objSpaceNormal, true);
+			outputBuffer.template contribute<ImportanceTarget>(coord, static_cast<float>(data));
+		} else {
+			outputBuffer.template contribute<ImportanceTarget>(coord, importance / maxImportance);
+		}
 		outputBuffer.template contribute<PolyShareTarget>(coord, sums[lodIdx].shadowImportance / static_cast<float>(lod.numPrimitives));
 	}
 }

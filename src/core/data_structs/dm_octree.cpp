@@ -371,6 +371,7 @@ void DmOctree<T>::init_children(int children, DataType count, int currentDepth,
 		//area[i] = math::intersection_area_nrm(childCellSize * 1.5f, localPos - (childLocalPos - 0.25f) * childCellSize, normal);
 		areaSum += area[i];
 	}
+	
 	int minCount = ei::ceil(count / 8.0f);
 	// Distribute the count proportional to the areas. To avoid loss we cannot
 	// simply round. https://stackoverflow.com/questions/13483430/how-to-make-rounded-percentages-add-up-to-100

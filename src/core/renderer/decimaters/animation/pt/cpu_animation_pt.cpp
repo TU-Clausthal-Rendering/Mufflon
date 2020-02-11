@@ -85,6 +85,7 @@ void CpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 		const auto processTime = CpuProfileState::get_process_time();
 		const auto cycles = CpuProfileState::get_cpu_cycle();
 		auto scope = Profiler::core().start<CpuProfileState>("Silhouette decimation");
+
 #pragma PARALLEL_FOR
 		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
 			m_decimaters[i]->upload_importance(m_params.impWeightMethod);
@@ -180,8 +181,8 @@ void CpuShadowSilhouettesPT::gather_importance() {
 			const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 			scene::PrimitiveHandle shadowPrim;
 			silhouette::pt::sample_importance(m_outputBuffer, m_sceneDesc, reinterpret_cast<silhouette::pt::SilhouetteParameters&>(m_params),
-											  coord, m_rngs[pixel], m_importances.get(),
-											  m_perFrameData.back().importanceSums.get());
+											  coord, m_rngs[pixel],
+											  m_perFrameData.back().importanceSums.get(), m_importances.get());
 		}
 		logPedantic("Finished importance iteration (", iter + 1, " of ", m_params.importanceIterations, ")");
 	}
@@ -195,7 +196,7 @@ void CpuShadowSilhouettesPT::display_importance(const bool accumulated) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 		silhouette::pt::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
 											  accumulated ? m_accumImportances.get() : m_importances.get(),
-											  m_perFrameData.back().importanceSums.get(),
+											  nullptr, m_perFrameData.back().importanceSums.get(),
 											  m_perFrameData.back().maxImportance == 0.f ? 1.f : m_perFrameData.back().maxImportance);
 	}
 }
@@ -273,7 +274,7 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
 		}
 		m_decimaters[i] = std::make_unique<pt::ImportanceDecimater>(obj.first->get_name(), &m_importanceBuffer[vertexOffsets[i] * m_world.get_frame_count()],
-																	lod, newLod, collapses, 1u + 2u * m_params.slidingWindowHalfWidth,
+																	lod, newLod, collapses, m_world.get_frame_count(),
 																	m_params.viewWeight, m_params.lightWeight,
 																	m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 	}
@@ -308,7 +309,7 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 	// Compute the total expected vertex count over all meshes
 	const auto currAnimationFrame = m_world.get_frame_current();
 	const auto endAnimationFrame = m_world.get_frame_count();
-	const auto end = std::min(currAnimationFrame + m_params.slidingWindowHalfWidth, endAnimationFrame);
+	const auto end = endAnimationFrame;
 	double expectedVertexCount = 0.0;
 
 	m_remainingVertexFactor.resize(m_decimaters.size(), 0.f);

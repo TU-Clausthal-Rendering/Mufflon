@@ -64,6 +64,8 @@ private:
 	std::vector<PerFrameData> m_perFrameData;
 	std::vector<double> m_remainingVertexFactor;
 
+	std::vector<float> m_last;
+
 	Stage m_stage = Stage::NONE;
 	std::vector<bool> m_reduced;
 };

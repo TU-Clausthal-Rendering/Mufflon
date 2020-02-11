@@ -257,7 +257,7 @@ target_include_directories(stbiloader
 )
 
 # Set the target definitions for DLL export
-target_compile_definitions(core PRIVATE _USE_MATH_DEFINES CORE_EXPORTS _CRT_SECURE_NO_WARNINGS)
+target_compile_definitions(core PRIVATE _USE_MATH_DEFINES CORE_EXPORTS _CRT_SECURE_NO_WARNINGS _ENABLE_ATOMIC_ALIGNMENT_FIX)
 target_compile_definitions(mffloader PRIVATE LOADER_EXPORTS _CRT_SECURE_NO_WARNINGS)
 target_compile_definitions(stbiloader PRIVATE _CRT_SECURE_NO_WARNINGS)
 # Set the compile definition for min. CC requirement

@@ -3,7 +3,7 @@
 #include "silhouette_pt_common.hpp"
 #include "util/string_view.hpp"
 #include "core/data_structs/dm_hashgrid.hpp"
-#include "core/data_structs/dm_octree.hpp"
+#include "core/data_structs/count_octree.hpp"
 #include "core/memory/residency.hpp"
 #include "core/scene/lod.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
@@ -19,7 +19,7 @@ public:
 
 	ImportanceDecimater(StringView objectName,
 						scene::Lod& original, scene::Lod& decimated,
-						const std::size_t initialCollapses,
+						const u32 clusterGridRes,
 						const float viewWeight, const float lightWeight,
 						const float shadowWeight, const float shadowSilhouetteWeight);
 	ImportanceDecimater(const ImportanceDecimater&) = delete;
@@ -28,6 +28,8 @@ public:
 	ImportanceDecimater& operator=(ImportanceDecimater&&) = delete;
 	~ImportanceDecimater();
 
+	StringView get_mesh_name() const noexcept { return m_objectName; }
+
 	void copy_back_normalized_importance();
 
 	// Resizes the buffers properly
@@ -35,13 +37,12 @@ public:
 	// Updates the importance densities of the decimated mesh
 	void update_importance_density(const ImportanceSums& impSums);
 	void update_importance_density(const ImportanceSums& impSums,
-								   const data_structs::DmOctree<float>& viewGrid,
-								   const data_structs::DmOctree<float>& irradianceGrid,
-								   const data_structs::DmOctree<i32>& irradianceCount);
+								   const data_structs::CountOctree& viewGrid,
+								   const data_structs::CountOctree& irradianceGrid);
 	void update_importance_density(const ImportanceSums& impSums,
 								   const data_structs::DmHashGrid<float>& viewGrid,
 								   const data_structs::DmHashGrid<float>& irradianceGrid,
-								   const data_structs::DmHashGrid<i32>& irradianceCount);
+								   const data_structs::DmHashGrid<u32>& irradianceCount);
 	/* Updates the decimated mesh by collapsing and uncollapsing vertices.
 	 * The specified threshold determines when a vertex collapses or gets restored
 	 */
@@ -57,7 +58,7 @@ public:
 private:
 	// Returns the vertex handle in the original mesh
 	VertexHandle get_original_vertex_handle(const VertexHandle decimatedHandle) const;
-	void decimate_with_error_quadrics(const std::size_t collapses);
+	void decimate_with_error_quadrics(const u32 clusterGridRes);
 	void pull_importance_from_device();
 
 	// Recomputes normals for decimated mesh
@@ -87,6 +88,8 @@ private:
 	const float m_lightWeight;										// Weight assigned to the irradiance-based importance
 	const float m_shadowWeight;										// Weight assigned to the shadow importance (sum only)
 	const float m_shadowSilhouetteWeight;							// Weight assigned to the shadow silhouette importance
+
+	u32 m_clusterGridRes;
 };
 
 } // namespace mufflon::renderer::decimaters::silhouette::pt

@@ -13,11 +13,185 @@
 #include <OpenMesh/Tools/Subdivider/Uniform/SubdividerT.hh>
 #include <OpenMesh/Tools/Subdivider/Adaptive/Composite/CompositeT.hh>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
+#include <OpenMesh/Core/Geometry/QuadricT.hh>
 #include "core/scene/tessellation/tessellater.hpp"
 #include "core/scene/tessellation/displacement_mapper.hpp"
 #include <cmath>
+#include <random>
 
 namespace mufflon::scene::geometry {
+
+class Octree {
+public:
+	Octree(const ei::Box& bounds, u32 capacity) :
+		m_sceneSize{ (bounds.max - bounds.min) * 1.002f },
+		m_sceneSizeInv{ 1.f / m_sceneSize },
+		m_minBound{ bounds.min - m_sceneSize * (1.002f - 1.f) / 2.f },
+		m_capacity{ std::max(capacity, 1u) },
+		m_size{ 9u },
+		m_depth{ 1u },
+		m_nodes{ std::make_unique<Node[]>(m_capacity) }
+	{
+		// Root node
+		m_nodes[0] = Node::as_parent(1);
+		for(std::size_t i = 0u; i < 8u; ++i)
+			m_nodes[1u + i] = Node{};
+	}
+
+	void split(const ei::Vec3& pos) {
+		if(m_size >= m_capacity)
+			return;
+
+		ei::Vec3 offPos = pos - m_minBound;
+		ei::Vec3 normPos = offPos * m_sceneSizeInv;
+		ei::UVec3 iPos{ normPos * (1 << 30) };
+		Node countOrChild = Node::as_parent(1);
+		u32 lvl = 1;
+		u32 idx;
+		do {
+			// Get the relative index of the child [0,7]
+			ei::UVec3 gridPos = iPos >> (30u - lvl);
+			idx = (gridPos.x & 1) + 2 * (gridPos.y & 1) + 4 * (gridPos.z & 1);
+			idx += countOrChild.get_child_offset();
+			countOrChild = m_nodes[idx];
+			++lvl;
+		} while(countOrChild.is_parent());
+
+		// Allocate space for the new children
+		const auto offset = m_size;
+		m_size += 8;
+		if(m_size >= m_capacity) {
+			m_size = m_capacity;
+			return;
+		}
+
+		m_depth = std::max(m_depth, lvl);
+		m_nodes[idx] = Node::as_parent(offset);
+		for(std::size_t i = 0u; i < 8u; ++i)
+			m_nodes[offset + i] = Node{};
+	}
+
+	u32 get_deepest_node(const ei::Vec3& pos) {
+		ei::Vec3 offPos = pos - m_minBound;
+		ei::Vec3 normPos = offPos * m_sceneSizeInv;
+		// Get the integer position on the finest level.
+		u32 gridRes = 1 << m_depth;
+		ei::UVec3 iPos{ normPos * gridRes };
+		// Get root value. This will most certainly be a child pointer...
+		Node countOrChild = m_nodes[0];
+		// The most significant bit in iPos distinguishes the children of the root node.
+		// For each level, the next bit will be the relevant one.
+		u32 currentLvlMask = gridRes;
+		u32 idx = 0;
+		while(countOrChild.is_parent()) {
+			currentLvlMask >>= 1;
+			// Get the relative index of the child [0,7]
+			idx = ((iPos.x & currentLvlMask) ? 1 : 0)
+				+ ((iPos.y & currentLvlMask) ? 2 : 0)
+				+ ((iPos.z & currentLvlMask) ? 4 : 0);
+			// 'Add' global offset (which is stored negative)
+			idx += countOrChild.get_child_offset();
+
+			countOrChild = m_nodes[idx];
+		}
+
+		return idx;
+	}
+
+	u32 size() const noexcept { return m_size; }
+
+private:
+	class Node {
+	public:
+		Node() = default;
+
+		static Node as_parent(u32 offset) {
+			return Node{ -static_cast<int>(offset) };
+		}
+
+		bool is_parent() const noexcept { return m_value < 0; }
+		u32 get_child_offset() const noexcept { return static_cast<u32>(-m_value); }
+
+	private:
+		Node(int val) : m_value{ val } {}
+
+		int m_value{ 0 };
+	};
+
+	ei::Vec3 m_sceneSize;
+	ei::Vec3 m_sceneSizeInv;
+	ei::Vec3 m_minBound;
+	u32 m_capacity;
+	u32 m_size;
+	u32 m_depth;
+	std::unique_ptr<Node[]> m_nodes;
+};
+
+
+// Cluster for vertex clustering
+struct VertexCluster {
+	ei::Vec3 posAccum{ 0.f };
+	u32 count{ 0u };
+	OpenMesh::Geometry::Quadricf q{};
+
+	void add_vertex(const ei::Vec3& pos, const OpenMesh::Geometry::Quadricf& quadric) noexcept {
+		count += 1u;
+		posAccum += pos;
+		q += quadric;
+	}
+};
+
+namespace {
+
+// Invert function that returns optional to indicate non-invertability instead of identity matrix
+std::optional<ei::Mat4x4> invert(const ei::Mat4x4& mat0) noexcept {
+	ei::Mat4x4 LU;
+	ei::UVec4 p;
+	if(ei::decomposeLUp(mat0, LU, p))
+		return ei::solveLUp(LU, p, ei::identity4x4());
+	return std::nullopt;
+}
+
+template < class Iter >
+u32 compute_cluster_center(const Iter begin, const Iter end) {
+	u32 clusterCount = 0u;
+	for(auto iter = begin; iter != end; ++iter) {
+		auto& cluster = *iter;
+		if(cluster.count > 0) {
+			// Attempt to compute the optimal contraction point by inverting the quadric matrix
+			const auto q = cluster.q;
+			const ei::Mat4x4 w{
+				q.a(), q.b(), q.c(), q.d(),
+				q.b(), q.e(), q.f(), q.g(),
+				q.c(), q.f(), q.h(), q.i(),
+				0,	   0,	  0,	 1
+			};
+			const auto inverse = invert(w);
+			if(inverse.has_value())
+				cluster.posAccum = ei::Vec3{ inverse.value() * ei::Vec4{ 0.f, 0.f, 0.f, 1.f } };
+			else
+				cluster.posAccum /= static_cast<float>(cluster.count);
+			clusterCount += 1;
+		}
+	}
+	return clusterCount;
+}
+
+template < class Iter >
+void compute_vertex_normals(PolygonMeshType& mesh, const Iter begin, const Iter end) {
+	for(auto iter = begin; iter != end; ++iter) {
+		const auto vertex = *iter;
+		PolygonMeshType::Normal normal;
+		// Ignoring warning about OpenMesh initializing a float vector with '0.0'...
+#pragma warning(push)
+#pragma warning(disable : 4244)
+		mesh.calc_vertex_normal_correct(vertex, normal);
+#pragma warning(pop)
+		mesh.set_normal(vertex, normal);
+	}
+}
+
+}
 
 // Default construction, creates material-index attribute.
 Polygons::Polygons() :
@@ -445,10 +619,230 @@ bool Polygons::apply_animation(u32 frame, const Bone* bones) {
 	return true;
 }
 
+template < class T >
+void Polygons::compute_error_quadrics(OpenMesh::VPropHandleT<OpenMesh::Geometry::QuadricT<T>> quadricProps) {
+	using OpenMesh::Geometry::QuadricT;
+	for(const auto vertex : m_meshData->vertices())
+		m_meshData->property(quadricProps, vertex).clear();
+	for(const auto face : m_meshData->faces()) {
+		// Assume triangle
+		auto vIter = m_meshData->cfv_ccwbegin(face);
+		const auto vh0 = *vIter;
+		const auto vh1 = *(++vIter);
+		const auto vh2 = *(++vIter);
+
+		const auto p0 = util::pun<ei::Vec3>(m_meshData->point(vh0));
+		const auto p1 = util::pun<ei::Vec3>(m_meshData->point(vh1));
+		const auto p2 = util::pun<ei::Vec3>(m_meshData->point(vh2));
+		auto normal = ei::cross(p1 - p0, p2 - p0);
+		auto area = ei::len(normal);
+		if(area > std::numeric_limits<decltype(area)>::min()) {
+			normal /= area;
+			area *= 0.5f;
+		}
+
+		const auto d = -ei::dot(p0, normal);
+		QuadricT<T> q{ normal.x, normal.y, normal.z, d };
+		q *= area;
+		m_meshData->property(quadricProps, vh0) += q;
+		m_meshData->property(quadricProps, vh1) += q;
+		m_meshData->property(quadricProps, vh2) += q;
+	}
+}
+
 // Creates a decimater 
 OpenMesh::Decimater::DecimaterT<PolygonMeshType> Polygons::create_decimater() {
 	return OpenMesh::Decimater::DecimaterT<PolygonMeshType>(*m_meshData);
 }
+
+//#define CLUSTER_OCTRE
+
+#ifdef CLUSTER_OCTRE
+std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
+	using OpenMesh::Geometry::Quadricf;
+
+	this->synchronize<Device::CPU>();
+
+	const auto previousVertices = m_meshData->n_vertices();
+
+	const auto vertexCount = 32 * 32 * 32;
+	std::vector<PolygonMeshType::VertexHandle> vertices;
+	std::copy(m_meshData->vertices_sbegin(), m_meshData->vertices_end(), std::back_inserter(vertices));
+	std::mt19937 rng{ std::random_device{}() };
+	std::shuffle(vertices.begin(), vertices.end(), rng);
+
+
+	// We have to track a few things per cluster
+	Octree octree{ m_boundingBox, 4 * vertexCount };
+	for(std::size_t i = 0u; i < vertexCount; ++i)
+		octree.split(util::pun<ei::Vec3>(m_meshData->point(vertices[i])));
+
+	std::vector<VertexCluster> clusters(octree.size());
+
+	const auto aabbMin = m_boundingBox.min;
+	const auto aabbDiag = m_boundingBox.max - m_boundingBox.min;
+	// Convenience function to compute the cluster index from a position
+	auto get_cluster_index = [&octree](const ei::Vec3& pos) -> u32 {
+		return octree.get_deepest_node(pos);
+	};
+
+	OpenMesh::VPropHandleT<Quadricf> quadricProps{};
+	m_meshData->add_property(quadricProps);
+	if(!quadricProps.is_valid())
+		throw std::runtime_error("Failed to add error quadric property");
+	// Compute the error quadrics for each vertex
+	this->compute_error_quadrics(quadricProps);
+
+	// For each vertex, determine the cluster it belongs to and update its statistics
+	for(const auto vertex : m_meshData->vertices()) {
+		const auto pos = util::pun<ei::Vec3>(m_meshData->point(vertex));
+		const auto clusterIndex = get_cluster_index(pos);
+		clusters[clusterIndex].add_vertex(pos, m_meshData->property(quadricProps, vertex));
+	}
+	m_meshData->remove_property(quadricProps);
+
+	// Calculate the representative cluster position for every cluster
+	u32 clusterCount = compute_cluster_center(clusters.begin(), clusters.end());
+
+	// Then we set the position of every vertex to that of its
+	// cluster representative
+	for(const auto vertex : m_meshData->vertices()) {
+		const auto pos = util::pun<ei::Vec3>(m_meshData->point(vertex));
+		const auto clusterIndex = get_cluster_index(pos);
+		// New cluster position has been previously computed
+		const auto newPos = clusters[clusterIndex].posAccum;
+		m_meshData->point(vertex) = util::pun<PolygonMeshType::Point>(newPos);
+	}
+	std::vector<PolygonMeshType::HalfedgeHandle> collapses{};
+	for(const auto vertex : m_meshData->vertices()) {
+		const auto p0 = util::pun<ei::Vec3>(m_meshData->point(vertex));
+		for(auto iter = m_meshData->cvoh_begin(vertex); iter.is_valid(); ++iter) {
+			const auto vh1 = m_meshData->to_vertex_handle(*iter);
+			const auto p1 = util::pun<ei::Vec3>(m_meshData->point(vh1));
+			if(p0 == p1)
+				collapses.push_back(*iter);
+		}
+	}
+	/*for(const auto heh : collapses) {
+		if(m_meshData->is_collapse_ok(heh))
+			m_meshData->collapse(heh);
+	}*/
+
+	compute_vertex_normals(*m_meshData, m_meshData->vertices_sbegin(), m_meshData->vertices_end());
+
+	if(garbageCollect)
+		this->garbage_collect();
+	else
+		this->rebuild_index_buffer();
+	// Do not garbage-collect the mesh yet - only rebuild the index buffer
+
+	// Adjust vertex and face attribute sizes
+	m_vertexAttributes.resize(m_meshData->n_vertices());
+	m_faceAttributes.resize(m_meshData->n_faces());
+	m_vertexAttributes.mark_changed(Device::CPU);
+	m_faceAttributes.mark_changed(Device::CPU);
+
+	const auto remainingVertices = std::distance(m_meshData->vertices_sbegin(), m_meshData->vertices_end());
+	logInfo("Clustered polygon mesh (", remainingVertices, " vertices, ", clusterCount, " cluster centres)");
+
+	return clusterCount;
+}
+#else // CLUSTER_OCTRE
+std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
+	using OpenMesh::Geometry::Quadricf;
+
+	this->synchronize<Device::CPU>();
+
+	const auto previousVertices = m_meshData->n_vertices();
+
+	// We have to track a few things per cluster
+	std::vector<VertexCluster> clusters(gridRes * gridRes * gridRes);
+
+	const auto aabbMin = m_boundingBox.min;
+	const auto aabbDiag = m_boundingBox.max - m_boundingBox.min;
+	// Convenience function to compute the cluster index from a position
+	auto get_cluster_index = [aabbMin, aabbDiag, gridRes](const ei::Vec3& pos) -> u32 {
+		// Get the normalized position [0, 1]^3
+		const auto normPos = (pos - aabbMin) / aabbDiag;
+		// Get the discretized grid position
+		const auto gridPos = ei::min(ei::UVec3{ normPos * ei::Vec3{ gridRes } }, (ei::UVec3{ gridRes } - 1u));
+		// Convert the 3D grid position into a 1D index (x -> y -> z)
+		const auto gridIndex = gridPos.x + gridPos.y * gridRes + gridPos.z * gridRes * gridRes;
+		return static_cast<u32>(gridIndex);
+	};
+	
+	OpenMesh::VPropHandleT<Quadricf> quadricProps{};
+	m_meshData->add_property(quadricProps);
+	if(!quadricProps.is_valid())
+		throw std::runtime_error("Failed to add error quadric property");
+	// Compute the error quadrics for each vertex
+	this->compute_error_quadrics(quadricProps);
+
+	// For each vertex, determine the cluster it belongs to and update its statistics
+	for(const auto vertex : m_meshData->vertices()) {
+		const auto pos = util::pun<ei::Vec3>(m_meshData->point(vertex));
+		const auto clusterIndex = get_cluster_index(pos);
+		clusters[clusterIndex].add_vertex(pos, m_meshData->property(quadricProps, vertex));
+	}
+	m_meshData->remove_property(quadricProps);
+
+	// Calculate the representative cluster position for every cluster
+	u32 clusterCount = compute_cluster_center(clusters.begin(), clusters.end());
+
+	// Then we set the position of every vertex to that of its
+	// cluster representative
+	for(const auto vertex : m_meshData->vertices()) {
+		const auto pos = util::pun<ei::Vec3>(m_meshData->point(vertex));
+		const auto clusterIndex = get_cluster_index(pos);
+		// New cluster position has been previously computed
+		const auto newPos = clusters[clusterIndex].posAccum;
+		m_meshData->point(vertex) = util::pun<PolygonMeshType::Point>(newPos);
+	}
+	// After that, we can easily remove degenerate faces (by collapsing degenerate halfedges)
+	/*for(const auto edge : m_meshData->edges()) {
+		const auto heh = m_meshData->halfedge_handle(edge, 0);
+		const auto vh0 = m_meshData->from_vertex_handle(heh);
+		const auto vh1 = m_meshData->to_vertex_handle(heh);
+		const auto p0 = util::pun<ei::Vec3>(m_meshData->point(vh0));
+		const auto p1 = util::pun<ei::Vec3>(m_meshData->point(vh1));
+		if((p0 == p1) && m_meshData->is_collapse_ok(heh))
+			m_meshData->collapse(heh);
+	}*/
+	std::vector<PolygonMeshType::HalfedgeHandle> collapses{};
+	for(const auto vertex : m_meshData->vertices()) {
+		const auto p0 = util::pun<ei::Vec3>(m_meshData->point(vertex));
+		for(auto iter = m_meshData->cvoh_begin(vertex); iter.is_valid(); ++iter) {
+			const auto vh1 = m_meshData->to_vertex_handle(*iter);
+			const auto p1 = util::pun<ei::Vec3>(m_meshData->point(vh1));
+			if(p0 == p1)
+				collapses.push_back(*iter);
+		}
+	}
+	/*for(const auto heh : collapses) {
+		if(m_meshData->is_collapse_ok(heh))
+			m_meshData->collapse(heh);
+	}*/
+
+	compute_vertex_normals(*m_meshData, m_meshData->vertices_sbegin(), m_meshData->vertices_end());
+
+	if(garbageCollect)
+		this->garbage_collect();
+	else
+		this->rebuild_index_buffer();
+	// Do not garbage-collect the mesh yet - only rebuild the index buffer
+
+	// Adjust vertex and face attribute sizes
+	m_vertexAttributes.resize(m_meshData->n_vertices());
+	m_faceAttributes.resize(m_meshData->n_faces());
+	m_vertexAttributes.mark_changed(Device::CPU);
+	m_faceAttributes.mark_changed(Device::CPU);
+
+	const auto remainingVertices = std::distance(m_meshData->vertices_sbegin(), m_meshData->vertices_end());
+	logInfo("Clustered polygon mesh (", remainingVertices, " vertices, ", clusterCount, " cluster centres)");
+
+	return clusterCount;
+}
+#endif // CLUSTER_OCTRE
 
 std::size_t Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 							   std::size_t targetVertices, bool garbageCollect) {
@@ -468,6 +862,7 @@ std::size_t Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>&
 	m_faceAttributes.resize(m_meshData->n_faces());
 
 	m_vertexAttributes.mark_changed(Device::CPU);
+	m_faceAttributes.mark_changed(Device::CPU);
 	if(targetVertices == 0) {
 		logInfo("Decimated polygon mesh (", actualDecimations, " decimations performed; ",
 				decimater.mesh().n_vertices() - actualDecimations, " vertices remaining)");
@@ -851,6 +1246,7 @@ template void Polygons::update_attribute_descriptor<Device::CUDA>(PolygonsDescri
 template void Polygons::update_attribute_descriptor<Device::OPENGL>(PolygonsDescriptor<Device::OPENGL>& descriptor,
 																	const std::vector<AttributeIdentifier>& vertexAttribs,
 																	const std::vector<AttributeIdentifier>& faceAttribs);
+template void Polygons::compute_error_quadrics<float>(OpenMesh::VPropHandleT<OpenMesh::Geometry::QuadricT<float>>);
 
 
 } // namespace mufflon::scene::geometry

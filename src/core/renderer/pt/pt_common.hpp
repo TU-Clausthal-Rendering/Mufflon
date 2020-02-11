@@ -129,10 +129,9 @@ inline CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT
 		if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) == WalkResult::CANCEL)
 			break;
 
-		if(pathLen == 0) {
+		if(pathLen == 0)
 			outputBuffer.template contribute<HitIdTarget>(coord, ei::Vec2{ vertex.get_primitive_id().instanceId,
 																		   vertex.get_primitive_id().primId });
-		}
 		++pathLen;
 
 		// Evaluate direct hit of area ligths
