@@ -3731,7 +3731,7 @@ Boolean render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename,
 
 	// Make the image a PFM by default
 	auto fileName = fs::u8path(filename);
-	if(fileName.extension() != ".pfm")
+	if(fileName.extension() != ".pfm" && fileName.extension() != ".exr")
 		fileName += ".pfm";
 	if(!fileName.is_absolute())
 		fileName = fs::absolute(fileName);

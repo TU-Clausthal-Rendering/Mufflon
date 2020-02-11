@@ -1,6 +1,7 @@
 #include "plugin/texture_plugin_interface.h"
 #include "util/filesystem.hpp"
 #include "util/log.hpp"
+#include "util/pixel_conversion.hpp"
 #include "util/string_view.hpp"
 #include <gli/gl.hpp>
 #include <gli/gli.hpp>
@@ -8,6 +9,10 @@
 #include <cuda_fp16.h>
 #include <cstring>
 #include <mutex>
+#include <tuple>
+
+#define TINYEXR_IMPLEMENTATION
+#include "tinyexr.h"
 
 // Helper macros for error checking and logging
 #define FUNCTION_NAME __func__
@@ -30,9 +35,111 @@ using namespace mufflon;
 
 namespace {
 
-Boolean load_openexr(const char* path, TextureData* texData) {
-	// TODO
-	return false;
+Boolean load_exr(const char* path, TextureData* texData) {
+	int width, height;
+	float* data;
+	const char* err;
+	if(int ret; ret = LoadEXR(&data, &width, &height, path, &err) != TINYEXR_SUCCESS) {
+		logError("[", FUNCTION_NAME, "] Failed to load EXR file '", path, "': ", err);
+		return false;
+	}
+
+	texData->components = 4u;
+	texData->format = TextureFormat::FORMAT_RGBA32F;
+	texData->layers = 1u;
+	texData->sRgb = false;
+	texData->width = static_cast<std::uint32_t>(width);
+	texData->height = static_cast<std::uint32_t>(height);
+	texData->data = reinterpret_cast<std::uint8_t*>(data);
+
+	// Flip image along x-axis
+	for(std::uint32_t y = 0u; y < texData->height / 2u; ++y) {
+		for(std::uint32_t x = 0u; x < texData->width; ++x) {
+			float tmp[4u];
+			const auto index = sizeof(tmp) * (x + y * texData->width);
+			const auto flippedIndex = sizeof(tmp) * (x + (texData->height - y - 1u) * texData->width);
+			std::memcpy(tmp, texData->data + index, sizeof(tmp));
+			std::memcpy(texData->data + index, texData->data + flippedIndex, sizeof(tmp));
+			std::memcpy(texData->data + flippedIndex, tmp, sizeof(tmp));
+		}
+	}
+
+	return true;
+}
+
+Boolean store_exr(const char* path, const TextureData* texData) {
+	const float* data = nullptr;
+	const auto channelType = util::get_channel_type(texData->format);
+
+	EXRHeader header;
+	InitEXRHeader(&header);
+
+	EXRImage image;
+	InitEXRImage(&image);
+
+	// To make things easier we only export float EXRs, since we have to convert to BGR anyway
+	const auto originalChannelCount = util::get_channel_count(texData->format);
+	constexpr std::size_t CHANNELS = 4u;
+	const auto pixelCount = static_cast<std::size_t>(texData->width) * static_cast<std::size_t>(texData->height);
+	std::vector<float> pixels(CHANNELS * pixelCount);
+	const auto pixelSize = util::get_format_size(texData->format);
+	for(std::size_t y = 0u; y < static_cast<std::size_t>(texData->height); ++y) {
+		for(std::size_t x = 0u; x < static_cast<std::size_t>(texData->width); ++x) {
+			const auto index = x + y * static_cast<std::size_t>(texData->width);
+			const auto byteOffset = pixelSize * index;
+			const auto value = util::read_pixel(reinterpret_cast<const char*>(texData->data) + byteOffset,
+												TextureFormat::FORMAT_RGBA32F);
+			// EXR is Y-inverted compared to our coordinate system
+			const auto pixelIndex = x + (static_cast<std::size_t>(texData->height) - y - 1u)
+				* static_cast<std::size_t>(texData->width);
+			pixels[0u * pixelCount + pixelIndex] = value.b;
+			pixels[1u * pixelCount + pixelIndex] = value.g;
+			pixels[2u * pixelCount + pixelIndex] = value.r;
+			// Check if we had an alpha channel present
+			if(originalChannelCount == 4u)
+				pixels[3u * pixelCount + pixelIndex] = value.a;
+			else
+				pixels[3u * pixelCount + pixelIndex] = 1.f;
+		}
+	}
+
+	const float* pixelPtrs[] = {
+		pixels.data() + 0u * pixelCount,
+		pixels.data() + 1u * pixelCount,
+		pixels.data() + 2u * pixelCount,
+		pixels.data() + 3u * pixelCount
+	};
+	image.num_channels = texData->components;
+	image.images = (unsigned char**)pixelPtrs;
+	image.width = static_cast<int>(texData->width);
+	image.height = static_cast<int>(texData->height);
+
+	header.num_channels = 4;
+	auto channels = std::make_unique<EXRChannelInfo[]>(header.num_channels);
+	header.channels = channels.get();
+	// Must be BGR(A) order, since most of EXR viewers expect this channel order.
+	strncpy(header.channels[0].name, "B", 255u); header.channels[0].name[strlen("B")] = '\0';
+	strncpy(header.channels[1].name, "G", 255u); header.channels[1].name[strlen("G")] = '\0';
+	strncpy(header.channels[2].name, "R", 255u); header.channels[2].name[strlen("R")] = '\0';
+	strncpy(header.channels[3].name, "A", 255u); header.channels[3].name[strlen("A")] = '\0';
+
+	auto pixelTypes = std::make_unique<int[]>(2 * header.num_channels);
+
+	header.pixel_types = pixelTypes.get();
+	header.requested_pixel_types = &pixelTypes[header.num_channels];
+	for(int i = 0; i < header.num_channels; i++) {
+		header.pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT; // pixel type of input image
+		header.requested_pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT; // pixel type of output image to be stored in .EXR
+	}
+
+	const char* err;
+	int ret = SaveEXRImageToFile(&image, &header, path, &err);
+	if(ret != TINYEXR_SUCCESS) {
+		logError("[", FUNCTION_NAME, "] Failed to save EXR file '", path, "': ", err);
+		return false;
+	}
+
+	return true;
 }
 
 unsigned char get_format(gli::format format, TextureData& texData) {
@@ -128,12 +235,14 @@ std::size_t get_channels(TextureFormat format) {
 
 Boolean can_load_texture_format(const char* ext) {
 	return std::strncmp(ext, ".dds", 4u) == 0
-		|| std::strncmp(ext, ".ktx", 4u) == 0;
+		|| std::strncmp(ext, ".ktx", 4u) == 0
+		|| std::strncmp(ext, ".exr", 4u) == 0;
 }
 
 Boolean can_store_texture_format(const char* ext) {
 	return std::strncmp(ext, ".dds", 4u) == 0
-		|| std::strncmp(ext, ".ktx", 4u) == 0;
+		|| std::strncmp(ext, ".ktx", 4u) == 0
+		|| std::strncmp(ext, ".exr", 4u) == 0;
 }
 
 
@@ -150,7 +259,7 @@ Boolean load_texture(const char* path, TextureData* texData) {
 
 		// Check if we need to load OpenEXR
 		if(pathView.length() >= 4u && pathView.substr(pathView.length() - 4u).compare(".exr") == 0)
-			return load_openexr(path, texData);
+			return load_exr(path, texData);
 
 		gli::texture tex = gli::load(path);
 		if(tex.empty()) {
@@ -255,6 +364,12 @@ Boolean store_texture(const char* path, const TextureData* texData) {
 		CHECK_NULLPTR(path, "texture path", false);
 		CHECK_NULLPTR(texData, "texture return data", false);
 
+		StringView pathView = path;
+
+		// Check if we need to store OpenEXR
+		if(pathView.length() >= 4u && pathView.substr(pathView.length() - 4u).compare(".exr") == 0)
+			return store_exr(path, texData);
+
 		constexpr std::size_t mipmap = 0u;
 
 		gli::texture::extent_type extent(texData->width, texData->height, 1);
@@ -282,11 +397,11 @@ Boolean store_texture(const char* path, const TextureData* texData) {
 				}
 			}
 		}
-		gli::save(tex, path);
+		gli::save(tex, pathView.data());
 		return true;
 	} catch(const std::exception& e) {
 		logError("[", FUNCTION_NAME, "] Texture store for '",
-			path, "' caught exception: ", e.what());
+				 path, "' caught exception: ", e.what());
 		return false;
 	}
 }
