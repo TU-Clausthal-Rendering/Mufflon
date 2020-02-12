@@ -48,7 +48,7 @@ private:
 	// Reset the initialization of the RNGs. If necessary also changes the number of RNGs.
 	void init_rngs(int num);
 	void gather_importance();
-	void update_reduction_factors();
+	void update_reduction_factors(u32 frameStart, u32 frameEnd);
 	void initialize_decimaters();
 	void compute_max_importance();
 	void display_importance(const bool accumulated = false);

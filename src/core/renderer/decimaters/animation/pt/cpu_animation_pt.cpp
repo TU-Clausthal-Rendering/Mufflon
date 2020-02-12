@@ -79,8 +79,17 @@ void CpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 		m_reduced = std::vector<bool>(m_world.get_frame_count(), false);
 	} else if(m_stage == Stage::IMPORTANCE_GATHERED && !m_reduced[m_world.get_frame_current()]) {
 		logInfo("Performing decimation iteration...");
+
+		const auto windowHalfWidth = (m_params.slidingWindowHalfWidth == 0u)
+			? m_world.get_frame_count()
+			: m_params.slidingWindowHalfWidth;
+		const u32 startFrame = std::max<u32>(m_world.get_frame_current(), m_params.slidingWindowHalfWidth)
+			- m_params.slidingWindowHalfWidth;
+		const u32 endFrame = std::min<u32>(m_world.get_frame_current() + m_params.slidingWindowHalfWidth,
+										   m_world.get_frame_count() - 1u);
+
 		// Update the reduction factors
-		this->update_reduction_factors();
+		this->update_reduction_factors(startFrame, endFrame);
 
 		const auto processTime = CpuProfileState::get_process_time();
 		const auto cycles = CpuProfileState::get_cpu_cycle();
@@ -88,7 +97,7 @@ void CpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 
 #pragma PARALLEL_FOR
 		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
-			m_decimaters[i]->upload_importance(m_params.impWeightMethod);
+			m_decimaters[i]->upload_importance(m_params.impWeightMethod, startFrame, endFrame);
 			m_decimaters[i]->iterate(static_cast<std::size_t>(m_params.threshold), (float)(1.0 - m_remainingVertexFactor[i]));
 		}
 		m_currentScene->clear_accel_structure();
@@ -290,7 +299,7 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 	logInfo("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - timeBegin).count(), "ms");
 }
 
-void CpuShadowSilhouettesPT::update_reduction_factors() {
+void CpuShadowSilhouettesPT::update_reduction_factors(u32 frameStart, u32 frameEnd) {
 	// To compute the reduction factors for each mesh, we take the total importance
 	// per mesh and assign the factors proportionally to them.
 	// Bringing in animations, we have different options:
@@ -305,17 +314,18 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 			m_remainingVertexFactor.push_back(1.0);
 		return;
 	}
-
+	
 	// Compute the total expected vertex count over all meshes
-	const auto currAnimationFrame = m_world.get_frame_current();
-	const auto endAnimationFrame = m_world.get_frame_count();
-	const auto end = endAnimationFrame;
 	double expectedVertexCount = 0.0;
 
 	m_remainingVertexFactor.resize(m_decimaters.size(), 0.f);
 	switch(m_params.vertexDistMethod) {
-		case PVertexDistMethod::Values::AVERAGE: {
-			for(u32 frame = 0; frame < end; ++frame) {
+		case PVertexDistMethod::Values::AVERAGE_ALL:
+			frameStart = 0u;
+			frameEnd = m_world.get_frame_count() - 1u;
+			[[fallthrough]];
+;		case PVertexDistMethod::Values::AVERAGE: {
+			for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
 				for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 					auto& decimater = m_decimaters[i];
 					if(decimater->get_original_vertex_count() > m_params.threshold) {
@@ -329,12 +339,16 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 			}
 			// Compute average per frame
 			for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
-				m_remainingVertexFactor[i] /= static_cast<float>(end);
+				m_remainingVertexFactor[i] /= static_cast<float>(frameEnd - frameStart + 1u);
 
-			expectedVertexCount /= static_cast<float>(end);
+			expectedVertexCount /= static_cast<float>(frameEnd - frameStart + 1u);
 		}	break;
+		case PVertexDistMethod::Values::MAX_ALL:
+			frameStart = 0u;
+			frameEnd = m_world.get_frame_count() - 1u;
+			[[fallthrough]];
 		case PVertexDistMethod::Values::MAX: {
-			for(u32 frame = 0; frame < end; ++frame) {
+			for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
 				for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 					auto& decimater = m_decimaters[i];
 					if(decimater->get_original_vertex_count() > m_params.threshold) {
@@ -348,7 +362,7 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 				}
 			}
 
-			expectedVertexCount /= static_cast<float>(end);
+			expectedVertexCount /= static_cast<float>(frameEnd - frameStart + 1u);
 		}	break;
 		default: throw std::runtime_error("Invalid vertex budget method");
 	}

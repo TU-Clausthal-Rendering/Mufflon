@@ -226,7 +226,10 @@ class DllHolder:
         self.core.scenario_get_name.restype = c_char_p
         self.core.scenario_get_name.argtypes = [c_void_p]
         self.core.world_set_frame_current.argtypes = [c_void_p, c_uint]
+        self.core.world_get_camera.restype = c_void_p
+        self.core.world_get_camera.argtypes = [c_void_p, c_char_p]
         self.core.world_get_current_scenario.restype = c_void_p
+        self.core.world_get_current_scenario.argtypes = [c_void_p]
         self.core.world_find_scenario.restype = c_void_p
         self.core.world_find_scenario.argtypes = [c_void_p, c_char_p]
         self.core.world_load_scenario.restype = c_void_p
@@ -423,6 +426,9 @@ class DllInterface:
 
     def render_get_active_scenario_name(self):
         return self.dllHolder.core.scenario_get_name(self.dllHolder.core.world_get_current_scenario()).decode()
+        
+    def world_get_camera(self, name):
+        return self.dllHolder.core.world_get_camera(self.muffInst, c_char_p(name.encode('utf-8')))
 
     def world_set_frame_current(self, frame):
         return self.dllHolder.core.world_set_frame_current(self.muffInst, c_uint(frame))

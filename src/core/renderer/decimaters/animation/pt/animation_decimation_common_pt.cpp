@@ -37,7 +37,7 @@ inline float compute_area(const PolygonMeshType& mesh, const OpenMesh::VertexHan
 
 ImportanceDecimater::ImportanceDecimater(StringView objectName, ArrayDevHandle_t<DEVICE, silhouette::pt::Importances<DEVICE>> impBuffer,
 										 Lod& original, Lod& decimated, const std::size_t initialCollapses,
-										 const u32 windowSize, const float viewWeight, const float lightWeight,
+										 const u32 frameCount, const float viewWeight, const float lightWeight,
 										 const float shadowWeight, const float shadowSilhouetteWeight) :
 	m_objectName(objectName),
 	m_original(original),
@@ -46,7 +46,7 @@ ImportanceDecimater::ImportanceDecimater(StringView objectName, ArrayDevHandle_t
 	m_decimatedPoly(&m_decimated.template get_geometry<Polygons>()),
 	m_originalMesh(m_originalPoly.get_mesh()),
 	m_decimatedMesh(&m_decimatedPoly->get_mesh()),
-	m_windowSize{ windowSize },
+	m_frameCount{ frameCount },
 	m_importanceBuffer{ impBuffer },
 	m_currImpBuffer{ nullptr },
 	m_viewWeight(viewWeight),
@@ -82,7 +82,7 @@ ImportanceDecimater::ImportanceDecimater(ImportanceDecimater&& dec) :
 	m_originalPoly(dec.m_originalPoly),
 	m_decimatedPoly(dec.m_decimatedPoly),
 	m_originalMesh(dec.m_originalMesh),
-	m_windowSize{ dec.m_windowSize },
+	m_frameCount{ dec.m_frameCount },
 	m_decimatedMesh(dec.m_decimatedMesh),
 	m_importanceBuffer(std::move(dec.m_importanceBuffer)),
 	m_currImpBuffer{ dec.m_currImpBuffer },
@@ -145,7 +145,8 @@ void ImportanceDecimater::update_importance_density(const silhouette::pt::Import
 	m_importanceSum.back() = importanceSum + m_shadowWeight * sum.shadowImportance - sum.shadowSilhouetteImportance;
 }
 
-void ImportanceDecimater::upload_importance(const PImpWeightMethod::Values weighting) {
+void ImportanceDecimater::upload_importance(const PImpWeightMethod::Values weighting,
+											u32 startFrame, u32 endFrame) {
 	// Map the importance back to the original mesh
 	for(auto iter = m_originalMesh.vertices_begin(); iter != m_originalMesh.vertices_end(); ++iter) {
 		const auto vertex = *iter;
@@ -158,17 +159,27 @@ void ImportanceDecimater::upload_importance(const PImpWeightMethod::Values weigh
 		// TODO: end of frame sequence!
 		m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = 0.f;
 		switch(weighting) {
+			case PImpWeightMethod::Values::AVERAGE_ALL:
+				startFrame = 0u;
+				endFrame = m_frameCount - 1u;
+				[[fallthrough]];
 			case PImpWeightMethod::Values::AVERAGE:
-				for(u32 f = 0u; f < m_windowSize; ++f) {
-					const auto offset = m_originalMesh.n_vertices() * f + m_originalMesh.property(m_collapsedTo, v).idx();
+				for(u32 f = startFrame; f <= endFrame; ++f) {
+					// TODO: the importance comes not from the original, but the successively decimated mesh
+					//const auto offset = m_originalMesh.n_vertices() * f + m_originalMesh.property(m_collapsedTo, v).idx();
+					const auto offset = m_originalMesh.n_vertices() * f + vertex.idx();
 					m_originalMesh.property(m_accumulatedImportanceDensity, vertex) += m_importanceBuffer[offset].viewImportance;
 				}
-				m_originalMesh.property(m_accumulatedImportanceDensity, vertex) /= static_cast<float>(m_windowSize);
-				m_originalMesh.property(m_accumulatedImportanceDensity, vertex) /= static_cast<float>(m_windowSize);
+				m_originalMesh.property(m_accumulatedImportanceDensity, vertex) /= static_cast<float>(endFrame - startFrame + 1u);
 				break;
+			case PImpWeightMethod::Values::MAX_ALL:
+				startFrame = 0u;
+				endFrame = m_frameCount - 1u;
+				[[fallthrough]];
 			case PImpWeightMethod::Values::MAX:
-				for(u32 f = 0u; f < m_windowSize; ++f) {
-					const auto offset = m_originalMesh.n_vertices() * f + m_originalMesh.property(m_collapsedTo, v).idx();
+				for(u32 f = startFrame; f <= endFrame; ++f) {
+					//const auto offset = m_originalMesh.n_vertices() * f + m_originalMesh.property(m_collapsedTo, v).idx();
+					const auto offset = m_originalMesh.n_vertices() * f + vertex.idx();
 					m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = std::max<float>(
 						m_originalMesh.property(m_accumulatedImportanceDensity, vertex),
 						m_importanceBuffer[offset].viewImportance);

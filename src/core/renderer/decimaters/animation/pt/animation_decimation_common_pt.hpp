@@ -18,8 +18,7 @@ public:
 
 	ImportanceDecimater(StringView objectName, ArrayDevHandle_t<DEVICE, silhouette::pt::Importances<DEVICE>> impBuffer,
 						scene::Lod& original, scene::Lod& decimated,
-						const std::size_t initialCollapses,
-						const u32 windowSize,
+						const std::size_t initialCollapses, const u32 frameCount,
 						const float viewWeight, const float lightWeight,
 						const float shadowWeight, const float shadowSilhouetteWeight);
 	ImportanceDecimater(const ImportanceDecimater&) = delete;
@@ -33,7 +32,7 @@ public:
 	// Updates the importance densities of the decimated mesh
 	void update_importance_density(const silhouette::pt::ImportanceSums& impSums);
 	// Uploads the importance with a given function for inter-frame coherency
-	void upload_importance(const PImpWeightMethod::Values weighting);
+	void upload_importance(const PImpWeightMethod::Values weighting, u32 frameStart, u32 frameEnd);
 	/* Updates the decimated mesh by collapsing and uncollapsing vertices.
 	 * The specified threshold determines when a vertex collapses or gets restored
 	 */
@@ -64,7 +63,7 @@ private:
 	scene::geometry::Polygons* m_decimatedPoly;
 	Mesh& m_originalMesh;
 	Mesh* m_decimatedMesh;
-	u32 m_windowSize;
+	u32 m_frameCount;
 
 	std::vector<double> m_importanceSum{};									// Stores the current importance sum (updates in update_importance_density)
 

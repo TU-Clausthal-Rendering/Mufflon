@@ -108,13 +108,13 @@ struct PShadowSilhouetteWeight {
 	}
 };
 struct PVertexDistMethod {
-	PARAM_ENUM(vertexDistMethod, AVERAGE, MAX) = Values::AVERAGE;
+	PARAM_ENUM(vertexDistMethod, AVERAGE, MAX, AVERAGE_ALL, MAX_ALL) = Values::AVERAGE;
 	static constexpr ParamDesc get_desc() noexcept {
 		return { "Vertex distribution method", ParameterTypes::ENUM };
 	}
 };
 struct PImpWeightMethod {
-	PARAM_ENUM(impWeightMethod, AVERAGE, MAX) = Values::AVERAGE;
+	PARAM_ENUM(impWeightMethod, AVERAGE, MAX, AVERAGE_ALL, MAX_ALL) = Values::AVERAGE;
 	static constexpr ParamDesc get_desc() noexcept {
 		return { "Importance weighting method", ParameterTypes::ENUM };
 	}
