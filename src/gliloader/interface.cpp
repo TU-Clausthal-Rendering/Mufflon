@@ -79,9 +79,8 @@ Boolean store_exr(const char* path, const TextureData* texData) {
 
 	// To make things easier we only export float EXRs, since we have to convert to BGR anyway
 	const auto originalChannelCount = util::get_channel_count(texData->format);
-	constexpr std::size_t CHANNELS = 4u;
 	const auto pixelCount = static_cast<std::size_t>(texData->width) * static_cast<std::size_t>(texData->height);
-	std::vector<float> pixels(CHANNELS * pixelCount);
+	std::vector<float> pixels(originalChannelCount * pixelCount);
 	const auto pixelSize = util::get_format_size(texData->format);
 	for(std::size_t y = 0u; y < static_cast<std::size_t>(texData->height); ++y) {
 		for(std::size_t x = 0u; x < static_cast<std::size_t>(texData->width); ++x) {
@@ -92,17 +91,26 @@ Boolean store_exr(const char* path, const TextureData* texData) {
 			// EXR is Y-inverted compared to our coordinate system
 			const auto pixelIndex = x + (static_cast<std::size_t>(texData->height) - y - 1u)
 				* static_cast<std::size_t>(texData->width);
-			pixels[0u * pixelCount + pixelIndex] = value.b;
-			pixels[1u * pixelCount + pixelIndex] = value.g;
-			pixels[2u * pixelCount + pixelIndex] = value.r;
-			// Check if we had an alpha channel present
-			if(originalChannelCount == 4u)
-				pixels[3u * pixelCount + pixelIndex] = value.a;
-			else
-				pixels[3u * pixelCount + pixelIndex] = 1.f;
+			switch(originalChannelCount) {
+				default:
+				case 4:
+					pixels[3u * pixelCount + pixelIndex] = value.a;
+					[[fallthrough]];
+				case 3:
+					pixels[2u * pixelCount + pixelIndex] = value.b;
+					[[fallthrough]];
+				case 2:
+					pixels[1u * pixelCount + pixelIndex] = value.g;
+					[[fallthrough]];
+				case 1:
+					pixels[0u * pixelCount + pixelIndex] = value.r;
+					break;
+			}
 		}
 	}
 
+	// It is perfectly valid to create these (possibly invalid) pointers, since
+	// we never access them if the channel count does not match
 	const float* pixelPtrs[] = {
 		pixels.data() + 0u * pixelCount,
 		pixels.data() + 1u * pixelCount,
@@ -114,14 +122,25 @@ Boolean store_exr(const char* path, const TextureData* texData) {
 	image.width = static_cast<int>(texData->width);
 	image.height = static_cast<int>(texData->height);
 
-	header.num_channels = 4;
+	header.num_channels = std::min(4, static_cast<int>(originalChannelCount));
 	auto channels = std::make_unique<EXRChannelInfo[]>(header.num_channels);
 	header.channels = channels.get();
 	// Must be BGR(A) order, since most of EXR viewers expect this channel order.
-	strncpy(header.channels[0].name, "B", 255u); header.channels[0].name[strlen("B")] = '\0';
-	strncpy(header.channels[1].name, "G", 255u); header.channels[1].name[strlen("G")] = '\0';
-	strncpy(header.channels[2].name, "R", 255u); header.channels[2].name[strlen("R")] = '\0';
-	strncpy(header.channels[3].name, "A", 255u); header.channels[3].name[strlen("A")] = '\0';
+	switch(originalChannelCount) {
+		default:
+		case 4:
+			strncpy(header.channels[3].name, "A", 255u); header.channels[3].name[strlen("A")] = '\0';
+			[[fallthrough]];
+		case 3:
+			strncpy(header.channels[2].name, "B", 255u); header.channels[2].name[strlen("B")] = '\0';
+			[[fallthrough]];
+		case 2:
+			strncpy(header.channels[1].name, "G", 255u); header.channels[1].name[strlen("G")] = '\0';
+			[[fallthrough]];
+		case 1:
+			strncpy(header.channels[0].name, "R", 255u); header.channels[0].name[strlen("R")] = '\0';
+			break;
+	}
 
 	auto pixelTypes = std::make_unique<int[]>(2 * header.num_channels);
 
