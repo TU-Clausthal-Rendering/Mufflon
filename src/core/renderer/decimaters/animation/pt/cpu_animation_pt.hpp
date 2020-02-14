@@ -62,7 +62,7 @@ private:
 	unique_device_ptr<Device::CPU, ArrayDevHandle_t<Device::CPU, silhouette::pt::Importances<Device::CPU>>[]> m_importances;
 	unique_device_ptr<Device::CPU, ArrayDevHandle_t<Device::CPU, silhouette::pt::Importances<Device::CPU>>[]> m_accumImportances;
 	std::vector<PerFrameData> m_perFrameData;
-	std::vector<double> m_remainingVertexFactor;
+	std::vector<std::size_t> m_remainingVertices;
 
 	std::vector<float> m_last;
 

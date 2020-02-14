@@ -46,7 +46,7 @@ public:
 	/* Updates the decimated mesh by collapsing and uncollapsing vertices.
 	 * The specified threshold determines when a vertex collapses or gets restored
 	 */
-	void iterate(const std::size_t targetCount);
+	void iterate(const std::size_t targetCount, const data_structs::CountOctree* view);
 
 	// Functions for querying internal state
 	float get_current_max_importance() const;

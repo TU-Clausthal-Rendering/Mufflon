@@ -37,6 +37,10 @@ namespace mufflon::util {
 class IByteReader;
 } // namespace mufflon::util
 
+namespace mufflon::data_structs {
+class CountOctree;
+}
+
 namespace mufflon { namespace scene {
 
 template < Device dev >
@@ -304,6 +308,7 @@ public:
 	// Implements decimation.
 	std::size_t decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 						 std::size_t targetVertices, bool garbageCollect);
+	std::size_t cluster(const data_structs::CountOctree& octree, bool garbageCollect);
 	std::size_t cluster(std::size_t gridRes, bool garbageCollect);
 
 	// Splits a vertex

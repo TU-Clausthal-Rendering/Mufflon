@@ -197,6 +197,7 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 
 			const auto weightedImportance = std::sqrt(importance * curv);
 			importanceSum += std::sqrt(importance * area * curv);
+			//m_importances[m_originalMesh.property(m_collapsedTo, v).idx()].viewImportance = weightedImportance;
 			// Put importance into temporary storage
 			//m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = weightedImportance;
 		}
@@ -373,7 +374,7 @@ ArrayDevHandle_t<Device::CPU, Importances<Device::CPU>> ImportanceDecimater<Devi
 }
 
 template < Device dev >
-void ImportanceDecimater<dev>::iterate(const std::size_t targetCount) {
+void ImportanceDecimater<dev>::iterate(const std::size_t targetCount, const data_structs::CountOctree* view) {
 	// Reset the collapse property
 	for(auto vertex : m_originalMesh.vertices()) {
 		m_originalMesh.property(m_collapsed, vertex) = false;
@@ -406,9 +407,14 @@ void ImportanceDecimater<dev>::iterate(const std::size_t targetCount) {
 	decimater.module(trackerHandle).set_properties(m_originalMesh, m_collapsed, m_collapsedTo);
 	decimater.module(impHandle).set_properties(m_originalMesh, m_accumulatedImportanceDensity);
 
-	if(targetCount) {
+	if(targetCount < get_original_vertex_count()) {
 		const auto t0 = std::chrono::high_resolution_clock::now();
-		const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
+		std::size_t collapses = 0u;
+		if(view != nullptr)
+			collapses = m_decimatedPoly->cluster(*view, false);
+		else
+			collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
+		//const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
 		const auto t1 = std::chrono::high_resolution_clock::now();
 		const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
 		logInfo("Collapse duration: ", duration.count(), "ms");

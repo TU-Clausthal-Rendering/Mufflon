@@ -4,6 +4,7 @@
 #include "util/parallel.hpp"
 #include "util/punning.hpp"
 #include "profiler/cpu_profiler.hpp"
+#include "core/data_structs/count_octree.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/scenario.hpp"
 #include "core/scene/materials/material.hpp"
@@ -20,113 +21,6 @@
 #include <random>
 
 namespace mufflon::scene::geometry {
-
-class Octree {
-public:
-	Octree(const ei::Box& bounds, u32 capacity) :
-		m_sceneSize{ (bounds.max - bounds.min) * 1.002f },
-		m_sceneSizeInv{ 1.f / m_sceneSize },
-		m_minBound{ bounds.min - m_sceneSize * (1.002f - 1.f) / 2.f },
-		m_capacity{ std::max(capacity, 1u) },
-		m_size{ 9u },
-		m_depth{ 1u },
-		m_nodes{ std::make_unique<Node[]>(m_capacity) }
-	{
-		// Root node
-		m_nodes[0] = Node::as_parent(1);
-		for(std::size_t i = 0u; i < 8u; ++i)
-			m_nodes[1u + i] = Node{};
-	}
-
-	void split(const ei::Vec3& pos) {
-		if(m_size >= m_capacity)
-			return;
-
-		ei::Vec3 offPos = pos - m_minBound;
-		ei::Vec3 normPos = offPos * m_sceneSizeInv;
-		ei::UVec3 iPos{ normPos * (1 << 30) };
-		Node countOrChild = Node::as_parent(1);
-		u32 lvl = 1;
-		u32 idx;
-		do {
-			// Get the relative index of the child [0,7]
-			ei::UVec3 gridPos = iPos >> (30u - lvl);
-			idx = (gridPos.x & 1) + 2 * (gridPos.y & 1) + 4 * (gridPos.z & 1);
-			idx += countOrChild.get_child_offset();
-			countOrChild = m_nodes[idx];
-			++lvl;
-		} while(countOrChild.is_parent());
-
-		// Allocate space for the new children
-		const auto offset = m_size;
-		m_size += 8;
-		if(m_size >= m_capacity) {
-			m_size = m_capacity;
-			return;
-		}
-
-		m_depth = std::max(m_depth, lvl);
-		m_nodes[idx] = Node::as_parent(offset);
-		for(std::size_t i = 0u; i < 8u; ++i)
-			m_nodes[offset + i] = Node{};
-	}
-
-	u32 get_deepest_node(const ei::Vec3& pos) {
-		ei::Vec3 offPos = pos - m_minBound;
-		ei::Vec3 normPos = offPos * m_sceneSizeInv;
-		// Get the integer position on the finest level.
-		u32 gridRes = 1 << m_depth;
-		ei::UVec3 iPos{ normPos * gridRes };
-		// Get root value. This will most certainly be a child pointer...
-		Node countOrChild = m_nodes[0];
-		// The most significant bit in iPos distinguishes the children of the root node.
-		// For each level, the next bit will be the relevant one.
-		u32 currentLvlMask = gridRes;
-		u32 idx = 0;
-		while(countOrChild.is_parent()) {
-			currentLvlMask >>= 1;
-			// Get the relative index of the child [0,7]
-			idx = ((iPos.x & currentLvlMask) ? 1 : 0)
-				+ ((iPos.y & currentLvlMask) ? 2 : 0)
-				+ ((iPos.z & currentLvlMask) ? 4 : 0);
-			// 'Add' global offset (which is stored negative)
-			idx += countOrChild.get_child_offset();
-
-			countOrChild = m_nodes[idx];
-		}
-
-		return idx;
-	}
-
-	u32 size() const noexcept { return m_size; }
-
-private:
-	class Node {
-	public:
-		Node() = default;
-
-		static Node as_parent(u32 offset) {
-			return Node{ -static_cast<int>(offset) };
-		}
-
-		bool is_parent() const noexcept { return m_value < 0; }
-		u32 get_child_offset() const noexcept { return static_cast<u32>(-m_value); }
-
-	private:
-		Node(int val) : m_value{ val } {}
-
-		int m_value{ 0 };
-	};
-
-	ei::Vec3 m_sceneSize;
-	ei::Vec3 m_sceneSizeInv;
-	ei::Vec3 m_minBound;
-	u32 m_capacity;
-	u32 m_size;
-	u32 m_depth;
-	std::unique_ptr<Node[]> m_nodes;
-};
-
 
 // Cluster for vertex clustering
 struct VertexCluster {
@@ -655,10 +549,7 @@ OpenMesh::Decimater::DecimaterT<PolygonMeshType> Polygons::create_decimater() {
 	return OpenMesh::Decimater::DecimaterT<PolygonMeshType>(*m_meshData);
 }
 
-//#define CLUSTER_OCTRE
-
-#ifdef CLUSTER_OCTRE
-std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
+std::size_t Polygons::cluster(const data_structs::CountOctree& octree, bool garbageCollect) {
 	using OpenMesh::Geometry::Quadricf;
 
 	this->synchronize<Device::CPU>();
@@ -673,17 +564,13 @@ std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
 
 
 	// We have to track a few things per cluster
-	Octree octree{ m_boundingBox, 4 * vertexCount };
-	for(std::size_t i = 0u; i < vertexCount; ++i)
-		octree.split(util::pun<ei::Vec3>(m_meshData->point(vertices[i])));
-
-	std::vector<VertexCluster> clusters(octree.size());
+	std::vector<VertexCluster> clusters(octree.capacity());
 
 	const auto aabbMin = m_boundingBox.min;
 	const auto aabbDiag = m_boundingBox.max - m_boundingBox.min;
 	// Convenience function to compute the cluster index from a position
 	auto get_cluster_index = [&octree](const ei::Vec3& pos) -> u32 {
-		return octree.get_deepest_node(pos);
+		return octree.get_node_id(pos).index;
 	};
 
 	OpenMesh::VPropHandleT<Quadricf> quadricProps{};
@@ -691,6 +578,7 @@ std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
 	if(!quadricProps.is_valid())
 		throw std::runtime_error("Failed to add error quadric property");
 	// Compute the error quadrics for each vertex
+	// TODO: weight by importance?
 	this->compute_error_quadrics(quadricProps);
 
 	// For each vertex, determine the cluster it belongs to and update its statistics
@@ -747,7 +635,7 @@ std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
 
 	return clusterCount;
 }
-#else // CLUSTER_OCTRE
+
 std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
 	using OpenMesh::Geometry::Quadricf;
 
@@ -842,7 +730,6 @@ std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
 
 	return clusterCount;
 }
-#endif // CLUSTER_OCTRE
 
 std::size_t Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 							   std::size_t targetVertices, bool garbageCollect) {

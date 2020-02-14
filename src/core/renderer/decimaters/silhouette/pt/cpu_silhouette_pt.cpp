@@ -81,7 +81,10 @@ void CpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 		auto scope = Profiler::core().start<CpuProfileState>("Silhouette decimation");
 #pragma omp parallel for schedule(dynamic)
 		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
-			m_decimaters[i]->iterate(m_remainingVertices[i]);
+			if(m_viewOctree)
+				m_decimaters[i]->iterate(m_remainingVertices[i], &(*m_viewOctree)[i]);
+			else
+				m_decimaters[i]->iterate(m_remainingVertices[i], nullptr);
 		}
 		m_currentScene->clear_accel_structure();
 		logInfo("Finished decimation iteration (", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),

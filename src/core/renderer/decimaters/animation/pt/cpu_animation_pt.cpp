@@ -95,10 +95,10 @@ void CpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 		const auto cycles = CpuProfileState::get_cpu_cycle();
 		auto scope = Profiler::core().start<CpuProfileState>("Silhouette decimation");
 
-#pragma PARALLEL_FOR
+#pragma omp parallel for schedule(dynamic)
 		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
 			m_decimaters[i]->upload_importance(m_params.impWeightMethod, startFrame, endFrame);
-			m_decimaters[i]->iterate(static_cast<std::size_t>(m_params.threshold), (float)(1.0 - m_remainingVertexFactor[i]));
+			m_decimaters[i]->iterate(m_remainingVertices[i]);
 		}
 		m_currentScene->clear_accel_structure();
 		logInfo("Finished decimation iteration (", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
@@ -307,18 +307,21 @@ void CpuShadowSilhouettesPT::update_reduction_factors(u32 frameStart, u32 frameE
 	// sum of every frame, we can take averages, or any other kind of weighting
 	// function really
 
-	m_remainingVertexFactor.clear();
+	m_remainingVertices.clear();
 	if(m_params.reduction == 0.f) {
 		// Do not reduce anything
-		for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
-			m_remainingVertexFactor.push_back(1.0);
+		for(const auto& decimater : m_decimaters)
+			m_remainingVertices.push_back(decimater->get_original_vertex_count());
 		return;
 	}
 	
 	// Compute the total expected vertex count over all meshes
-	double expectedVertexCount = 0.0;
+	double importanceSum = 0.0;
+	std::size_t reducibleVertices = 0u;
+	std::size_t nonReducibleVertices = 0u;
 
-	m_remainingVertexFactor.resize(m_decimaters.size(), 0.f);
+	std::vector<double> importance(m_decimaters.size());
+
 	switch(m_params.vertexDistMethod) {
 		case PVertexDistMethod::Values::AVERAGE_ALL:
 			frameStart = 0u;
@@ -328,20 +331,19 @@ void CpuShadowSilhouettesPT::update_reduction_factors(u32 frameStart, u32 frameE
 			for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
 				for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 					auto& decimater = m_decimaters[i];
-					if(decimater->get_original_vertex_count() > m_params.threshold) {
-						m_remainingVertexFactor[i] += (decimater->get_importance_sum(frame));
-						expectedVertexCount += (1.f - m_params.reduction) * decimater->get_original_vertex_count();
-					} else {
-						m_remainingVertexFactor[i] += 1.f;
-						expectedVertexCount += decimater->get_original_vertex_count();
-					}
+					if(decimater->get_original_vertex_count() > m_params.threshold)
+						importance[i] += decimater->get_importance_sum(frame);
 				}
 			}
-			// Compute average per frame
-			for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
-				m_remainingVertexFactor[i] /= static_cast<float>(frameEnd - frameStart + 1u);
 
-			expectedVertexCount /= static_cast<float>(frameEnd - frameStart + 1u);
+			for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+				importance[i] /= static_cast<double>(frameEnd - frameStart + 1u);
+				importanceSum += importance[i];
+				if(m_decimaters[i]->get_original_vertex_count() > m_params.threshold)
+					reducibleVertices += m_decimaters[i]->get_original_vertex_count();
+				else
+					nonReducibleVertices += m_decimaters[i]->get_original_vertex_count();
+			}
 		}	break;
 		case PVertexDistMethod::Values::MAX_ALL:
 			frameStart = 0u;
@@ -352,42 +354,35 @@ void CpuShadowSilhouettesPT::update_reduction_factors(u32 frameStart, u32 frameE
 				for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 					auto& decimater = m_decimaters[i];
 					if(decimater->get_original_vertex_count() > m_params.threshold) {
-						m_remainingVertexFactor[i] = std::max(m_remainingVertexFactor[i],
-							(decimater->get_importance_sum(frame)));
-						expectedVertexCount += (1.f - m_params.reduction) * decimater->get_original_vertex_count();
+						importance[i] = std::max(importance[i], decimater->get_importance_sum(frame));
+						reducibleVertices += m_decimaters[i]->get_original_vertex_count();
 					} else {
-						m_remainingVertexFactor[i] = 1.f;
-						expectedVertexCount += decimater->get_original_vertex_count();
+						nonReducibleVertices += m_decimaters[i]->get_original_vertex_count();
 					}
 				}
 			}
-
-			expectedVertexCount /= static_cast<float>(frameEnd - frameStart + 1u);
+			reducibleVertices /= frameEnd - frameStart + 1u;
+			nonReducibleVertices /= frameEnd - frameStart + 1u;
 		}	break;
 		default: throw std::runtime_error("Invalid vertex budget method");
 	}
-
 	
 	// Determine the reduction parameters for each mesh
-	constexpr u32 MAX_ITERATION_COUNT = 10u;
-	for(u32 iteration = 0u; iteration < MAX_ITERATION_COUNT; ++iteration) {
-		double vertexCountAfterDecimation = 0.0;
-		for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
-			vertexCountAfterDecimation += m_remainingVertexFactor[i] * m_decimaters[i]->get_original_vertex_count();
-		const double normalizationFactor = expectedVertexCount / vertexCountAfterDecimation;
+	const auto totalVertexCount = reducibleVertices + nonReducibleVertices;
+	const std::size_t targetVertexCount = static_cast<std::size_t>((1.f - m_params.reduction) * totalVertexCount);
+	std::size_t reducedVertexPool = targetVertexCount - nonReducibleVertices;
 
-		bool anyAboveOne = false;
-
-		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-			if(m_decimaters[i]->get_original_vertex_count() > m_params.threshold) {
-				m_remainingVertexFactor[i] *= normalizationFactor;
-				anyAboveOne |= m_remainingVertexFactor[i] > 1.0;
-				m_remainingVertexFactor[i] = std::clamp(m_remainingVertexFactor[i], 0.0, 1.0);
-			}
+	for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+		if(m_decimaters[i]->get_original_vertex_count() > m_params.threshold) {
+			const auto targetVertexCount = std::min(m_decimaters[i]->get_original_vertex_count(),
+													static_cast<std::size_t>(importance[i]
+																			 * static_cast<double>(reducedVertexPool) / importanceSum));
+			reducedVertexPool -= targetVertexCount;
+			importanceSum -= importance[i];
+			m_remainingVertices.push_back(targetVertexCount);
+		} else {
+			m_remainingVertices.push_back(m_decimaters[i]->get_original_vertex_count());
 		}
-
-		if(!anyAboveOne)
-			break;
 	}
 }
 
