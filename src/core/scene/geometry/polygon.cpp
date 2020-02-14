@@ -922,6 +922,26 @@ void Polygons::transform(const ei::Mat3x4& transMat) {
 	m_vertexAttributes.mark_changed(Device::CPU);
 }
 
+float Polygons::compute_surface_area() const noexcept {
+	float area = 0.f;
+	for(const auto face : m_meshData->faces()) {
+		auto vIter = m_meshData->cfv_ccwbegin(face);
+		const auto a = *vIter; ++vIter;
+		const auto b = *vIter; ++vIter;
+		const auto c = *vIter; ++vIter;
+		const auto pA = util::pun<ei::Vec3>(m_meshData->point(a));
+		const auto pB = util::pun<ei::Vec3>(m_meshData->point(b));
+		const auto pC = util::pun<ei::Vec3>(m_meshData->point(c));
+		area += ei::len(ei::cross(pB - pA, pC - pA));
+		if(vIter.is_valid()) {
+			const auto d = *vIter;
+			const auto pD = util::pun<ei::Vec3>(m_meshData->point(d));
+			area += ei::len(ei::cross(pC - pA, pD - pA));
+		}
+	}
+	return 0.5f * area;
+}
+
 void Polygons::remove_curvature() {
 	if(m_curvatureHdl.has_value()) {
 		m_vertexAttributes.remove_attribute(m_curvatureHdl.value());

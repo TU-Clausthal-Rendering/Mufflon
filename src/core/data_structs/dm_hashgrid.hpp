@@ -52,6 +52,9 @@ public:
 	// Increase the counter for a cell using a world position.
 	void increase_count(const ei::Vec3& position, const T& value = T{ 1 });
 
+	u32 get_cell_index(const ei::Vec3& pos) const;
+	float get_count(const u32 cellIndex) const;
+
 	// Returns the point-sampled density at the given position wrt. the area of the plane passing through the cell
 	float get_density(const ei::Vec3& position, const ei::Vec3& normal) const;
 

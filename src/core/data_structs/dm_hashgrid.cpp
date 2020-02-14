@@ -1,4 +1,5 @@
 #include "dm_hashgrid.hpp"
+#include "util/assert.hpp"
 #include <climits>
 
 namespace mufflon::data_structs {
@@ -66,6 +67,12 @@ void DmHashGrid<T>::increase_count(const ei::Vec3& position, const T& value) {
 			++s;
 		} // else spin-lock (achieved by not changing i)
 	}
+}
+
+template < class T >
+float DmHashGrid<T>::get_count(const u32 cellIndex) const {
+	mAssert(cellIndex < m_dataCount);
+	return static_cast<float>(m_data[cellIndex].count.load());
 }
 
 template < class T >
@@ -141,6 +148,21 @@ T DmHashGrid<T>::get_count(const ei::UVec3& gridPos) const {
 		c = m_data[i].count.load();
 	}
 	return c;
+}
+template < class T >
+u32 DmHashGrid<T>::get_cell_index(const ei::Vec3& pos) const {
+	const ei::IVec3 gridPosI = ei::floor(pos / m_cellSize);
+	const ei::UVec3 gridPos{ gridPosI };
+	u32 h = get_cell_hash(gridPos);
+	u32 i = h % m_mapSize;
+	int s = 1;
+	T c = m_data[i].count.load();
+	while(c > 0 && m_data[i].cell != gridPos) {
+		i = (h + (s & 1 ? s * s : -s * s) + m_mapSize) % m_mapSize;
+		++s;
+		c = m_data[i].count.load();
+	}
+	return i;
 }
 
 template class DmHashGrid<i32>;

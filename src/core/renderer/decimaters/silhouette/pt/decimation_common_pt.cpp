@@ -18,17 +18,21 @@ using namespace mufflon::renderer::decimaters::modules;
 namespace {
 
 inline float compute_area(const PolygonMeshType& mesh, const OpenMesh::VertexHandle vertex) {
-	// Important: only works for triangles!
 	float area = 0.f;
-	const auto center = mesh.point(vertex);
-	auto circIter = mesh.cvv_ccwbegin(vertex);
-	OpenMesh::Vec3f a = mesh.point(*circIter);
-	OpenMesh::Vec3f b;
-	++circIter;
-	for(; circIter.is_valid(); ++circIter) {
-		b = a;
-		a = mesh.point(*circIter);
-		area += ((a - center) % (b - center)).length();
+	for(auto fIter = mesh.cvf_ccwbegin(vertex); fIter.is_valid(); ++fIter) {
+		auto vIter = mesh.cfv_ccwbegin(*fIter);
+		const auto a = *vIter; ++vIter;
+		const auto b = *vIter; ++vIter;
+		const auto c = *vIter; ++vIter;
+		const auto pA = util::pun<ei::Vec3>(mesh.point(a));
+		const auto pB = util::pun<ei::Vec3>(mesh.point(b));
+		const auto pC = util::pun<ei::Vec3>(mesh.point(c));
+		area += ei::len(ei::cross(pB - pA, pC - pA));
+		if(vIter.is_valid()) {
+			const auto d = *vIter;
+			const auto pD = util::pun<ei::Vec3>(mesh.point(d));
+			area += ei::len(ei::cross(pC - pA, pD - pA));
+		}
 	}
 	return 0.5f * area;
 }
@@ -73,6 +77,9 @@ ImportanceDecimater<dev>::ImportanceDecimater(StringView objectName, Lod& origin
 		// Valid, since no decimation has been performed yet
 		m_originalMesh.property(m_collapsedTo, vertex) = vertex;
 	}
+
+	// Add curvature
+	m_originalPoly.compute_curvature();
 
 	// Perform initial decimation
 	this->decimate_with_error_quadrics(m_clusterGridRes);
@@ -149,13 +156,13 @@ void ImportanceDecimater<Device::CPU>::pull_importance_from_device() {
 }
 
 template < Device dev >
-void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& sum) {
+void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& sum, const bool useCurvature) {
 	// First get the data off the GPU
 	this->pull_importance_from_device();
 
 
+	double importanceSum = 0.0;
 	// Update our statistics: the importance density of each vertex
-	float importanceSum = 0.0;
 #pragma PARALLEL_REDUCTION(+, importanceSum)
 	for(i64 i = 0; i < static_cast<i64>(m_decimatedMesh->n_vertices()); ++i) {
 		const auto vertex = m_decimatedMesh->vertex_handle(static_cast<u32>(i));
@@ -166,15 +173,15 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 		const float viewImportance = m_importances[vertex.idx()].viewImportance;
 
 		const float importance = viewImportance + m_lightWeight * flux;
-
 		importanceSum += importance;
 		m_importances[vertex.idx()].viewImportance = importance / area;
 	}
 
-	// Subtract the shadow silhouette importance and use shadow importance instead
-	logPedantic("Importance sum/shadow/silhouette(", m_objectName, "): ", importanceSum, " ", sum.shadowImportance, " ", sum.shadowSilhouetteImportance);
-	m_importanceSum = importanceSum + m_shadowWeight * sum.shadowImportance - sum.shadowSilhouetteImportance;
-
+	const float* curvature = nullptr;
+	if(useCurvature) {
+		curvature = m_originalPoly.template acquire_const<Device::CPU, float>(m_originalPoly.get_curvature_hdl().value());
+		importanceSum = 0.0;
+	}
 	// Map the importance back to the original mesh
 	for(auto iter = m_originalMesh.vertices_begin(); iter != m_originalMesh.vertices_end(); ++iter) {
 		const auto vertex = *iter;
@@ -183,9 +190,25 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 		while(m_originalMesh.property(m_collapsed, v))
 			v = m_originalMesh.property(m_collapsedTo, v);
 
-		// Put importance into temporary storage
-		m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = m_importances[m_originalMesh.property(m_collapsedTo, v).idx()].viewImportance;
+		const auto importance = std::max(0.f, cuda::atomic_load<dev, float>(m_importances[m_originalMesh.property(m_collapsedTo, v).idx()].viewImportance));
+		if(useCurvature) {
+			const auto area = compute_area(m_originalMesh, vertex);
+			const auto curv = std::abs(curvature[vertex.idx()]);
+
+			const auto weightedImportance = std::sqrt(importance * curv);
+			importanceSum += std::sqrt(importance * area * curv);
+			// Put importance into temporary storage
+			//m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = weightedImportance;
+		}
+		//} else {
+			m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = importance;
+		//}
 	}
+
+	// Subtract the shadow silhouette importance and use shadow importance instead
+	logPedantic("Importance sum/shadow/silhouette(", m_objectName, "): ", importanceSum,
+				" ", sum.shadowImportance, " ", sum.shadowSilhouetteImportance);
+	m_importanceSum = importanceSum + m_shadowWeight * sum.shadowImportance - sum.shadowSilhouetteImportance;
 }
 
 template < Device dev >
@@ -206,7 +229,6 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 	}
 
 	// Update our statistics: the importance density of each vertex
-	const float importanceSum = viewGrid.sum().value;
 //#pragma PARALLEL_REDUCTION(+, importanceSum)
 	for(i64 i = 0; i < static_cast<i64>(m_decimatedMesh->n_vertices()); ++i) {
 		const auto vertex = m_decimatedMesh->vertex_handle(static_cast<u32>(i));
@@ -220,17 +242,15 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 		// In contrast to saving importance per vertex, we have to divide by the sample count here
 		// because we have to distribute the value across many vertices
 		const auto id = viewGrid.get_node_id(pos);
-		const auto viewSample = viewGrid.get_density(pos, normal, id, true);
-		const auto sum = viewSample / area;// / static_cast<float>(vertexCount[id.index]);
+		//const auto viewSample = viewGrid.get_density(pos, normal, id, true);
+		const auto viewSample = viewGrid.get_samples(id).value;
+		const auto sum = viewSample / static_cast<float>(vertexCount[id.index]);
 
-		//importanceSum += sum;
 		m_importances[vertex.idx()].viewImportance = sum;// / area;
 	}
 
-	// Subtract the shadow silhouette importance and use shadow importance instead
-	logPedantic("Importance sum/shadow/silhouette(", m_objectName, "): ", importanceSum, " ", sum.shadowImportance, " ", sum.shadowSilhouetteImportance);
-	m_importanceSum = importanceSum + m_shadowWeight * sum.shadowImportance - sum.shadowSilhouetteImportance;
-
+	double importanceSum = 0.0;
+	const auto* curvature = m_originalPoly.template acquire_const<Device::CPU, float>(m_originalPoly.get_curvature_hdl().value());
 	// Map the importance back to the original mesh
 	for(auto iter = m_originalMesh.vertices_begin(); iter != m_originalMesh.vertices_end(); ++iter) {
 		const auto vertex = *iter;
@@ -239,9 +259,21 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 		while(m_originalMesh.property(m_collapsed, v))
 			v = m_originalMesh.property(m_collapsedTo, v);
 
+		const auto importance = cuda::atomic_load<dev, float>(m_importances[m_originalMesh.property(m_collapsedTo, v).idx()].viewImportance);
+		const auto area = compute_area(m_originalMesh, vertex);
+		const auto curv = std::abs(curvature[vertex.idx()]);
+
+		const auto weightedImportance = std::sqrt(importance * curv);
+		importanceSum += std::sqrt(importance * area * curv);
+
 		// Put importance into temporary storage
-		m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = m_importances[m_originalMesh.property(m_collapsedTo, v).idx()].viewImportance;
+		m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = weightedImportance;
 	}
+
+	// Subtract the shadow silhouette importance and use shadow importance instead
+	logPedantic("Importance sum/shadow/silhouette(", m_objectName, "): ", importanceSum,
+				" ", sum.shadowImportance, " ", sum.shadowSilhouetteImportance);
+	m_importanceSum = importanceSum + m_shadowWeight * sum.shadowImportance - sum.shadowSilhouetteImportance;
 }
 
 template < Device dev >
@@ -252,10 +284,19 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 	// First get the data off the GPU
 	this->pull_importance_from_device();
 
+	// TODO: proper reservation
+	std::vector<u32> vertexCount(viewGrid.capacity());
+
+	for(i64 i = 0; i < static_cast<i64>(m_decimatedMesh->n_vertices()); ++i) {
+		const auto vertex = m_decimatedMesh->vertex_handle(static_cast<u32>(i));
+		const auto pos = util::pun<ei::Vec3>(m_decimatedMesh->point(vertex));
+		const auto id = viewGrid.get_cell_index(pos);
+		vertexCount[id] += 1u;
+	}
 
 	// Update our statistics: the importance density of each vertex
 	float importanceSum = 0.0;
-#pragma PARALLEL_REDUCTION(+, importanceSum)
+//#pragma PARALLEL_REDUCTION(+, importanceSum)
 	for(i64 i = 0; i < static_cast<i64>(m_decimatedMesh->n_vertices()); ++i) {
 		const auto vertex = m_decimatedMesh->vertex_handle(static_cast<u32>(i));
 		// Important: only works for triangles!
@@ -264,9 +305,18 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 		const auto normal = util::pun<ei::Vec3>(m_decimatedMesh->normal(vertex));
 		const auto flux = irradianceGrid.get_density(pos, normal)
 			/ std::max(1.f, static_cast<float>(irradianceCount.get_density(pos, normal)));
-		const auto viewImportance = viewGrid.get_density(pos, normal);
 
-		const float importance = viewImportance + m_lightWeight * flux;
+		const auto id = viewGrid.get_cell_index(pos);
+		const auto count = viewGrid.get_count(id);
+		const auto viewImportance = count / std::max(1.f, static_cast<float>(vertexCount[id]));
+		if(isnan(viewImportance)) {
+			printf("%f %d %d\n", count, id, vertexCount[id]);
+			fflush(stdout);
+			__debugbreak();
+		}
+		//const auto viewImportance = viewGrid.get_density(pos, normal);
+
+		const float importance = viewImportance;// +m_lightWeight * flux;
 
 		importanceSum += importance;
 		m_importances[vertex.idx()].viewImportance = importance;
@@ -323,7 +373,7 @@ ArrayDevHandle_t<Device::CPU, Importances<Device::CPU>> ImportanceDecimater<Devi
 }
 
 template < Device dev >
-void ImportanceDecimater<dev>::iterate(const std::size_t minVertexCount, const float reduction) {
+void ImportanceDecimater<dev>::iterate(const std::size_t targetCount) {
 	// Reset the collapse property
 	for(auto vertex : m_originalMesh.vertices()) {
 		m_originalMesh.property(m_collapsed, vertex) = false;
@@ -356,8 +406,7 @@ void ImportanceDecimater<dev>::iterate(const std::size_t minVertexCount, const f
 	decimater.module(trackerHandle).set_properties(m_originalMesh, m_collapsed, m_collapsedTo);
 	decimater.module(impHandle).set_properties(m_originalMesh, m_accumulatedImportanceDensity);
 
-	if(reduction != 0.f) {
-		const std::size_t targetCount = (reduction == 1.f) ? 0u : static_cast<std::size_t>((1.f - reduction) * m_originalPoly.get_vertex_count());
+	if(targetCount) {
 		const auto t0 = std::chrono::high_resolution_clock::now();
 		const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
 		const auto t1 = std::chrono::high_resolution_clock::now();

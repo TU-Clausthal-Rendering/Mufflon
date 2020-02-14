@@ -1,4 +1,5 @@
 #include "silhouette_importance_gathering_pt.hpp"
+#include "silhouette_importance_gathering_pt_octree.hpp"
 #include "cpu_silhouette_pt.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "util/parallel.hpp"
@@ -80,7 +81,7 @@ void CpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 		auto scope = Profiler::core().start<CpuProfileState>("Silhouette decimation");
 #pragma omp parallel for schedule(dynamic)
 		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
-			m_decimaters[i]->iterate(static_cast<std::size_t>(m_params.threshold), (float)(1.0 - m_remainingVertexFactor[i]));
+			m_decimaters[i]->iterate(m_remainingVertices[i]);
 		}
 		m_currentScene->clear_accel_structure();
 		logInfo("Finished decimation iteration (", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
@@ -105,6 +106,12 @@ void CpuShadowSilhouettesPT::iterate() {
 			m_importanceSums[i].shadowSilhouetteImportance.store(0.f);
 		}
 
+		m_viewOctree = nullptr;
+		m_irradianceOctree = nullptr;
+		m_viewGrid = nullptr;
+		m_irradianceGrid = nullptr;
+		m_irradianceCountGrid = nullptr;
+
 		if(m_params.impDataStruct == PImpDataStruct::Values::OCTREE) {
 			m_viewOctree = std::make_unique<data_structs::CountOctreeManager>(static_cast<u32>(m_params.impCapacity), static_cast<u32>(m_decimaters.size()), 8u);
 			m_irradianceOctree = std::make_unique<data_structs::CountOctreeManager>(static_cast<u32>(m_params.impCapacity), static_cast<u32>(m_decimaters.size()), 8u);
@@ -116,7 +123,7 @@ void CpuShadowSilhouettesPT::iterate() {
 			m_viewGrid = std::make_unique<data_structs::DmHashGrid<float>>(static_cast<u32>(m_params.impCapacity));
 			m_irradianceGrid = std::make_unique<data_structs::DmHashGrid<float>>(static_cast<u32>(m_params.impCapacity));
 			m_irradianceCountGrid = std::make_unique<data_structs::DmHashGrid<u32>>(static_cast<u32>(m_params.impCapacity));
-			const auto cell_size = 0.0005f * m_sceneDesc.diagSize;
+			const auto cell_size = 0.00005f * m_sceneDesc.diagSize;
 			m_viewGrid->set_cell_size(cell_size);
 			m_irradianceGrid->set_cell_size(cell_size);
 			m_irradianceCountGrid->set_cell_size(cell_size);
@@ -166,8 +173,8 @@ void CpuShadowSilhouettesPT::gather_importance() {
 			scene::PrimitiveHandle shadowPrim;
 			switch(m_params.impDataStruct) {
 				case PImpDataStruct::Values::OCTREE:
-					silhouette::sample_importance(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel],
-												  m_importanceSums.get(), *m_viewOctree, *m_viewOctree);
+					silhouette::sample_importance_octree(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel],
+														 m_importanceSums.get(), *m_viewOctree, *m_irradianceOctree);
 					break;
 				case PImpDataStruct::Values::HASHGRID:
 					silhouette::sample_importance(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel],
@@ -257,7 +264,7 @@ void CpuShadowSilhouettesPT::initialize_decimaters() {
 }
 
 void CpuShadowSilhouettesPT::update_reduction_factors() {
-	m_remainingVertexFactor.clear();
+	m_remainingVertices.clear();
 	if(m_params.reduction == 0.f) {
 		// Do not reduce anything
 		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
@@ -271,15 +278,17 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 					break;
 				case PImpDataStruct::Values::VERTEX:
 				default:
-					m_decimaters[i]->update_importance_density(sums);
+					m_decimaters[i]->update_importance_density(sums, m_params.impSumStrat == PImpSumStrat::Values::CURV_AREA);
 					break;
 			}
-			m_remainingVertexFactor.push_back(1.0);
+			m_remainingVertices.push_back(m_decimaters[i]->get_original_vertex_count());
 		}
 		return;
 	}
 
-	double expectedVertexCount = 0.0;
+	double importanceSum = 0.0;
+	std::size_t reducibleVertices = 0u;
+	std::size_t nonReducibleVertices = 0u;
 	for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 		auto& decimater = m_decimaters[i];
 		ImportanceSums sums{ m_importanceSums[i].shadowImportance, m_importanceSums[i].shadowSilhouetteImportance };
@@ -292,38 +301,31 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 				break;
 			case PImpDataStruct::Values::VERTEX:
 			default:
-				m_decimaters[i]->update_importance_density(sums);
+				m_decimaters[i]->update_importance_density(sums, m_params.impSumStrat == PImpSumStrat::Values::CURV_AREA);
 				break;
 		}
 		if(decimater->get_original_vertex_count() > m_params.threshold) {
-			m_remainingVertexFactor.push_back(decimater->get_importance_sum());
-			expectedVertexCount += (1.f - m_params.reduction) * decimater->get_original_vertex_count();
+			importanceSum += decimater->get_importance_sum();
+			reducibleVertices += decimater->get_original_vertex_count();
 		} else {
-			m_remainingVertexFactor.push_back(1.0);
-			expectedVertexCount += decimater->get_original_vertex_count();
+			nonReducibleVertices += decimater->get_original_vertex_count();
 		}
 	}
+	const auto totalVertexCount = reducibleVertices + nonReducibleVertices;
+	const std::size_t targetVertexCount = static_cast<std::size_t>((1.f - m_params.reduction) * totalVertexCount);
+	std::size_t reducedVertexPool = targetVertexCount - nonReducibleVertices;
 
-	// Determine the reduction parameters for each mesh
-	constexpr u32 MAX_ITERATION_COUNT = 10u;
-	for(u32 iteration = 0u; iteration < MAX_ITERATION_COUNT; ++iteration) {
-		double vertexCountAfterDecimation = 0.0;
-		for(std::size_t i = 0u; i < m_decimaters.size(); ++i)
-			vertexCountAfterDecimation += m_remainingVertexFactor[i] * m_decimaters[i]->get_original_vertex_count();
-		const double normalizationFactor = expectedVertexCount / vertexCountAfterDecimation;
-
-		bool anyAboveOne = false;
-
-		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-			if(m_decimaters[i]->get_original_vertex_count() > m_params.threshold) {
-				m_remainingVertexFactor[i] *= normalizationFactor;
-				anyAboveOne |= m_remainingVertexFactor[i] > 1.0;
-				m_remainingVertexFactor[i] = std::clamp(m_remainingVertexFactor[i], 0.0, 1.0);
-			}
+	for(auto& decimater : m_decimaters) {
+		if(decimater->get_original_vertex_count() > m_params.threshold) {
+			const auto targetVertexCount = std::min(decimater->get_original_vertex_count(),
+													static_cast<std::size_t>(decimater->get_importance_sum()
+																			 * static_cast<double>(reducedVertexPool) / importanceSum));
+			reducedVertexPool -= targetVertexCount;
+			importanceSum -= decimater->get_importance_sum();
+			m_remainingVertices.push_back(targetVertexCount);
+		} else {
+			m_remainingVertices.push_back(decimater->get_original_vertex_count());
 		}
-
-		if(!anyAboveOne)
-			break;
 	}
 }
 

@@ -8,6 +8,7 @@
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/renderer/pt/pt_common.hpp"
+#include "core/scene/util.hpp"
 #include "core/scene/accel_structs/intersection.hpp"
 #include "core/scene/lights/light_tree_sampling.hpp"
 #include <ei/3dintersection.hpp>
@@ -697,8 +698,10 @@ inline CUDA_FUNCTION void sample_importance(pt::SilhouetteTargets::RenderBufferT
 												   scene.worldToInstance[hitId.instanceId]);
 			const auto objSpaceNormal = ei::transform(vertices[pathLen].get_normal(),
 													  ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
+			const auto area = compute_area_instance_transformed(scene, lod.polygon, hitId);
+
 			record_direct_hit(lod.polygon, hitId.primId, numVertices, objSpacePos,
-							  objSpaceNormal, cosAngle, params.viewWeight * sharpness,
+							  objSpaceNormal, cosAngle, params.viewWeight * sharpness / area,
 							  get_imp_struct(scene.lodIndices[hitId.instanceId], impStruct...));
 		}
 
@@ -836,16 +839,16 @@ inline CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBuf
 			importance += importances[lodIdx][vertexIndex].viewImportance * distSqr / distSqrSum;
 		}
 
-		if(view != nullptr) {
+		/*if(view != nullptr) {
 			const auto objSpacePos = ei::transform(vertex.get_position(),
 												   scene.worldToInstance[hitId.instanceId]);
 			const auto objSpaceNormal = ei::transform(vertex.get_normal(),
 													  ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
 			const auto data = (*view)[lodIdx].get_density(objSpacePos, objSpaceNormal, true);
 			outputBuffer.template contribute<ImportanceTarget>(coord, static_cast<float>(data));
-		} else {
+		} else {*/
 			outputBuffer.template contribute<ImportanceTarget>(coord, importance / maxImportance);
-		}
+		//}
 		outputBuffer.template contribute<PolyShareTarget>(coord, sums[lodIdx].shadowImportance / static_cast<float>(lod.numPrimitives));
 	}
 }

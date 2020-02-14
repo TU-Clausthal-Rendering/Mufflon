@@ -315,6 +315,8 @@ public:
 	// Transforms polygon data
 	void transform(const ei::Mat3x4& transMat);
 
+	float compute_surface_area() const noexcept;
+
 	// Computes the "mean_curvature" attribute for all vertices
 	void compute_curvature();
 
@@ -388,6 +390,9 @@ public:
 	}
 	const FaceAttributeHandle& get_material_indices_hdl() const noexcept {
 		return m_matIndicesHdl;
+	}
+	std::optional<VertexAttributeHandle> get_curvature_hdl() const noexcept {
+		return m_curvatureHdl;
 	}
 
 	const ei::Box& get_bounding_box() const noexcept {

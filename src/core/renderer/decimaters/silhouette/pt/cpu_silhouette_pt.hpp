@@ -50,7 +50,7 @@ private:
 	// Stores the importance's of each mesh on the GPU/CPU (ptr to actual arrays)
 	unique_device_ptr<Device::CPU, ArrayDevHandle_t<Device::CPU, pt::Importances<Device::CPU>>[]> m_importances;
 	unique_device_ptr<Device::CPU, pt::DeviceImportanceSums<Device::CPU>[]> m_importanceSums;
-	std::vector<double> m_remainingVertexFactor;
+	std::vector<std::size_t> m_remainingVertices;
 
 	std::unique_ptr<data_structs::CountOctreeManager> m_viewOctree{};
 	std::unique_ptr<data_structs::CountOctreeManager> m_irradianceOctree{};

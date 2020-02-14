@@ -23,11 +23,17 @@ struct PImpDataStruct {
 		return { "Importance data structure", ParameterTypes::ENUM };
 	}
 };
+struct PImpSumStrat {
+	PARAM_ENUM(impSumStrat, NORMAL, CURV_AREA) = Values::NORMAL;
+	static constexpr ParamDesc get_desc() noexcept {
+		return { "Importance sum strategy", ParameterTypes::ENUM };
+	}
+};
 
 using SilhouetteParameters = ParameterHandler <
 	PImportanceIterations, PDecimationIterations,
 	PTargetReduction, PInitialReduction, PVertexThreshold,
-	PSelectiveImportance, PShadowSizeWeight, PImpDataStruct,
+	PSelectiveImportance, PShadowSizeWeight, PImpDataStruct, PImpSumStrat,
 	PDirectIndirectRatio, PSharpnessFactor,
 	PClusterSize, PImpStructCapacity,
 	PViewWeight, PLightWeight, PShadowWeight, PShadowSilhouetteWeight,

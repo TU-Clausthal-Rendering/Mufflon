@@ -85,7 +85,7 @@ void GpuShadowSilhouettesPT::post_iteration(IOutputHandler& outputBuffer) {
 		auto scope = Profiler::core().start<CpuProfileState>("Silhouette decimation");
 #pragma PARALLEL_FOR
 		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
-			m_decimaters[i]->iterate(static_cast<std::size_t>(m_params.threshold), (float)(1.0 - m_remainingVertexFactor[i]));
+			m_decimaters[i]->iterate(m_remainingVertexFactor[i]);
 		}
 		logInfo("Finished decimation iteration (", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
 				"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles)");
@@ -238,7 +238,7 @@ void GpuShadowSilhouettesPT::update_reduction_factors() {
 	if(m_params.reduction == 0.f) {
 		// Do not reduce anything
 		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-			m_decimaters[i]->update_importance_density(sums[i]);
+			m_decimaters[i]->update_importance_density(sums[i], m_params.impSumStrat == PImpSumStrat::Values::CURV_AREA);
 			m_remainingVertexFactor.push_back(1.0);
 		}
 		return;
@@ -247,7 +247,7 @@ void GpuShadowSilhouettesPT::update_reduction_factors() {
 	double expectedVertexCount = 0.0;
 	for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 		auto& decimater = m_decimaters[i];
-		decimater->update_importance_density(sums[i]);
+		decimater->update_importance_density(sums[i], m_params.impSumStrat == PImpSumStrat::Values::CURV_AREA);
 		if(decimater->get_original_vertex_count() > m_params.threshold) {
 			m_remainingVertexFactor.push_back(decimater->get_importance_sum());
 			expectedVertexCount += (1.f - m_params.reduction) * decimater->get_original_vertex_count();

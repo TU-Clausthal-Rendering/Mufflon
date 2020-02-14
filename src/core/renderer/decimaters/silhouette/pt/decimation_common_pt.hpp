@@ -35,7 +35,7 @@ public:
 	// Resizes the buffers properly
 	ArrayDevHandle_t<dev, Importances<dev>> start_iteration();
 	// Updates the importance densities of the decimated mesh
-	void update_importance_density(const ImportanceSums& impSums);
+	void update_importance_density(const ImportanceSums& impSums, const bool useCurvature);
 	void update_importance_density(const ImportanceSums& impSums,
 								   const data_structs::CountOctree& viewGrid,
 								   const data_structs::CountOctree& irradianceGrid);
@@ -46,7 +46,7 @@ public:
 	/* Updates the decimated mesh by collapsing and uncollapsing vertices.
 	 * The specified threshold determines when a vertex collapses or gets restored
 	 */
-	void iterate(const std::size_t minVertexCount, const float reduction);
+	void iterate(const std::size_t targetCount);
 
 	// Functions for querying internal state
 	float get_current_max_importance() const;

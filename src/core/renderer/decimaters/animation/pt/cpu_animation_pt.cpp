@@ -323,7 +323,7 @@ void CpuShadowSilhouettesPT::update_reduction_factors(u32 frameStart, u32 frameE
 		case PVertexDistMethod::Values::AVERAGE_ALL:
 			frameStart = 0u;
 			frameEnd = m_world.get_frame_count() - 1u;
-			[[fallthrough]];
+			[[fallthrough]]
 ;		case PVertexDistMethod::Values::AVERAGE: {
 			for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
 				for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
