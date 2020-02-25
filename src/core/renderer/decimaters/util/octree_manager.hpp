@@ -2,7 +2,7 @@
 
 #include "octree.hpp"
 #include "util/types.hpp"
-#include "core/memory/unique_device_ptr.h"
+#include "core/memory/unique_device_ptr.hpp"
 #include <ei/3dtypes.hpp>
 #include <memory>
 #include <vector>

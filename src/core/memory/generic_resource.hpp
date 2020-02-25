@@ -2,7 +2,7 @@
 
 #include <cstddef>
 #include "residency.hpp"
-#include "unique_device_ptr.h"
+#include "unique_device_ptr.hpp"
 #include "util/tagged_tuple.hpp"
 
 namespace mufflon {

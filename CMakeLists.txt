@@ -256,6 +256,34 @@ target_include_directories(stbiloader
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/epsilon/include
 )
 
+# Specify the precompiled headers
+if(${CMAKE_VERSION} VERSION_GREATER "3.16.0")
+	target_precompile_headers(core
+		PRIVATE
+			$<$<COMPILE_LANGUAGE:CXX>:<algorithm$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<array$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<atomic$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<iterator$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<limits$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<memory$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<string$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<type_traits$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<vector$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:core/concepts.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/memory/allocator.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/memory/residency.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/memory/synchronize.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/memory/unique_device_ptr.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/renderer/parameter.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/renderer/path_util.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/renderer/random_walk.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/renderer/renderer.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/renderer/renderer_base.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/scene/geometry/polygon_mesh.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/scene/materials/material_definitions.hpp>
+	)
+endif()
+
 # Set the target definitions for DLL export
 target_compile_definitions(core PRIVATE _USE_MATH_DEFINES CORE_EXPORTS _CRT_SECURE_NO_WARNINGS _ENABLE_ATOMIC_ALIGNMENT_FIX)
 target_compile_definitions(mffloader PRIVATE LOADER_EXPORTS _CRT_SECURE_NO_WARNINGS)

@@ -216,6 +216,5 @@ public:
 private:
 	std::size_t m_n;
 };
-}
-// TODO remove include from this place
-#include "unique_device_ptr.h"
+
+} // namespace mufflon
