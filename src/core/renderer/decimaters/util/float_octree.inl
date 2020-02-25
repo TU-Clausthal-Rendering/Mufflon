@@ -70,6 +70,9 @@ __host__ void FloatOctree::join(const Octree<O>& other, const float weight) noex
 					m_childCounter += 7u;
 					const auto newNode = NodeType::as_parent(static_cast<u32>(offset));
 					std::get<0>(curr)->store(newNode, std::memory_order_release);
+					m_depth.store(ei::max(m_depth.load(std::memory_order_acquire),
+										  static_cast<u32>(std::get<2>(curr)) + 1u),
+								  std::memory_order_release);
 					// We don't have to initialize the children here, since later iterations will do that
 					for(u32 i = 0u; i < 8u; ++i)
 						subTreeQueue.emplace_back(&m_nodes[offset + i], &other.node(otherOffset + i), std::get<2>(curr) + 1u);

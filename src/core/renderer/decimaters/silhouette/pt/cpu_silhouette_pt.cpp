@@ -202,9 +202,19 @@ void CpuShadowSilhouettesPT::display_importance() {
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		silhouette::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
-										  m_importances.get(), m_viewOctree.get(),
-										  m_importanceSums.get(), m_maxImportance == 0.f ? 1.f : m_maxImportance);
+		switch(m_params.impDataStruct) {
+			case PImpDataStruct::Values::OCTREE:
+				silhouette::sample_vis_importance_octree(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
+														 m_viewOctree->data(), m_irradianceOctree->data());
+				break;
+			case PImpDataStruct::Values::HASHGRID:
+			case PImpDataStruct::Values::VERTEX:
+			default:
+				silhouette::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord, m_rngs[pixel],
+												  m_importances.get(), m_viewOctree.get(),
+												  m_importanceSums.get(), m_maxImportance == 0.f ? 1.f : m_maxImportance);
+				break;
+		}
 	}
 }
 

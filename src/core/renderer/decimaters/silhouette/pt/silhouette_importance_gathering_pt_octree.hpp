@@ -19,6 +19,33 @@ namespace mufflon { namespace renderer { namespace decimaters { namespace silhou
 
 using namespace scene::lights;
 
+template < class Octree >
+inline CUDA_FUNCTION void distribute_sample(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+											const u32 primId, const ei::Vec3& objSpacePos,
+											Octree& octree, const float value) {
+	if(primId < polygon.numTriangles) {
+		const auto tri = scene::get_triangle(polygon, primId);
+		float distSum = 0.f;
+		for(u32 i = 0u; i < 3u; ++i)
+			distSum += ei::len(tri.v(i) - objSpacePos);
+		for(u32 i = 0u; i < 3u; ++i) {
+			const auto dist = ei::len(tri.v(i) - objSpacePos);
+			// TODO: normal!
+			octree.add_sample(tri.v(i), ei::Vec3{ 0.f, 1.f, 0.f }, value * dist / distSum);
+		}
+	} else {
+		const auto quad = scene::get_quad(polygon, primId);
+		float distSum = 0.f;
+		for(u32 i = 0u; i < 4u; ++i)
+			distSum += ei::len(quad.v(i) - objSpacePos);
+		for(u32 i = 0u; i < 4u; ++i) {
+			const auto dist = ei::len(quad.v(i) - objSpacePos);
+			// TODO: normal!
+			octree.add_sample(quad.v(i), ei::Vec3{ 0.f, 1.f, 0.f }, value * dist / distSum);
+		}
+	}
+}
+
 inline CUDA_FUNCTION void sample_importance_octree(pt::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 												   const scene::SceneDescriptor<CURRENT_DEV>& scene,
 												   const SilhouetteParameters& params,
@@ -94,8 +121,8 @@ inline CUDA_FUNCTION void sample_importance_octree(pt::SilhouetteTargets::Render
 						// Determine the face area
 						const auto lodIdx = scene.lodIndices[hitId.instanceId];
 						const auto area = compute_area_instance_transformed(scene, scene.lods[lodIdx].polygon, hitId);
-						irradianceOctrees[lodIdx].add_sample(objSpacePos, objSpaceNormal,
-															 params.lightWeight / area);
+						distribute_sample(scene.lods[lodIdx].polygon, static_cast<u32>(hitId.primId),
+										  objSpacePos, irradianceOctrees[lodIdx], params.lightWeight / area);
 					}
 				} else if(pathLen == 1) {
 					// Determine the "rest of the direct" radiance
@@ -181,7 +208,8 @@ inline CUDA_FUNCTION void sample_importance_octree(pt::SilhouetteTargets::Render
 
 			const auto impDensity = sharpness * (1.f - ei::abs(cosAngle)) / area;
 			if(!isnan(impDensity))
-				viewOctrees[lodIdx].add_sample(objSpacePos, objSpaceNormal, impDensity);
+				distribute_sample(scene.lods[lodIdx].polygon, static_cast<u32>(hitId.primId),
+								  objSpacePos, viewOctrees[lodIdx], impDensity);
 		}
 
 		vertices[pathLen].ext().pathRadiance = ei::Vec3{ 0.f };
@@ -224,12 +252,65 @@ inline CUDA_FUNCTION void sample_importance_octree(pt::SilhouetteTargets::Render
 				const auto lodIdx = scene.lodIndices[hitId.instanceId];
 				const auto area = compute_area_instance_transformed(scene, scene.lods[lodIdx].polygon, hitId);
 
-
-				irradianceOctrees[lodIdx].add_sample(objSpacePos, objSpaceNormal,
-													 params.lightWeight * importance / area);
+				distribute_sample(scene.lods[lodIdx].polygon, static_cast<u32>(hitId.primId),
+								  objSpacePos, irradianceOctrees[lodIdx], params.lightWeight * importance / area);
 			}
 		}
 
+	}
+}
+
+
+inline CUDA_FUNCTION void sample_vis_importance_octree(pt::SilhouetteTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
+													   const scene::SceneDescriptor<CURRENT_DEV>& scene,
+													   const Pixel& coord, math::Rng& rng,
+													   const FloatOctree* view,
+													   const SampleOctree* irradiance) {
+	Spectrum throughput{ ei::Vec3{1.0f} };
+	float guideWeight = 1.0f;
+	PtPathVertex vertex;
+	VertexSample sample;
+	// Create a start for the path
+	PtPathVertex::create_camera(&vertex, nullptr, scene.camera.get(), coord, rng.next());
+
+	scene::Point lastPosition = vertex.get_position();
+	math::RndSet2_1 rnd{ rng.next(), rng.next() };
+	float rndRoulette = math::sample_uniform(u32(rng.next()));
+	if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) == WalkResult::HIT) {
+		const auto& hitpoint = vertex.get_position();
+		const auto& hitId = vertex.get_primitive_id();
+		const auto lodIdx = scene.lodIndices[hitId.instanceId];
+		if(hitId.primId >= scene.lods[lodIdx].numPrimitives)
+			return;
+		const auto polygon = scene.lods[lodIdx].polygon;
+
+		const auto objSpacePos = ei::transform(vertex.get_position(),
+											   scene.worldToInstance[hitId.instanceId]);
+
+		// Iterate over the vertices and interpolate
+		float distSum = 0.f;
+		float viewImp = 0.f;
+		float irrImp = 0.f;
+		if(static_cast<u32>(hitId.primId) < polygon.numTriangles) {
+			const auto tri = scene::get_triangle(polygon, hitId.primId);
+			for(u32 i = 0u; i < 3u; ++i) {
+				const auto dist = ei::len(tri.v(i) - objSpacePos);
+				viewImp += dist * view[lodIdx].get_samples(tri.v(i));
+				irrImp += dist * irradiance[lodIdx].get_samples(tri.v(i));
+				distSum += dist;
+			}
+		} else {
+			const auto quad = scene::get_quad(polygon, hitId.primId);
+			for(u32 i = 0u; i < 4u; ++i) {
+				const auto dist = ei::len(quad.v(i) - objSpacePos);
+				viewImp += dist * view[lodIdx].get_samples(quad.v(i));
+				irrImp += dist * irradiance[lodIdx].get_samples(quad.v(i));
+				distSum += dist;
+			}
+		}
+
+		const auto importance = (viewImp + irrImp) / distSum;
+		outputBuffer.template contribute<ImportanceTarget>(coord, importance);
 	}
 }
 

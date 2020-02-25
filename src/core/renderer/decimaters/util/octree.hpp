@@ -121,7 +121,7 @@ private:
 };
 
 struct FloatOctreeNode {
-	float data;
+	float data = 0.f;
 
 	// Creates a node that is pointing to other nodes as a parent
 	CUDA_FUNCTION static FloatOctreeNode as_parent(const u32 offset) noexcept {
@@ -153,8 +153,8 @@ struct FloatOctreeNode {
 };
 
 struct SampleOctreeNode {
-	i32 count;
-	float data;
+	i32 count = 0;
+	float data = 0.f;
 
 	// Creates a node that is pointing to other nodes as a parent
 	CUDA_FUNCTION static SampleOctreeNode as_parent(const u32 offset) noexcept {

@@ -115,7 +115,7 @@ __host__ std::pair<std::vector<std::pair<u32, float>>, std::size_t> Octree<N>::t
 					base.y + ((i & 2) >> 1u),
 					base.z + (i >> 2u),
 					curr.second.w + 1u
-								   });
+				});
 			}
 		} else {
 			// We need to fill entire ranges at the given depth
@@ -123,7 +123,7 @@ __host__ std::pair<std::vector<std::pair<u32, float>>, std::size_t> Octree<N>::t
 			const auto size = 1llu << (depth - std::min(depth, static_cast<std::size_t>(curr.second.w)));
 			ei::UVec3 coord{ curr.second };
 			if(missedLevels != 0u)
-				coord = ei::UVec3{ coord } >> missedLevels;
+				coord >>= missedLevels;
 
 			const auto startX = static_cast<std::size_t>(coord.x) * size;
 			const auto startY = static_cast<std::size_t>(coord.y) * size;

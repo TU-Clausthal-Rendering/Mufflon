@@ -66,7 +66,22 @@ inline CUDA_FUNCTION float compute_area_instance_transformed(const scene::SceneD
 		return mufflon::scene::compute_area(mufflon::scene::get_triangle(polygon, static_cast<u32>(hitId.primId)), instToWorld);
 	else
 		return mufflon::scene::compute_area(mufflon::scene::get_quad(polygon, static_cast<u32>(hitId.primId)), instToWorld);
+}
 
+inline CUDA_FUNCTION ei::Triangle transform(const ei::Triangle& triangle, const ei::Mat3x4& transformation) noexcept {
+	return ei::Triangle{
+		ei::transform(triangle.v0, transformation),
+		ei::transform(triangle.v1, transformation),
+		ei::transform(triangle.v2, transformation)
+	};
+}
+inline CUDA_FUNCTION ei::Tetrahedron transform(const ei::Tetrahedron& quad, const ei::Mat3x4& transformation) noexcept {
+	return ei::Tetrahedron{
+		ei::transform(quad.v0, transformation),
+		ei::transform(quad.v1, transformation),
+		ei::transform(quad.v2, transformation),
+		ei::transform(quad.v3, transformation)
+	};
 }
 
 }} // namespace mufflon::scene
