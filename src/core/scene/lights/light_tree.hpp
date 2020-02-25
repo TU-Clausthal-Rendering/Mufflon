@@ -269,8 +269,6 @@ private:
 
 }} // namespace scene::lights
 
-template struct DeviceManagerConcept<scene::lights::LightTreeBuilder>;
-
 namespace scene { namespace lights {
 
 #endif // __CUDACC__

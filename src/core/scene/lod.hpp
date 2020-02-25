@@ -8,6 +8,7 @@
 #include "util/assert.hpp"
 #include "util/tagged_tuple.hpp"
 #include <memory>
+#include <unordered_set>
 
 namespace mufflon {
 

@@ -1,24 +1,20 @@
 ﻿#include "polygon.hpp"
 #include "util/assert.hpp"
 #include "util/log.hpp"
-#include "util/parallel.hpp"
 #include "util/punning.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "core/data_structs/count_octree.hpp"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/scenario.hpp"
 #include "core/scene/materials/material.hpp"
-#include "core/scene/textures/interface.hpp"
 #include "core/math/curvature.hpp"
+#include "core/scene/tessellation/tessellater.hpp"
+#include "core/scene/tessellation/displacement_mapper.hpp"
 #include <OpenMesh/Core/Mesh/Handles.hh>
 #include <OpenMesh/Tools/Subdivider/Uniform/SubdividerT.hh>
 #include <OpenMesh/Tools/Subdivider/Adaptive/Composite/CompositeT.hh>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Core/Geometry/QuadricT.hh>
-#include "core/scene/tessellation/tessellater.hpp"
-#include "core/scene/tessellation/displacement_mapper.hpp"
-#include <cmath>
-#include <random>
 
 namespace mufflon::scene::geometry {
 
@@ -549,28 +545,64 @@ OpenMesh::Decimater::DecimaterT<PolygonMeshType> Polygons::create_decimater() {
 	return OpenMesh::Decimater::DecimaterT<PolygonMeshType>(*m_meshData);
 }
 
-std::size_t Polygons::cluster(const data_structs::CountOctree& octree, bool garbageCollect) {
+std::size_t Polygons::cluster(const data_structs::CountOctree& octree,
+							  const std::size_t targetVertices,
+							  const bool garbageCollect) {
 	using OpenMesh::Geometry::Quadricf;
 
 	this->synchronize<Device::CPU>();
 
 	const auto previousVertices = m_meshData->n_vertices();
 
-	const auto vertexCount = 32 * 32 * 32;
-	std::vector<PolygonMeshType::VertexHandle> vertices;
-	std::copy(m_meshData->vertices_sbegin(), m_meshData->vertices_end(), std::back_inserter(vertices));
-	std::mt19937 rng{ std::random_device{}() };
-	std::shuffle(vertices.begin(), vertices.end(), rng);
+	// Perform a breadth-first search to bring clusters down in equal levels
+	std::vector<bool> octreeNodeMask(octree.capacity(), false);
+	std::vector<data_structs::CountOctree::NodeId> currLevel;
+	std::vector<data_structs::CountOctree::NodeId> nextLevel;
+	currLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(targetVertices, 1llu))));
+	nextLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(targetVertices, 1llu))));
+	std::size_t finalNodes = 0u;
+	u32 cutoffDepthMask = octree.get_root_depth_mask();
+	
+	currLevel.push_back(octree.get_root_node());
+	while(finalNodes < targetVertices && !currLevel.empty()) {
+		nextLevel.clear();
+		for(const auto& cluster : currLevel) {
+			if(!octree.is_leaf(cluster)) {
+				const auto children = octree.get_children(cluster);
+				for(const auto c : children)
+					nextLevel.push_back(c);
+			} else {
+				octreeNodeMask[cluster.index] = true;
+				finalNodes += 1u;
+			}
+		}
+		cutoffDepthMask >>= 1u;
+		std::swap(currLevel, nextLevel);
+	}
 
+	// TODO: trim if we went over the line
+	if(finalNodes > targetVertices) {
+		// Reduce cutoff depth by one to indicate that the last level shall not get clustered
+		cutoffDepthMask <<= 1u;
+	} else {
+		// Mark all remaining nodes as end-of-the-line
+		for(const auto& cluster : currLevel) {
+			octreeNodeMask[cluster.index] = true;
+			finalNodes += 1u;
+		}
+	}
+	printf("%llu\n", finalNodes);
+	fflush(stdout);
 
 	// We have to track a few things per cluster
+	// TODO: better bound!
 	std::vector<VertexCluster> clusters(octree.capacity());
 
 	const auto aabbMin = m_boundingBox.min;
 	const auto aabbDiag = m_boundingBox.max - m_boundingBox.min;
 	// Convenience function to compute the cluster index from a position
-	auto get_cluster_index = [&octree](const ei::Vec3& pos) -> u32 {
-		return octree.get_node_id(pos).index;
+	auto get_cluster_index = [&octree, &octreeNodeMask](const ei::Vec3& pos) -> data_structs::CountOctree::NodeId {
+		return octree.get_node_id(pos, octreeNodeMask);
 	};
 
 	OpenMesh::VPropHandleT<Quadricf> quadricProps{};
@@ -585,7 +617,8 @@ std::size_t Polygons::cluster(const data_structs::CountOctree& octree, bool garb
 	for(const auto vertex : m_meshData->vertices()) {
 		const auto pos = util::pun<ei::Vec3>(m_meshData->point(vertex));
 		const auto clusterIndex = get_cluster_index(pos);
-		clusters[clusterIndex].add_vertex(pos, m_meshData->property(quadricProps, vertex));
+		if(clusterIndex.levelMask >= cutoffDepthMask)
+			clusters[clusterIndex.index].add_vertex(pos, m_meshData->property(quadricProps, vertex));
 	}
 	m_meshData->remove_property(quadricProps);
 
@@ -598,8 +631,10 @@ std::size_t Polygons::cluster(const data_structs::CountOctree& octree, bool garb
 		const auto pos = util::pun<ei::Vec3>(m_meshData->point(vertex));
 		const auto clusterIndex = get_cluster_index(pos);
 		// New cluster position has been previously computed
-		const auto newPos = clusters[clusterIndex].posAccum;
-		m_meshData->point(vertex) = util::pun<PolygonMeshType::Point>(newPos);
+		if(clusterIndex.levelMask >= cutoffDepthMask) {
+			const auto newPos = clusters[clusterIndex.index].posAccum;
+			m_meshData->point(vertex) = util::pun<PolygonMeshType::Point>(newPos);
+		}
 	}
 	std::vector<PolygonMeshType::HalfedgeHandle> collapses{};
 	for(const auto vertex : m_meshData->vertices()) {

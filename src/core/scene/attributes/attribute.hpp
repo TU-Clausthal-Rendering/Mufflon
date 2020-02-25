@@ -2,23 +2,19 @@
 
 #include "attribute_sizes.hpp"
 #include "attribute_handles.hpp"
-#include "core/memory/allocator.hpp"
+#include "util/tagged_tuple.hpp"
 #include "core/memory/residency.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
-#include "util/byte_io.hpp"
-#include "util/string_pool.hpp"
-#include "util/tagged_tuple.hpp"
-#include <cstddef>
-#include <functional>
-#include <climits>
+
 #include <optional>
-#include <stdexcept>
-#include <string>
-#include "util/string_view.hpp"
-#include <type_traits>
-#include <unordered_map>
 #include <vector>
-#include "core/memory/dyntype_memory.hpp"
+
+namespace mufflon::util {
+
+class IByteReader;
+class IByteWriter;
+
+} // namespace mufflon::util
 
 namespace mufflon::scene {
 
@@ -314,5 +310,9 @@ private:
 
 	std::vector<AttribInfo> m_attributes;
 };
+
+
+extern template class OpenMeshAttributePool<true>;
+extern template class OpenMeshAttributePool<false>;
 
 } // namespace mufflon::scene

@@ -1,6 +1,7 @@
 #include "light_tree.hpp"
 #include "ei/3dtypes.hpp"
 #include "util/assert.hpp"
+#include "core/concepts.hpp"
 #include "core/memory/allocator.hpp"
 #include "core/cuda/error.hpp"
 #include "core/math/sfcurves.hpp"
@@ -670,6 +671,8 @@ void LightTreeBuilder::unload() {
 	}
 	// TODO: unload envmap handle
 }
+
+template struct DeviceManagerConcept<scene::lights::LightTreeBuilder>;
 
 template void LightTreeBuilder::synchronize<Device::CPU>(const ei::Box&);
 template void LightTreeBuilder::synchronize<Device::CUDA>(const ei::Box&);

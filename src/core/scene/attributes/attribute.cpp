@@ -1,7 +1,9 @@
 #include "attribute.hpp"
-#include "core/memory/residency.hpp"
-#include "core/memory/synchronize.hpp"
-#include <ei/vector.hpp>
+#include "util/byte_io.hpp"
+#include "util/int_types.hpp"
+#include "core/memory/allocator.hpp"
+
+//#include <ei/vector.hpp>
 
 namespace mufflon { namespace scene {
 

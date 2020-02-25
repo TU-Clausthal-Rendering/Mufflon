@@ -1,19 +1,17 @@
 #pragma once
 
 #include "polygon_mesh.hpp"
-#include "util/assert.hpp"
+#include "util/range.hpp"
+#include "util/string_view.hpp"
+#include "core/scene/types.hpp"
 #include "core/scene/attributes/attribute.hpp"
 #include "core/scene/attributes/attribute_handles.hpp"
-#include "core/scene/types.hpp"
-#include "util/range.hpp"
 #include <ei/3dtypes.hpp>
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
-#include <optional>
-#include "util/string_view.hpp"
 #include <functional>
+#include <optional>
 #include <tuple>
 #include <vector>
-#include <unordered_set>
 
 // Forward declarations
 namespace OpenMesh::Subdivider::Uniform {
@@ -308,7 +306,8 @@ public:
 	// Implements decimation.
 	std::size_t decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 						 std::size_t targetVertices, bool garbageCollect);
-	std::size_t cluster(const data_structs::CountOctree& octree, bool garbageCollect);
+	std::size_t cluster(const data_structs::CountOctree& octree, const std::size_t targetVertices,
+						const bool garbageCollect);
 	std::size_t cluster(std::size_t gridRes, bool garbageCollect);
 
 	// Splits a vertex

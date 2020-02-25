@@ -1,13 +1,11 @@
 #pragma once
 
-#include "core/scene/attributes/attribute.hpp"
 #include "core/scene/types.hpp"
+#include "core/scene/attributes/attribute.hpp"
 #include "core/scene/tessellation/tessellater.hpp"
 #include <ei/3dtypes.hpp>
 #include <ei/vector.hpp>
-#include <tuple>
 #include <vector>
-#include <unordered_set>
 
 namespace mufflon {
 enum class Device : unsigned char;

@@ -50,7 +50,7 @@ public:
 	constexpr BasicStringView& operator=(const BasicStringView&) = default;
 
 	// Conversion
-	explicit operator std::string() const { return std::string(data(), size()); }
+	explicit operator std::basic_string<value_type, traits_type>() const { return std::basic_string<value_type, traits_type>(data(), size()); }
 
 	// Iterators
 	constexpr iterator begin() const noexcept { return m_data; }
@@ -89,7 +89,8 @@ public:
 
 	// Operations
 	constexpr size_type copy(pointer dest, size_type count, size_type pos = 0) const {
-		return traits_type::copy(dest, data(), std::min(count, size() - pos));
+		(void)traits_type::copy(dest, data(), std::min(count, size() - pos));
+		return count;
 	}
 	constexpr BasicStringView substr(size_type pos = 0, size_type count = npos) const {
 		return BasicStringView{ m_data + pos, std::min(count == npos ? m_size : count, size() - pos) };
@@ -254,6 +255,11 @@ using StringView = BasicStringView<char>;
 using WStringView = BasicStringView<wchar_t>;
 using U16StringView = BasicStringView<char16_t>;
 using U32StringView = BasicStringView<char32_t>;
+
+extern template class BasicStringView<char>;
+extern template class BasicStringView<wchar_t>;
+extern template class BasicStringView<char16_t>;
+extern template class BasicStringView<char32_t>;
 
 } // namespace mufflon
 

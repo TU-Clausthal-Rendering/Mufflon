@@ -2,7 +2,6 @@
 
 #include "residency.hpp"
 #include "core/export/core_api.h"
-#include "allocator.hpp"
 #include "generic_resource.hpp"
 #include "util/types.hpp"
 #include "util/assert.hpp"
@@ -262,6 +261,5 @@ private:
 	u32 m_dataCapacity;			// Maximum number of data elements
 	std::atomic_uint32_t m_cpuHMCounter;		// Store the atomic counter here, because the returned HashMap<CPU> is not trivially copyable otherwise
 };
-template struct DeviceManagerConcept<HashMapManager<int,int>>;
 
 } // namespace mufflon

@@ -1,9 +1,8 @@
 #include "sphere.hpp"
-#include "core/scene/descriptors.hpp"
-#include "core/scene/tessellation/tessellater.hpp"
-#include "core/scene/scenario.hpp"
-#include <cuda_runtime.h>
 #include "util/punning.hpp"
+#include "core/scene/descriptors.hpp"
+#include "core/scene/scenario.hpp"
+#include "core/scene/tessellation/tessellater.hpp"
 
 namespace mufflon::scene::geometry {
 

@@ -2,7 +2,6 @@
 
 #include "residency.hpp"
 #include "synchronize.hpp"
-#include "util/assert.hpp"
 #include "core/cuda/error.hpp"
 #include "core/opengl/gl_buffer.hpp"
 #include <stdexcept>

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/scene/geometry/polygon_mesh.hpp"
 #include <ei/3dtypes.hpp>
 #include <ei/vector.hpp>
 #include <OpenMesh/Core/IO/SR_binary.hh>
