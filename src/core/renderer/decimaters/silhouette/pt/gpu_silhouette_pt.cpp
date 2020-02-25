@@ -215,7 +215,8 @@ void GpuShadowSilhouettesPT::initialize_decimaters() {
 			collapses = static_cast<std::size_t>(std::ceil(m_params.initialReduction * polygons.get_vertex_count()));
 			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
 		}
-		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CUDA>>(obj.first->get_name(), lod, newLod, collapses,
+		m_decimaters[i] = std::make_unique<ImportanceDecimater<Device::CUDA>>(obj.first->get_name(), lod, newLod,
+																			  static_cast<u32>(collapses),
 																			  m_params.viewWeight, m_params.lightWeight,
 																			  m_params.shadowWeight, m_params.shadowSilhouetteWeight);
 	}

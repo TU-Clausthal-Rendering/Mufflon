@@ -5,6 +5,7 @@
 #include "silhouette_pt_params.hpp"
 #include "core/data_structs/dm_hashgrid.hpp"
 #include "core/data_structs/count_octree.hpp"
+#include "core/renderer/decimaters/util/octree_manager.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include <OpenMesh/Core/Utils/Property.hh>
@@ -52,8 +53,8 @@ private:
 	unique_device_ptr<Device::CPU, pt::DeviceImportanceSums<Device::CPU>[]> m_importanceSums;
 	std::vector<std::size_t> m_remainingVertices;
 
-	std::unique_ptr<data_structs::CountOctreeManager> m_viewOctree{};
-	std::unique_ptr<data_structs::CountOctreeManager> m_irradianceOctree{};
+	std::unique_ptr<OctreeManager<FloatOctree>> m_viewOctree{};
+	std::unique_ptr<OctreeManager<SampleOctree>> m_irradianceOctree{};
 	std::unique_ptr<data_structs::DmHashGrid<float>> m_viewGrid{};
 	std::unique_ptr<data_structs::DmHashGrid<float>> m_irradianceGrid{};
 	std::unique_ptr<data_structs::DmHashGrid<u32>> m_irradianceCountGrid{};

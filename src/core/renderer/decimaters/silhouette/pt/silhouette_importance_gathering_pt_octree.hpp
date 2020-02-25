@@ -4,6 +4,7 @@
 #include "silhouette_pt_params.hpp"
 #include "core/data_structs/dm_hashgrid.hpp"
 #include "core/data_structs/count_octree.hpp"
+#include "core/renderer/decimaters/util/octree.inl"
 #include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
@@ -23,8 +24,8 @@ inline CUDA_FUNCTION void sample_importance_octree(pt::SilhouetteTargets::Render
 												   const SilhouetteParameters& params,
 												   const Pixel& coord, math::Rng& rng,
 												   DeviceImportanceSums<CURRENT_DEV>* sums,
-												   data_structs::CountOctreeManager& viewOctrees,
-												   data_structs::CountOctreeManager& irradianceOctrees) {
+												   FloatOctree* viewOctrees,
+												   SampleOctree* irradianceOctrees) {
 	Spectrum throughput{ ei::Vec3{1.0f} };
 	// We gotta keep track of our vertices
 	// TODO: flexible length!
@@ -84,10 +85,54 @@ inline CUDA_FUNCTION void sample_importance_octree(pt::SilhouetteTargets::Render
 				if(shadowHit.hitId.instanceId < 0) {
 					if(params.show_direct()) {
 						mAssert(!isnan(mis));
-
 						// TODO
+						const auto hitId = vertices[pathLen].get_primitive_id();
+						const auto objSpacePos = ei::transform(vertices[pathLen].get_position(),
+															   scene.worldToInstance[hitId.instanceId]);
+						const auto objSpaceNormal = ei::transform(vertices[pathLen].get_normal(),
+																  ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
+						// Determine the face area
+						const auto lodIdx = scene.lodIndices[hitId.instanceId];
+						const auto area = compute_area_instance_transformed(scene, scene.lods[lodIdx].polygon, hitId);
+						irradianceOctrees[lodIdx].add_sample(objSpacePos, objSpaceNormal,
+															 params.lightWeight / area);
 					}
 				} else if(pathLen == 1) {
+					// Determine the "rest of the direct" radiance
+					const u64 ambientNeeSeed = rng.next();
+					ei::Vec3 rad{ 0.f };
+					const int neeCount = ei::max<int>(1, params.neeCount);
+					const scene::Point vertexPos = vertices[pathLen].get_position();
+					const scene::Point vertexNormal = vertices[pathLen].get_geometric_normal();
+					for(int i = 0; i < neeCount; ++i) {
+						math::RndSet2 currNeeRnd = rng.next();
+						auto currNee = scene::lights::connect(scene, i, neeCount,
+															  ambientNeeSeed, vertexPos,
+															  currNeeRnd);
+						Pixel outCoord;
+						auto currValue = vertices[pathLen].evaluate(currNee.dir.direction, scene.media, outCoord);
+						if(currNee.cosOut != 0) value.cosOut *= currNee.cosOut;
+						mAssert(!isnan(currValue.value.x) && !isnan(currValue.value.y) && !isnan(currValue.value.z));
+						const Spectrum currRadiance = currValue.value * currNee.diffIrradiance;
+						if(any(greater(currRadiance, 0.0f)) && currValue.cosOut > 0.0f) {
+							bool anyhit = scene::accel_struct::any_intersection(
+								scene, vertexPos, currNee.position,
+								vertexNormal, currNee.geoNormal,
+								currNee.dir.direction);
+							if(!anyhit) {
+								AreaPdf currHitPdf = currValue.pdf.forw.to_area_pdf(currNee.cosOut, currNee.distSq);
+								// TODO: it seems that, since we're looking at irradiance here (and also did not weight
+								// the previous weightedIrradiance with 1/(neeCount + 1)) we must not use the regular
+								// MIS weight here
+								float curMis = 1.0f / (1 + currHitPdf / currNee.creationPdf);
+								mAssert(!isnan(curMis));
+								rad += currValue.cosOut * currRadiance * curMis;
+							}
+						}
+					}
+
+					vertices[pathLen].ext().otherNeeLuminance = get_luminance(rad);
+
 					// TODO
 				}
 			}
@@ -152,7 +197,40 @@ inline CUDA_FUNCTION void sample_importance_octree(pt::SilhouetteTargets::Render
 		if(vertices[pathLen].is_end_point()) break;
 	} while(pathLen < params.maxPathLength);
 
+	
 	// TODO
+	// Go back over the path and add up the irradiance from indirect illumination
+	ei::Vec3 accumRadiance{ 0.f };
+	ei::Vec3 currThroughput = throughput;
+	for(int p = pathLen; p >= 1; --p) {
+		// Last vertex doesn't have indirect contribution
+		if(p < pathLen) {
+			// Compute the throughput at the target vertex by recursively removing later throughputs
+			currThroughput /= vertices[p].ext().throughput;
+			accumRadiance = currThroughput * (accumRadiance + vertices[p + 1].ext().pathRadiance);
+			const ei::Vec3 irradiance = ei::abs(vertices[p].ext().outCos) * accumRadiance;
+
+			const auto& hitId = vertices[p].get_primitive_id();
+			const auto* lod = &scene.lods[scene.lodIndices[hitId.instanceId]];
+			const u32 numVertices = hitId.primId < (i32)lod->polygon.numTriangles ? 3u : 4u;
+
+			const float importance = get_luminance(irradiance) * (1.f - ei::abs(vertices[p].ext().outCos));
+			if(params.show_indirect()) {
+				const auto objSpacePos = ei::transform(vertices[p].get_position(),
+													   scene.worldToInstance[hitId.instanceId]);
+				const auto objSpaceNormal = ei::transform(vertices[p].get_normal(),
+														  ei::Mat3x3{ scene.worldToInstance[hitId.instanceId] });
+				// Determine the face area
+				const auto lodIdx = scene.lodIndices[hitId.instanceId];
+				const auto area = compute_area_instance_transformed(scene, scene.lods[lodIdx].polygon, hitId);
+
+
+				irradianceOctrees[lodIdx].add_sample(objSpacePos, objSpaceNormal,
+													 params.lightWeight * importance / area);
+			}
+		}
+
+	}
 }
 
 }}}}} // namespace mufflon::renderer::decimaters::silhouette::pt

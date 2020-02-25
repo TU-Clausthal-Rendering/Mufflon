@@ -116,11 +116,11 @@ void CpuShadowSilhouettesPT::iterate() {
 		m_irradianceCountGrid = nullptr;
 
 		if(m_params.impDataStruct == PImpDataStruct::Values::OCTREE) {
-			m_viewOctree = std::make_unique<data_structs::CountOctreeManager>(static_cast<u32>(m_params.impCapacity), static_cast<u32>(m_decimaters.size()), 8u);
-			m_irradianceOctree = std::make_unique<data_structs::CountOctreeManager>(static_cast<u32>(m_params.impCapacity), static_cast<u32>(m_decimaters.size()), 8u);
+			m_viewOctree = std::make_unique<OctreeManager<FloatOctree>>(static_cast<u32>(m_params.impCapacity), static_cast<u32>(m_decimaters.size()));
+			m_irradianceOctree = std::make_unique<OctreeManager<SampleOctree>>(static_cast<u32>(m_params.impCapacity), static_cast<u32>(m_decimaters.size()));
 			for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-				m_viewOctree->create(m_sceneDesc.aabbs[i]);
-				m_irradianceOctree->create(m_sceneDesc.aabbs[i]);
+				m_viewOctree->create(m_sceneDesc.aabbs[i], 40000.f);
+				m_irradianceOctree->create(m_sceneDesc.aabbs[i], 8u, 40000.f);
 			}
 		} else if(m_params.impDataStruct == PImpDataStruct::Values::HASHGRID) {
 			m_viewGrid = std::make_unique<data_structs::DmHashGrid<float>>(static_cast<u32>(m_params.impCapacity));
@@ -176,8 +176,9 @@ void CpuShadowSilhouettesPT::gather_importance() {
 			scene::PrimitiveHandle shadowPrim;
 			switch(m_params.impDataStruct) {
 				case PImpDataStruct::Values::OCTREE:
-					silhouette::sample_importance_octree(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel],
-														 m_importanceSums.get(), *m_viewOctree, *m_irradianceOctree);
+					silhouette::sample_importance_octree(m_outputBuffer, m_sceneDesc, m_params, coord,
+														 m_rngs[pixel], m_importanceSums.get(),
+														 m_viewOctree->data(), m_irradianceOctree->data());
 					break;
 				case PImpDataStruct::Values::HASHGRID:
 					silhouette::sample_importance(m_outputBuffer, m_sceneDesc, m_params, coord, m_rngs[pixel],

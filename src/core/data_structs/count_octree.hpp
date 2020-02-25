@@ -66,6 +66,31 @@ public:
 		return Data{ static_cast<int>(count), sum };
 	}
 
+	// Utility functions for external traversal
+	const NodeId get_root_node() const noexcept {
+		return NodeId{ 1u << m_depth.load(), static_cast<u32>(&m_root - m_nodes) };
+	}
+	bool is_leaf(const NodeId& id) const noexcept {
+		mAssert(id.index < m_allocationCounter.load());
+		return m_nodes[id.index].is_leaf();
+	}
+	std::array<NodeId, 8u> get_children(const NodeId& id) const noexcept {
+		mAssert(id.index < m_allocationCounter.load());
+		const auto& node = m_nodes[id.index];
+		mAssert(node.is_parent());
+		const auto offset = node.get_child_offset();
+		return { {
+			NodeId{ id.levelMask >> 1u, offset + 0u },
+			NodeId{ id.levelMask >> 1u, offset + 1u },
+			NodeId{ id.levelMask >> 1u, offset + 2u },
+			NodeId{ id.levelMask >> 1u, offset + 3u },
+			NodeId{ id.levelMask >> 1u, offset + 4u },
+			NodeId{ id.levelMask >> 1u, offset + 5u },
+			NodeId{ id.levelMask >> 1u, offset + 6u },
+			NodeId{ id.levelMask >> 1u, offset + 7u }
+		} };
+	}
+
 	NodeId get_node_id(const ei::Vec3& pos) const noexcept {
 		const ei::Vec3 offPos = pos - m_minBound;
 		const ei::Vec3 normPos = offPos * m_diagonalInv;
@@ -79,6 +104,31 @@ public:
 		auto currentLvlMask = gridRes;
 		u32 idx = 0u;
 		while(node->is_parent()) {
+			currentLvlMask >>= 1;
+			const auto offset = node->get_child_offset();
+			// Get the relative index of the child [0,7] plus the child offset for the node index
+			idx = ((iPos.x & currentLvlMask) ? 1 : 0)
+				+ ((iPos.y & currentLvlMask) ? 2 : 0)
+				+ ((iPos.z & currentLvlMask) ? 4 : 0)
+				+ offset;
+			node = &m_nodes[idx];
+		}
+		return NodeId{ currentLvlMask, idx };
+	}
+
+	NodeId get_node_id(const ei::Vec3& pos, const std::vector<bool>& nodeMask) const noexcept {
+		const ei::Vec3 offPos = pos - m_minBound;
+		const ei::Vec3 normPos = offPos * m_diagonalInv;
+		// Get the integer position on the finest level.
+		const auto gridRes = 1u << m_depth.load();
+		const ei::UVec3 iPos{ normPos * gridRes };
+		// Get root value. This will most certainly be a child pointer...
+		const Node* node = &m_root;
+		// The most significant bit in iPos distinguishes the children of the root node.
+		// For each level, the next bit will be the relevant one.
+		auto currentLvlMask = gridRes;
+		u32 idx = 0u;
+		while(node->is_parent() && !nodeMask[node - m_nodes]) {
 			currentLvlMask >>= 1;
 			const auto offset = node->get_child_offset();
 			// Get the relative index of the child [0,7] plus the child offset for the node index
@@ -316,8 +366,17 @@ public:
 		return m_childCounter.load();
 	}
 
+	const ei::Vec3& get_minimum_boundary() const noexcept { return m_minBound; }
+
 	const ei::Vec3 get_bounds_diagonal() const noexcept {
 		return m_diagonal;
+	}
+	const ei::Vec3 get_bounds_inverted_diagonal() const noexcept {
+		return m_diagonalInv;
+	}
+
+	u32 get_root_depth_mask() const noexcept {
+		return 1u << m_depth.load();
 	}
 
 private:
@@ -357,30 +416,30 @@ private:
 			return Node{ static_cast<int>(initCount), initValue };
 		}
 
-		bool is_parent() const noexcept { return m_data.load().count < 0; }
+		bool is_parent() const noexcept { return m_data.load(std::memory_order_acquire).count < 0; }
 		bool is_leaf() const noexcept { return !is_parent(); }
 
 		// This function is purely for the spinlock functionality in case
 		// the capacity limit has been reached
-		bool is_parent_or_fresh() const noexcept { return m_data.load().count <= 0; }
+		bool is_parent_or_fresh() const noexcept { return m_data.load(std::memory_order_acquire).count <= 0; }
 
 		u32 get_child_offset() const noexcept {
 			mAssert(this->is_parent());
-			return static_cast<u32>(-m_data.load().count);
+			return static_cast<u32>(-m_data.load(std::memory_order_acquire).count);
 		}
 
 		Data get_data() const noexcept {
 			mAssert(this->is_leaf());
-			return m_data.load();
+			return m_data.load(std::memory_order_acq_rel);
 		}
 
 		SampleAddResult add_sample(float value) noexcept {
-			auto oldV = m_data.load();
+			auto oldV = m_data.load(std::memory_order_acquire);
 			Data newV;
 			do {
 				if(oldV.count < 0) return { false, static_cast<u32>(-oldV.count), 0.f };
 				newV = Data{ oldV.count + 1, oldV.value + value };
-			} while(!m_data.compare_exchange_weak(oldV, newV));
+			} while(!m_data.compare_exchange_weak(oldV, newV, std::memory_order::memory_order_acq_rel));
 			return { true, static_cast<u32>(newV.count), newV.value };
 		}
 
@@ -438,7 +497,7 @@ private:
 		if(result.countOrOffset == m_splitCount) {
 			// Allocate new children
 			// Allocate new children
-			const auto offset = m_allocationCounter.fetch_add(8u);
+			const auto offset = m_allocationCounter.fetch_add(8u, std::memory_order::memory_order_acq_rel);
 			// Ensure that we don't overflow our node array
 			if(offset + 8 >= m_capacity) {
 				// TODO: to avoid a deadlock here we reset the node count to zero, even though it should
@@ -455,11 +514,11 @@ private:
 				m_nodes[offset + i] = Node::as_split_child(static_cast<u32>(m_splitCount / 8.f), result.value / 8.f);
 			curr = Node::as_parent(static_cast<u32>(offset));
 
-			auto oldDepth = m_depth.load();
+			auto oldDepth = m_depth.load(std::memory_order::memory_order_acquire);
 			decltype(oldDepth) newDepth;
 			do {
 				newDepth = std::max(oldDepth, depth + 1u);
-			} while(!m_depth.compare_exchange_weak(oldDepth, newDepth));
+			} while(!m_depth.compare_exchange_weak(oldDepth, newDepth, std::memory_order::memory_order_seq_cst));
 			// If we split, then we do not perform the insertion again
 			return nullptr;
 		} else if(result.countOrOffset > m_splitCount) {

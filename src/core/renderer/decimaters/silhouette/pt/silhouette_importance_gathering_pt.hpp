@@ -4,6 +4,7 @@
 #include "silhouette_pt_params.hpp"
 #include "core/data_structs/dm_hashgrid.hpp"
 #include "core/data_structs/count_octree.hpp"
+#include "core/renderer/decimaters/util/octree_manager.hpp"
 #include "core/export/core_api.h"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
@@ -806,7 +807,7 @@ inline CUDA_FUNCTION void sample_vis_importance(pt::SilhouetteTargets::RenderBuf
 												const scene::SceneDescriptor<CURRENT_DEV>& scene,
 												const Pixel& coord, math::Rng& rng,
 												Importances<CURRENT_DEV>** importances,
-												data_structs::CountOctreeManager* view,
+												OctreeManager<FloatOctree>* view,
 												DeviceImportanceSums<CURRENT_DEV>* sums,
 												const float maxImportance) {
 	Spectrum throughput{ ei::Vec3{1.0f} };

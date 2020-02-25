@@ -4,6 +4,7 @@
 #include "util/string_view.hpp"
 #include "core/data_structs/dm_hashgrid.hpp"
 #include "core/data_structs/count_octree.hpp"
+#include "core/renderer/decimaters/util/octree_manager.hpp"
 #include "core/memory/residency.hpp"
 #include "core/scene/lod.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
@@ -37,8 +38,8 @@ public:
 	// Updates the importance densities of the decimated mesh
 	void update_importance_density(const ImportanceSums& impSums, const bool useCurvature);
 	void update_importance_density(const ImportanceSums& impSums,
-								   const data_structs::CountOctree& viewGrid,
-								   const data_structs::CountOctree& irradianceGrid);
+								   FloatOctree& viewGrid,
+								   const SampleOctree& irradianceGrid);
 	void update_importance_density(const ImportanceSums& impSums,
 								   const data_structs::DmHashGrid<float>& viewGrid,
 								   const data_structs::DmHashGrid<float>& irradianceGrid,
@@ -46,7 +47,7 @@ public:
 	/* Updates the decimated mesh by collapsing and uncollapsing vertices.
 	 * The specified threshold determines when a vertex collapses or gets restored
 	 */
-	void iterate(const std::size_t targetCount, const data_structs::CountOctree* view);
+	void iterate(const std::size_t targetCount, const FloatOctree* view);
 
 	// Functions for querying internal state
 	float get_current_max_importance() const;

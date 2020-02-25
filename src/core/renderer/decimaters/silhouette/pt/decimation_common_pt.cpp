@@ -3,10 +3,15 @@
 #include "util/punning.hpp"
 #include "core/renderer/decimaters/silhouette/modules/importance_quadrics.hpp"
 #include "core/renderer/decimaters/modules/collapse_tracker.hpp"
+#include "core/renderer/decimaters/util/octree.inl"
+#include "core/renderer/decimaters/util/float_octree.inl"
 #include "core/scene/geometry/polygon.hpp"
 #include <ei/vector.hpp>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
+
+#include <gli/gli/texture3d.hpp>
+#include <gli/gli/save.hpp>
 
 namespace mufflon::renderer::decimaters::silhouette::pt {
 
@@ -214,10 +219,15 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 
 template < Device dev >
 void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& sum,
-														 const data_structs::CountOctree& viewGrid,
-														 const data_structs::CountOctree& irradianceGrid) {
+														 FloatOctree& viewGrid,
+														 const SampleOctree& irradianceGrid) {
 	// First get the data off the GPU
 	this->pull_importance_from_device();
+
+	viewGrid.export_to_file(std::string(m_objectName) + "-view.ktx", 8u);
+	irradianceGrid.export_to_file(std::string(m_objectName) + "-irradiance.ktx", 8u);
+	viewGrid.join(irradianceGrid, 1.f);
+	viewGrid.export_to_file(std::string(m_objectName) + "-merged.ktx", 8u);
 
 	// TODO: proper reservation
 	std::vector<u32> vertexCount(viewGrid.capacity());
@@ -225,8 +235,8 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 	for(i64 i = 0; i < static_cast<i64>(m_decimatedMesh->n_vertices()); ++i) {
 		const auto vertex = m_decimatedMesh->vertex_handle(static_cast<u32>(i));
 		const auto pos = util::pun<ei::Vec3>(m_decimatedMesh->point(vertex));
-		const auto id = viewGrid.get_node_id(pos);
-		vertexCount[id.index] += 1u;
+		//const auto id = viewGrid.get_node_id(pos);
+		//vertexCount[id.index] += 1u;
 	}
 
 	// Update our statistics: the importance density of each vertex
@@ -242,12 +252,12 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 
 		// In contrast to saving importance per vertex, we have to divide by the sample count here
 		// because we have to distribute the value across many vertices
-		const auto id = viewGrid.get_node_id(pos);
+		//const auto id = viewGrid.get_node_id(pos);
 		//const auto viewSample = viewGrid.get_density(pos, normal, id, true);
-		const auto viewSample = viewGrid.get_samples(id).value;
-		const auto sum = viewSample / static_cast<float>(vertexCount[id.index]);
+		//const auto viewSample = viewGrid.get_samples(id).value;
+		//const auto sum = viewSample / static_cast<float>(vertexCount[id.index]);
 
-		m_importances[vertex.idx()].viewImportance = sum;// / area;
+		//m_importances[vertex.idx()].viewImportance = sum;// / area;
 	}
 
 	double importanceSum = 0.0;
@@ -374,7 +384,7 @@ ArrayDevHandle_t<Device::CPU, Importances<Device::CPU>> ImportanceDecimater<Devi
 }
 
 template < Device dev >
-void ImportanceDecimater<dev>::iterate(const std::size_t targetCount, const data_structs::CountOctree* view) {
+void ImportanceDecimater<dev>::iterate(const std::size_t targetCount, const FloatOctree* view) {
 	// Reset the collapse property
 	for(auto vertex : m_originalMesh.vertices()) {
 		m_originalMesh.property(m_collapsed, vertex) = false;
@@ -410,9 +420,10 @@ void ImportanceDecimater<dev>::iterate(const std::size_t targetCount, const data
 	if(targetCount < get_original_vertex_count()) {
 		const auto t0 = std::chrono::high_resolution_clock::now();
 		std::size_t collapses = 0u;
-		if(view != nullptr)
-			collapses = m_decimatedPoly->cluster(*view, false);
-		else
+		// TODO
+		/*if(view != nullptr)
+			collapses = m_decimatedPoly->cluster(*view, targetCount, false);
+		else*/
 			collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
 		//const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
 		const auto t1 = std::chrono::high_resolution_clock::now();
