@@ -3754,7 +3754,8 @@ Boolean render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename,
 	TextureData texData{};
 	texData.data = reinterpret_cast<uint8_t*>(data.get());
 	texData.components = numChannels;
-	texData.format = numChannels == 1 ? FORMAT_R32F : FORMAT_RGB32F;
+	texData.format = numChannels == 1 ? FORMAT_R32F : (numChannels == 2 ? FORMAT_RG32F
+													   : (numChannels == 3 ? FORMAT_RGB32F : FORMAT_RGBA32F));
 	texData.width = res.x;
 	texData.height = res.y;
 	texData.sRgb = false;
