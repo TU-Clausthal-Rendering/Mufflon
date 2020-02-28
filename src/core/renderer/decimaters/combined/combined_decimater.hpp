@@ -44,6 +44,17 @@ public:
 	double get_importance_sum(const u32 frame) const noexcept { return m_importanceSums[frame]; }
 	std::size_t get_original_vertex_count() const noexcept;
 	std::size_t get_decimated_vertex_count() const noexcept;
+	void get_decimated_importance(ArrayDevHandle_t<Device::CPU, float> buffer) {
+		for(auto iter = m_originalMesh.vertices_begin(); iter != m_originalMesh.vertices_end(); ++iter) {
+			const auto vertex = *iter;
+			// Traverse collapse chain and snatch importance
+			auto v = vertex;
+			while(m_originalMesh.property(m_collapsed, v))
+				v = m_originalMesh.property(m_collapsedTo, v);
+			const auto imp = m_originalMesh.property(m_accumulatedImportanceDensity, vertex);
+			buffer[v.idx()] = imp;
+		}
+	}
 
 private:
 	VertexHandle get_original_vertex_handle(const VertexHandle decimatedHandle) const noexcept;

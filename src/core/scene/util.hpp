@@ -15,14 +15,30 @@ __forceinline__  CUDA_FUNCTION constexpr float get_luminance(const ei::Vec3& vec
 	return ei::dot(LUM_WEIGHT, vec);
 }
 
-inline CUDA_FUNCTION ei::Triangle get_triangle(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
-											   const u32 primId) {
-
-	const ei::IVec3 indices{
+inline CUDA_FUNCTION ei::IVec3 get_triangle_vertex_indices(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+														   const u32 primId) noexcept {
+	return ei::IVec3{
 			polygon.vertexIndices[3u * primId + 0],
 			polygon.vertexIndices[3u * primId + 1],
 			polygon.vertexIndices[3u * primId + 2]
 	};
+}
+inline CUDA_FUNCTION ei::IVec4 get_quad_vertex_indices(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+													   const u32 primId) noexcept {
+	const u32 vertexOffset = polygon.numTriangles * 3u;
+	const u32 primIdx = primId - polygon.numTriangles;
+	return ei::IVec4{
+			polygon.vertexIndices[vertexOffset + 4u * primIdx + 0],
+			polygon.vertexIndices[vertexOffset + 4u * primIdx + 1],
+			polygon.vertexIndices[vertexOffset + 4u * primIdx + 2],
+			polygon.vertexIndices[vertexOffset + 4u * primIdx + 3]
+	};
+}
+
+inline CUDA_FUNCTION ei::Triangle get_triangle(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+											   const u32 primId) noexcept {
+
+	const auto indices = get_triangle_vertex_indices(polygon, primId);
 	return ei::Triangle{
 		polygon.vertices[indices.x],
 		polygon.vertices[indices.y],
@@ -30,15 +46,8 @@ inline CUDA_FUNCTION ei::Triangle get_triangle(const scene::PolygonsDescriptor<C
 	};
 }
 inline CUDA_FUNCTION ei::Tetrahedron get_quad(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
-											  const u32 primId) {
-	const u32 vertexOffset = polygon.numTriangles * 3u;
-	const u32 primIdx = primId - polygon.numTriangles;
-	const ei::IVec4 indices{
-			polygon.vertexIndices[vertexOffset + 4u * primIdx + 0],
-			polygon.vertexIndices[vertexOffset + 4u * primIdx + 1],
-			polygon.vertexIndices[vertexOffset + 4u * primIdx + 2],
-			polygon.vertexIndices[vertexOffset + 4u * primIdx + 3]
-	};
+											  const u32 primId) noexcept {
+	const auto indices = get_quad_vertex_indices(polygon, primId);
 	return ei::Tetrahedron{
 		polygon.vertices[indices.x],
 		polygon.vertices[indices.y],

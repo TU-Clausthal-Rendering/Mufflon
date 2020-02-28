@@ -59,6 +59,10 @@ private:
 	unique_device_ptr<Device::CPU, combined::ShadowStatus[]> m_shadowStatus;
 	std::size_t m_lightCount = 0u;
 
+	// Debug
+	std::vector<float> m_accumImportances;
+	std::vector<float*> m_accumImpAccess;
+
 	// Superfluous
 	Stage m_stage = Stage::NONE;
 	std::vector<bool> m_isFrameReduced;

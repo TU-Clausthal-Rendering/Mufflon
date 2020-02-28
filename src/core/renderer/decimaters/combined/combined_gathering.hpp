@@ -375,7 +375,56 @@ inline CUDA_FUNCTION void sample_vis_importance_octree(CombinedTargets::RenderBu
 		const auto area = scene::compute_area(scene, polygon, hitId);
 
 		const auto importance = viewImp / (area * distSum);
-		outputBuffer.template contribute<silhouette::ImportanceTarget>(coord, importance);
+		outputBuffer.template set<silhouette::ImportanceTarget>(coord, importance);
+	}
+}
+
+inline CUDA_FUNCTION void sample_vis_importance(CombinedTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
+												const scene::SceneDescriptor<CURRENT_DEV>& scene,
+												const Pixel& coord, math::Rng& rng,
+												const ConstArrayDevHandle_t<CURRENT_DEV, ConstArrayDevHandle_t<CURRENT_DEV, float>> importances) {
+	Spectrum throughput{ ei::Vec3{1.0f} };
+	float guideWeight = 1.0f;
+	PtPathVertex vertex;
+	VertexSample sample;
+	// Create a start for the path
+	PtPathVertex::create_camera(&vertex, nullptr, scene.camera.get(), coord, rng.next());
+
+	scene::Point lastPosition = vertex.get_position();
+	math::RndSet2_1 rnd{ rng.next(), rng.next() };
+	float rndRoulette = math::sample_uniform(u32(rng.next()));
+	if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) == WalkResult::HIT) {
+		const auto& hitpoint = vertex.get_position();
+		const auto& hitId = vertex.get_primitive_id();
+		const auto lodIdx = scene.lodIndices[hitId.instanceId];
+		if(hitId.primId >= scene.lods[lodIdx].numPrimitives)
+			return;
+
+		const auto polygon = scene.lods[lodIdx].polygon;
+		const auto objSpacePos = ei::transform(vertex.get_position(),
+											   scene.worldToInstance[hitId.instanceId]);
+
+		float imp = 0.f;
+		float distSum = 0.f;
+		if(static_cast<u32>(hitId.primId) < polygon.numTriangles) {
+			const auto indices = scene::get_triangle_vertex_indices(polygon, hitId.primId);
+			const auto tri = scene::get_triangle(polygon, hitId.primId);
+			for(u32 i = 0u; i < 3u; ++i) {
+				const auto dist = ei::len(tri.v(i) - objSpacePos);
+				imp += dist * importances[lodIdx][indices[i]];
+				distSum += dist;
+			}
+		} else {
+			const auto indices = scene::get_quad_vertex_indices(polygon, hitId.primId);
+			const auto quad = scene::get_triangle(polygon, hitId.primId);
+			for(u32 i = 0u; i < 4u; ++i) {
+				const auto dist = ei::len(quad.v(i) - objSpacePos);
+				imp += dist * importances[lodIdx][indices[i]];
+				distSum += dist;
+			}
+		}
+		const auto importance = imp / distSum;
+		outputBuffer.template set<silhouette::ImportanceTarget>(coord, importance);
 	}
 }
 

@@ -115,7 +115,19 @@ void CpuCombinedReducer::iterate() {
 			display_importance();
 		}
 	} else if(m_stage == Stage::IMPORTANCE_GATHERED && m_params.reduction == 0) {
-		// TODO
+		std::size_t vertices = 0u;
+		for(const auto& decimater : m_decimaters)
+			vertices += decimater->get_decimated_vertex_count();
+		// TODO: uses quite a bit of memory
+		m_accumImportances = std::vector<float>(vertices);
+		m_accumImpAccess.clear();
+		m_accumImpAccess.reserve(m_decimaters.size());
+		vertices = 0u;
+		for(const auto& decimater : m_decimaters) {
+			m_accumImpAccess.push_back(m_accumImportances.data() + vertices);
+			decimater->get_decimated_importance(m_accumImpAccess.back());
+			vertices += decimater->get_decimated_vertex_count();
+		}
 		display_importance(true);
 	}
 }
@@ -161,12 +173,15 @@ void CpuCombinedReducer::gather_importance() {
 void CpuCombinedReducer::display_importance(const bool accumulated) {
 	// TODO: accumulated!
 	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
-	const auto shadowStatusOffset = m_world.get_frame_current() * m_lightCount * (m_params.maxPathLength - 1) * NUM_PIXELS;
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		combined::sample_vis_importance_octree(m_outputBuffer, m_sceneDesc, coord,
-											   m_rngs[pixel], m_viewOctrees[m_world.get_frame_current()].data());
+		if(accumulated)
+			combined::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord,
+											m_rngs[pixel], m_accumImpAccess.data());
+		else
+			combined::sample_vis_importance_octree(m_outputBuffer, m_sceneDesc, coord,
+												   m_rngs[pixel], m_viewOctrees[m_world.get_frame_current()].data());
 	}
 }
 
