@@ -224,9 +224,7 @@ void ImportanceDecimater<dev>::update_importance_density(const ImportanceSums& s
 	// First get the data off the GPU
 	this->pull_importance_from_device();
 
-	viewGrid.export_to_file(std::string(m_objectName) + "-view.ktx", 8u);
-	irradianceGrid.export_to_file(std::string(m_objectName) + "-irradiance.ktx", 8u);
-	viewGrid.join(irradianceGrid, 1.f);
+	viewGrid.join(irradianceGrid, m_lightWeight);
 	viewGrid.export_to_file(std::string(m_objectName) + "-merged.ktx", 8u);
 
 	// TODO: proper reservation

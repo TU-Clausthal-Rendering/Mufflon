@@ -865,7 +865,12 @@ float Polygons::compute_surface_area() const noexcept {
 }
 
 void Polygons::remove_curvature() {
-	if(m_curvatureHdl.has_value()) {
+	u32 oldValue = m_curvRefCount.load(std::memory_order_acquire);
+	u32 newValue;
+	do {
+		newValue = std::max(1u, oldValue) - 1u;
+	} while(m_curvRefCount.compare_exchange_weak(oldValue, newValue, std::memory_order_acq_rel));
+	if(newValue == 0u && m_curvatureHdl.has_value()) {
 		m_vertexAttributes.remove_attribute(m_curvatureHdl.value());
 		m_curvatureHdl.reset();
 	}
@@ -873,7 +878,7 @@ void Polygons::remove_curvature() {
 
 void Polygons::compute_curvature() {
 	// Check if the curvature has been computed before
-	if(!m_curvatureHdl.has_value())
+	if(m_curvRefCount.fetch_add(1u) == 0 && !m_curvatureHdl.has_value())
 		m_curvatureHdl = this->template add_vertex_attribute<float>("mean_curvature");
 
 	float* curv = m_vertexAttributes.template acquire<Device::CPU, float>(m_curvatureHdl.value());

@@ -101,7 +101,7 @@ inline CUDA_FUNCTION void sample_importance(ss::SilhouetteTargets::RenderBufferT
 												  neeSeed, vertex.get_position(), neeRnd,
 												  &lightIndex);
 				Pixel outCoord;
-				auto value = vertex.evaluate(nee.dir.direction, scene.media, outCoord, nee.dist);
+				auto value = vertex.evaluate(nee.dir.direction, scene.media, outCoord);
 				if(nee.cosOut != 0) value.cosOut *= nee.cosOut;
 				mAssert(!isnan(value.value.x) && !isnan(value.value.y) && !isnan(value.value.z));
 				Spectrum radiance = value.value * nee.diffIrradiance;

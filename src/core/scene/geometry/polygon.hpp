@@ -8,6 +8,7 @@
 #include "core/scene/attributes/attribute_handles.hpp"
 #include <ei/3dtypes.hpp>
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
+#include <atomic>
 #include <functional>
 #include <optional>
 #include <tuple>
@@ -501,6 +502,7 @@ private:
 	VertexAttributeHandle m_pointsHdl;
 	VertexAttributeHandle m_normalsHdl;
 	VertexAttributeHandle m_uvsHdl;
+	std::atomic_uint32_t m_curvRefCount = 0u;
 	std::optional<VertexAttributeHandle> m_curvatureHdl;
 	std::optional<VertexAttributeHandle> m_animationWeightHdl;
 	FaceAttributeHandle m_matIndicesHdl;

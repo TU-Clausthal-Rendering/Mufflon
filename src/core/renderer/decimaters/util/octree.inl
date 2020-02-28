@@ -88,6 +88,27 @@ __host__ void Octree<N>::add_sample(const ei::Vec3& pos, const ei::Vec3& normal,
 }
 
 template < class N >
+__host__ double Octree<N>::compute_leaf_sum() const noexcept {
+	std::vector<const std::atomic<N>*> queue;
+	queue.push_back(&m_root);
+	double sum = 0.0;
+
+	while(!queue.empty()) {
+		const auto curr = queue.back();
+		queue.pop_back();
+		const auto currVal = curr->load(std::memory_order_acquire);
+
+		if(currVal.is_leaf()) {
+			sum += currVal.get_sample();
+		} else {
+			for(u32 i = 0u; i < 8u; ++i)
+				queue.push_back(m_nodes + (currVal.get_child_offset() + i));
+		}
+	}
+	return sum;
+}
+
+template < class N >
 __host__ std::pair<std::vector<std::pair<u32, float>>, std::size_t> Octree<N>::to_grid(const std::size_t maxDepth) const noexcept {
 	std::vector<std::pair<const std::atomic<N>*, ei::UVec4>> queue;
 	queue.reserve(this->leafs());

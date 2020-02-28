@@ -21,7 +21,7 @@ public:
 		m_allocationCounter{ 0u },
 		m_nodeMemory{ std::make_unique<std::atomic<NodeType>[]>(m_capacity) },
 		m_octrees{},
-		m_cudaNodeMemory{ make_udevptr_array<Device::CUDA, NodeType, false>(m_capacity) },
+		m_cudaNodeMemory{ nullptr },
 		m_cudaOctrees{ nullptr }
 	{
 		m_octrees.reserve(octreeCapacity);
@@ -48,6 +48,9 @@ public:
 							   std::forward<Args>(args)...);
 	}
 	void update_readonly() {
+		if(!m_cudaNodeMemory)
+			m_cudaNodeMemory = make_udevptr_array<Device::CUDA, NodeType, false>(m_capacity);
+
 		std::vector<ReadOnlyType> readOnlyTrees;
 		readOnlyTrees.reserve(m_octrees.size());
 		m_cudaOctrees = make_udevptr_array<Device::CUDA, ReadOnlyType, false>(m_octrees.size());
