@@ -269,6 +269,11 @@ if(${CMAKE_VERSION} VERSION_GREATER "3.16.0")
 			$<$<COMPILE_LANGUAGE:CXX>:<string$<ANGLE-R>>
 			$<$<COMPILE_LANGUAGE:CXX>:<type_traits$<ANGLE-R>>
 			$<$<COMPILE_LANGUAGE:CXX>:<vector$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<ei/vector.hpp$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<ei/2dtypes.hpp$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<ei/3dtypes.hpp$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<ei/2dintersection.hpp$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<ei/3dintersection.hpp$<ANGLE-R>>
 			$<$<COMPILE_LANGUAGE:CXX>:core/concepts.hpp>
 			$<$<COMPILE_LANGUAGE:CXX>:core/memory/allocator.hpp>
 			$<$<COMPILE_LANGUAGE:CXX>:core/memory/residency.hpp>
