@@ -185,6 +185,7 @@ void WorldContainer::apply_transformation(InstanceHandle hdl) {
 		objectHandle = duplicate_object(objectHandle, newName);
 		hdl->set_object(*objectHandle);
 	}
+	// TODO: delayed LoD loading prevents this from working...
 	for(size_t i = 0; i < objectHandle->get_lod_slot_count(); i++) {
 		if(objectHandle->has_original_lod_available(u32(i))) {
 			Lod& lod = objectHandle->get_original_lod(u32(i));

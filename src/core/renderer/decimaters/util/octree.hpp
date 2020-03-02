@@ -27,6 +27,7 @@ public:
 	~Octree() = default;
 
 	__host__ float get_samples(const ei::Vec3& pos) const noexcept;
+	__host__ float get_density(const ei::Vec3& pos, const ei::Vec3& normal) const noexcept;
 	__host__ void add_sample(const ei::Vec3& pos, const ei::Vec3& normal, const float value) noexcept;
 	__host__ std::pair<std::vector<std::pair<u32, float>>, std::size_t> to_grid(const std::size_t maxDepth) const noexcept;
 	__host__ void export_to_file(const std::string& path, const std::size_t maxDepth = std::numeric_limits<std::size_t>::max()) const;

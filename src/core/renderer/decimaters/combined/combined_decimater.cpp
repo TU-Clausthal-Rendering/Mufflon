@@ -148,7 +148,8 @@ void CombinedDecimater::update(const PImpWeightMethod::Values weighting,
 			case PImpWeightMethod::Values::AVERAGE:
 				for(u32 f = startFrame; f <= endFrame; ++f) {
 					// Fetch octree value (TODO)
-					const auto imp = m_viewImportance[f]->get_samples(util::pun<ei::Vec3>(m_originalMesh.point(vertex)));
+					const auto imp = m_viewImportance[f]->get_density(util::pun<ei::Vec3>(m_originalMesh.point(vertex)),
+																	  util::pun<ei::Vec3>(m_originalMesh.normal(vertex)));
 					importance += imp;
 				}
 				importance /= static_cast<float>(endFrame - startFrame + 1u);
@@ -160,12 +161,13 @@ void CombinedDecimater::update(const PImpWeightMethod::Values weighting,
 			case PImpWeightMethod::Values::MAX:
 				for(u32 f = startFrame; f <= endFrame; ++f) {
 					// Fetch octree value (TODO)
-					const auto imp = m_viewImportance[f]->get_samples(util::pun<ei::Vec3>(m_originalMesh.point(vertex)));
+					const auto imp = m_viewImportance[f]->get_density(util::pun<ei::Vec3>(m_originalMesh.point(vertex)),
+																	  util::pun<ei::Vec3>(m_originalMesh.normal(vertex)));
 					importance = std::max<float>(importance, imp);
 				}
 				break;
 		}
-		const auto weightedImportance = std::sqrt(importance * curv);
+		const auto weightedImportance = std::sqrt(importance * curv) / area;
 		m_originalMesh.property(m_accumulatedImportanceDensity, vertex) = weightedImportance;
 	}
 }

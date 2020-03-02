@@ -2,6 +2,7 @@
 
 #include "octree.hpp"
 #include "util/log.hpp"
+#include "core/math/intersection_areas.hpp"
 
 namespace mufflon { namespace renderer { namespace decimaters {
 
@@ -62,6 +63,43 @@ __host__ float Octree<N>::get_samples(const ei::Vec3& pos) const noexcept {
 		currVal = m_nodes[idx].load(std::memory_order_acquire);
 	}
 	return currVal.get_sample();
+}
+
+template < class N >
+__host__ float Octree<N>::get_density(const ei::Vec3& pos, const ei::Vec3& normal) const noexcept {
+	const ei::Vec3 offPos = pos - m_minBound;
+	const ei::Vec3 normPos = offPos * m_diagonalInv;
+	// Get the integer position on the finest level.
+	const decltype(m_depth.load()) gridRes = 1u << m_depth.load(std::memory_order_acquire);
+	const ei::UVec3 iPos{ normPos * gridRes };
+	auto currentLvlMask = gridRes;
+	auto currVal = m_root.load(std::memory_order_consume);
+	while(currVal.is_parent()) {
+		currentLvlMask >>= 1;
+		const auto offset = currVal.get_child_offset();
+		// Get the relative index of the child [0,7] plus the child offset for the node index
+		const auto idx = ((iPos.x & currentLvlMask) ? 1 : 0)
+			+ ((iPos.y & currentLvlMask) ? 2 : 0)
+			+ ((iPos.z & currentLvlMask) ? 4 : 0)
+			+ offset;
+		currVal = m_nodes[idx].load(std::memory_order_acquire);
+	}
+
+	const float sample = currVal.get_sample();
+	if(sample > 0.f) {
+		// Get the world space cell boundaries
+		currentLvlMask = ei::max(1u, currentLvlMask);
+		const auto currentGridRes = gridRes / currentLvlMask;
+		const ei::UVec3 cellPos = iPos / currentLvlMask;
+		const ei::Vec3 cellSize = 1.0f / (currentGridRes * m_diagonalInv);
+		const ei::Vec3 cellMin = cellPos * cellSize;
+		//ei::Vec3 cellMax = cellMin + cellSize;
+		//float area = math::intersection_area(cellMin, cellMax, offPos, normal);
+		const float area = math::intersection_area_nrm(cellSize, offPos - cellMin, normal);
+		return sdiv(sample, area);
+		//return m_densityScale * countOrChild;
+	}
+	return 0.f;
 }
 
 template < class N >

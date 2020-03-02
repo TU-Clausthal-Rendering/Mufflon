@@ -178,10 +178,12 @@ void CpuCombinedReducer::display_importance(const bool accumulated) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
 		if(accumulated)
 			combined::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord,
-											m_rngs[pixel], m_accumImpAccess.data());
+											m_rngs[pixel], m_accumImpAccess.data(),
+											m_importanceSums.data(), m_world.get_frame_current());
 		else
 			combined::sample_vis_importance_octree(m_outputBuffer, m_sceneDesc, coord,
-												   m_rngs[pixel], m_viewOctrees[m_world.get_frame_current()].data());
+												   m_rngs[pixel], m_viewOctrees[m_world.get_frame_current()].data(),
+												   m_importanceSums.data(), m_world.get_frame_current());
 	}
 }
 
@@ -210,9 +212,20 @@ void CpuCombinedReducer::initialize_decimaters() {
 		for(const auto& obj : objects) {
 			// TODO: proper bounding box!
 			const auto aabb = obj.first->get_lod(0).get_bounding_box();
+
+			// We have to weight the splitting factor with the average instance scaling.
+			// Since we weight importance with baseArea / area, it otherwise happens
+			// that, if all instances are scaled up or down, importance isn't properly
+			// gathered
+			ei::Vec3 scaleSum{ 0.f };
+			for(std::size_t i = obj.second.offset; i < (obj.second.offset + obj.second.count); ++i)
+				scaleSum += scene::Instance::extract_scale(m_world.get_world_to_instance_transformation(instances[i]));
+			scaleSum /= static_cast<float>(obj.second.count);
+			const auto splitScale = ei::max(scaleSum) * ei::max(scaleSum);
+
 			// TODO: proper splitting factors!
-			m_viewOctrees.back().create(aabb, 8.f);
-			m_irradianceOctrees.back().create(aabb, 8u, 8.f);
+			m_viewOctrees.back().create(aabb, 8.f * splitScale);
+			m_irradianceOctrees.back().create(aabb, 8u, 8.f * splitScale);
 
 			m_viewOctreeAccess[m_world.get_frame_count() * o + i] = m_viewOctrees.back().data() + o;
 			m_irradianceOctreeAccess[m_world.get_frame_count() * o + i] = m_irradianceOctrees.back().data() + o;

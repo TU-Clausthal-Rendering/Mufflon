@@ -73,7 +73,12 @@ struct RadianceTarget {
 	static constexpr u32 NUM_CHANNELS = 3u;
 	static constexpr bool REQUIRED = true;
 };
+struct ImportanceSumTarget {
+	static constexpr const char NAME[] = "Importance Sum";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 1u;
+};
 
-using CombinedTargets = TargetList<RadianceTarget, silhouette::ImportanceTarget, PenumbraTarget>;
+using CombinedTargets = TargetList<RadianceTarget, silhouette::ImportanceTarget, ImportanceSumTarget, PenumbraTarget>;
 
 }}}} // namespace mufflon::renderer::decimaters::combined

@@ -332,7 +332,9 @@ inline CUDA_FUNCTION void sample_importance_octree(CombinedTargets::RenderBuffer
 inline CUDA_FUNCTION void sample_vis_importance_octree(CombinedTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 													   const scene::SceneDescriptor<CURRENT_DEV>& scene,
 													   const Pixel& coord, math::Rng& rng,
-													   const FloatOctree* view) {
+													   const FloatOctree* view,
+													   const ConstArrayDevHandle_t<CURRENT_DEV, double> importanceSums,
+													   const u32 currFrame) {
 	Spectrum throughput{ ei::Vec3{1.0f} };
 	float guideWeight = 1.0f;
 	PtPathVertex vertex;
@@ -376,13 +378,16 @@ inline CUDA_FUNCTION void sample_vis_importance_octree(CombinedTargets::RenderBu
 
 		const auto importance = viewImp / (area * distSum);
 		outputBuffer.template set<silhouette::ImportanceTarget>(coord, importance);
+		outputBuffer.template set<ImportanceSumTarget>(coord, static_cast<float>(importanceSums[scene.numLods * currFrame + lodIdx]));
 	}
 }
 
 inline CUDA_FUNCTION void sample_vis_importance(CombinedTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 												const scene::SceneDescriptor<CURRENT_DEV>& scene,
 												const Pixel& coord, math::Rng& rng,
-												const ConstArrayDevHandle_t<CURRENT_DEV, ConstArrayDevHandle_t<CURRENT_DEV, float>> importances) {
+												const ConstArrayDevHandle_t<CURRENT_DEV, ConstArrayDevHandle_t<CURRENT_DEV, float>> importances,
+												const ConstArrayDevHandle_t<CURRENT_DEV, double> importanceSums,
+												const u32 currFrame) {
 	Spectrum throughput{ ei::Vec3{1.0f} };
 	float guideWeight = 1.0f;
 	PtPathVertex vertex;
@@ -425,6 +430,7 @@ inline CUDA_FUNCTION void sample_vis_importance(CombinedTargets::RenderBufferTyp
 		}
 		const auto importance = imp / distSum;
 		outputBuffer.template set<silhouette::ImportanceTarget>(coord, importance);
+		outputBuffer.template set<ImportanceSumTarget>(coord, static_cast<float>(importanceSums[scene.numLods * currFrame + lodIdx]));
 	}
 }
 
