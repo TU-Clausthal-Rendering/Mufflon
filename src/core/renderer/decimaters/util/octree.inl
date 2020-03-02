@@ -3,6 +3,8 @@
 #include "octree.hpp"
 #include "util/log.hpp"
 #include "core/math/intersection_areas.hpp"
+#include <gli/texture3d.hpp>
+#include <gli/save.hpp>
 
 namespace mufflon { namespace renderer { namespace decimaters {
 

@@ -10,9 +10,6 @@
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 
-#include <gli/gli/texture3d.hpp>
-#include <gli/gli/save.hpp>
-
 namespace mufflon::renderer::decimaters::silhouette::pt {
 
 using namespace modules;

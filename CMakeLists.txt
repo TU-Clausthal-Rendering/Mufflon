@@ -220,6 +220,8 @@ target_include_directories(core
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/cub
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/epsilon/include
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/glad
+		${CMAKE_CURRENT_SOURCE_DIR}/deps/gli
+		${CMAKE_CURRENT_SOURCE_DIR}/deps/gli/external
 		${CMAKE_CURRENT_SOURCE_DIR}/external/OpenMesh-8.0/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/include
 		${CMAKE_CURRENT_SOURCE_DIR}/external/oidn-0.9/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/include
 )

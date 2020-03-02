@@ -65,6 +65,7 @@ private:
 
 	// Superfluous
 	Stage m_stage = Stage::NONE;
+	std::vector<bool> m_hasFrameImp;
 	std::vector<bool> m_isFrameReduced;
 
 

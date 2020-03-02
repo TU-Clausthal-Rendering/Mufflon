@@ -33,6 +33,7 @@ void CpuCombinedReducer::pre_reset() {
 	if(m_stage == Stage::NONE) {
 		this->initialize_decimaters();
 		m_stage = Stage::INITIALIZED;
+		m_hasFrameImp = std::vector<bool>(m_world.get_frame_count(), false);
 	}
 
 	RendererBase<Device::CPU, combined::CombinedTargets>::pre_reset();
@@ -92,27 +93,33 @@ void CpuCombinedReducer::post_iteration(IOutputHandler& outputBuffer) {
 
 void CpuCombinedReducer::iterate() {
 	if(m_stage == Stage::INITIALIZED) {
-		logInfo("Gathering importance for frame ", m_world.get_frame_current());
+		if(m_hasFrameImp[m_world.get_frame_current()]) {
+			if(m_params.reduction == 0)
+				display_importance();
+		} else {
+			logInfo("Gathering importance for frame ", m_world.get_frame_current());
 
-		const auto processTime = CpuProfileState::get_process_time();
-		const auto cycles = CpuProfileState::get_cpu_cycle();
+			const auto processTime = CpuProfileState::get_process_time();
+			const auto cycles = CpuProfileState::get_cpu_cycle();
 
-		// Do the usual importance gathering
-		gather_importance();
+			// Do the usual importance gathering
+			gather_importance();
 
-		// Update the importance sums
-		for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-			m_decimaters[i]->finish_gather(m_world.get_frame_current());
-		}
+			// Update the importance sums
+			for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+				m_decimaters[i]->finish_gather(m_world.get_frame_current());
+			}
 
-		if(m_decimaters.size() == 0u)
-			return;
+			if(m_decimaters.size() == 0u)
+				return;
 
-		logInfo("Finished importance gathering (",
-				std::chrono::duration_cast<std::chrono::milliseconds>(processTime).count(),
-				"ms, ", cycles / 1'000'000, " MCycles)");
-		if(m_params.reduction == 0) {
-			display_importance();
+			m_hasFrameImp[m_world.get_frame_current()] = true;
+			logInfo("Finished importance gathering (",
+					std::chrono::duration_cast<std::chrono::milliseconds>(processTime).count(),
+					"ms, ", cycles / 1'000'000, " MCycles)");
+			if(m_params.reduction == 0) {
+				display_importance();
+			}
 		}
 	} else if(m_stage == Stage::IMPORTANCE_GATHERED && m_params.reduction == 0) {
 		std::size_t vertices = 0u;
