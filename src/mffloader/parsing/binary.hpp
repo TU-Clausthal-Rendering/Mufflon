@@ -39,7 +39,7 @@ public:
 				   const bool deinstance, const bool loadWorldToInstTrans,
 				   const bool keepTrackOfAabb, const bool noDefaultInstances);
 
-	void load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod);
+	void load_lod(const fs::path& file, ObjectHdl obj, mufflon::u32 objId, mufflon::u32 lod);
 
 	const std::vector<std::string>& get_material_names() const noexcept {
 		return m_materialNames;

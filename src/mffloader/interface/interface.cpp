@@ -181,7 +181,7 @@ Boolean loader_load_lod(MufflonLoaderInstanceHdl hdl, ObjectHdl obj, u32 lod) {
 		return false;
 	std::string status;
 	binary::BinaryLoader loader{ mffLoaderInst.mffInst, status };
-	loader.load_lod(mffLoaderInst.binPath, objId, lod);
+	loader.load_lod(mffLoaderInst.binPath, obj, objId, lod);
 	return true;
 	CATCH_ALL(false)
 }

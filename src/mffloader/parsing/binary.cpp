@@ -870,7 +870,7 @@ void BinaryLoader::deinstance() {
 		applyTranformation(frames);
 }
 
-void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod) {
+void BinaryLoader::load_lod(const fs::path& file, ObjectHdl obj, mufflon::u32 objId, mufflon::u32 lod) {
 	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::load_lod");
 	m_filePath = file;
 
@@ -930,7 +930,10 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 		object.keyframe = read<u32>();
 		object.animObjId = read<u32>();
 		object.aabb = read<ei::Box>();
-		object.objHdl = world_get_object(m_mffInstHdl, object.name.data());
+		if(obj == nullptr)
+			object.objHdl = world_get_object(m_mffInstHdl, object.name.data());
+		else
+			object.objHdl = obj;
 		if(object.objHdl == nullptr)
 			throw std::runtime_error("Unknown object '" + std::string(object.name) + ")");
 		// Read the LoD

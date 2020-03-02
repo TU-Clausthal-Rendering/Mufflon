@@ -147,6 +147,17 @@ ObjectHandle WorldContainer::create_object(const StringView name, ObjectFlags fl
 	return &hdl;
 }
 
+ObjectHandle WorldContainer::duplicate_object(ObjectHandle hdl, const StringView newName) {
+	const auto pooledName = m_namePool.insert(newName);
+	if(m_objects.find(pooledName) != m_objects.cend())
+		throw std::runtime_error("Object with the name already exists!");
+	auto& newHdl = m_objects.emplace(pooledName, Object{ hdl->get_object_id() });
+	newHdl.set_name(pooledName);
+	newHdl.set_flags(hdl->get_flags());
+	newHdl.copy_lods_from(*hdl);
+	return &newHdl;
+}
+
 void WorldContainer::set_bone(u32 boneIndex, u32 keyframe, const ei::DualQuaternion& transformation) {
 	if(boneIndex > m_numBones)
 		throw std::runtime_error(std::string("Cannot set bone ") + std::to_string(boneIndex) + ", only " + std::to_string(m_numBones) + " were reserved.");
@@ -160,13 +171,6 @@ ObjectHandle WorldContainer::get_object(const StringView name) {
 	if(iter != m_objects.end())
 		return &iter->second;
 	return nullptr;
-}
-
-ObjectHandle WorldContainer::duplicate_object(ObjectHandle hdl, const StringView newName) {
-	const auto pooledName = m_namePool.insert(newName);
-	ObjectHandle newHdl = create_object(pooledName, hdl->get_flags());
-	newHdl->copy_lods_from(*hdl);
-	return newHdl;
 }
 
 void WorldContainer::apply_transformation(InstanceHandle hdl) {
