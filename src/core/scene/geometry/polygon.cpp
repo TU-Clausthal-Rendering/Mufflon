@@ -8,6 +8,7 @@
 #include "core/scene/scenario.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/math/curvature.hpp"
+#include "core/scene/clustering/uniform_clustering.hpp"
 #include "core/scene/tessellation/tessellater.hpp"
 #include "core/scene/tessellation/displacement_mapper.hpp"
 #include <OpenMesh/Core/Mesh/Handles.hh>
@@ -678,80 +679,14 @@ std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
 
 	const auto previousVertices = m_meshData->n_vertices();
 
-	// We have to track a few things per cluster
-	std::vector<VertexCluster> clusters(gridRes * gridRes * gridRes);
-
-	const auto aabbMin = m_boundingBox.min;
-	const auto aabbDiag = m_boundingBox.max - m_boundingBox.min;
-	// Convenience function to compute the cluster index from a position
-	auto get_cluster_index = [aabbMin, aabbDiag, gridRes](const ei::Vec3& pos) -> u32 {
-		// Get the normalized position [0, 1]^3
-		const auto normPos = (pos - aabbMin) / aabbDiag;
-		// Get the discretized grid position
-		const auto gridPos = ei::min(ei::UVec3{ normPos * ei::Vec3{ gridRes } }, (ei::UVec3{ gridRes } - 1u));
-		// Convert the 3D grid position into a 1D index (x -> y -> z)
-		const auto gridIndex = gridPos.x + gridPos.y * gridRes + gridPos.z * gridRes * gridRes;
-		return static_cast<u32>(gridIndex);
-	};
-	
-	OpenMesh::VPropHandleT<Quadricf> quadricProps{};
-	m_meshData->add_property(quadricProps);
-	if(!quadricProps.is_valid())
-		throw std::runtime_error("Failed to add error quadric property");
-	// Compute the error quadrics for each vertex
-	this->compute_error_quadrics(quadricProps);
-
-	// For each vertex, determine the cluster it belongs to and update its statistics
-	for(const auto vertex : m_meshData->vertices()) {
-		const auto pos = util::pun<ei::Vec3>(m_meshData->point(vertex));
-		const auto clusterIndex = get_cluster_index(pos);
-		clusters[clusterIndex].add_vertex(pos, m_meshData->property(quadricProps, vertex));
-	}
-	m_meshData->remove_property(quadricProps);
-
-	// Calculate the representative cluster position for every cluster
-	u32 clusterCount = compute_cluster_center(clusters.begin(), clusters.end());
-
-	// Then we set the position of every vertex to that of its
-	// cluster representative
-	for(const auto vertex : m_meshData->vertices()) {
-		const auto pos = util::pun<ei::Vec3>(m_meshData->point(vertex));
-		const auto clusterIndex = get_cluster_index(pos);
-		// New cluster position has been previously computed
-		const auto newPos = clusters[clusterIndex].posAccum;
-		m_meshData->point(vertex) = util::pun<PolygonMeshType::Point>(newPos);
-	}
-	// After that, we can easily remove degenerate faces (by collapsing degenerate halfedges)
-	/*for(const auto edge : m_meshData->edges()) {
-		const auto heh = m_meshData->halfedge_handle(edge, 0);
-		const auto vh0 = m_meshData->from_vertex_handle(heh);
-		const auto vh1 = m_meshData->to_vertex_handle(heh);
-		const auto p0 = util::pun<ei::Vec3>(m_meshData->point(vh0));
-		const auto p1 = util::pun<ei::Vec3>(m_meshData->point(vh1));
-		if((p0 == p1) && m_meshData->is_collapse_ok(heh))
-			m_meshData->collapse(heh);
-	}*/
-	std::vector<PolygonMeshType::HalfedgeHandle> collapses{};
-	for(const auto vertex : m_meshData->vertices()) {
-		const auto p0 = util::pun<ei::Vec3>(m_meshData->point(vertex));
-		for(auto iter = m_meshData->cvoh_begin(vertex); iter.is_valid(); ++iter) {
-			const auto vh1 = m_meshData->to_vertex_handle(*iter);
-			const auto p1 = util::pun<ei::Vec3>(m_meshData->point(vh1));
-			if(p0 == p1)
-				collapses.push_back(*iter);
-		}
-	}
-	/*for(const auto heh : collapses) {
-		if(m_meshData->is_collapse_ok(heh))
-			m_meshData->collapse(heh);
-	}*/
-
-	compute_vertex_normals(*m_meshData, m_meshData->vertices_sbegin(), m_meshData->vertices_end());
+	clustering::UniformVertexClusterer clusterer{ ei::UVec3(gridRes) };
+	const auto clusterCount = clusterer.cluster(*m_meshData, m_boundingBox);
 
 	if(garbageCollect)
 		this->garbage_collect();
 	else
 		this->rebuild_index_buffer();
+	compute_vertex_normals(*m_meshData, m_meshData->vertices_sbegin(), m_meshData->vertices_end());
 	// Do not garbage-collect the mesh yet - only rebuild the index buffer
 
 	// Adjust vertex and face attribute sizes
