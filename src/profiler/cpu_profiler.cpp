@@ -162,12 +162,13 @@ std::ostream& CpuProfileState::save_profiler_total_and_snapshots(std::ostream& s
 
 std::size_t CpuProfileState::get_total_memory() {
 #ifdef _WIN32
-	ULONGLONG memKb;
-	if(!::GetPhysicallyInstalledSystemMemory(&memKb)) {
+	MEMORYSTATUSEX state;
+	state.dwLength = sizeof(state);
+	if(!::GlobalMemoryStatusEx(&state)) {
 		logError("[CpuProfileState::get_total_memory] Failed to optain physical memory size");
 		return 0u;
 }
-	return memKb * 1024;
+	return state.ullTotalPhys;
 #else // _WIN32
 	return sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
 #endif // _WIN32
