@@ -27,6 +27,8 @@
 #include "core/renderer/wireframe/gl_wireframe.h"
 #include "core/renderer/debug/debug_bvh_renderer.hpp"
 
+#include "core/renderer/decimaters/plain/vertex_clusterer.hpp"
+
 namespace mufflon::renderer {
 
 using Renderers = util::TaggedTuple<
@@ -38,12 +40,14 @@ using Renderers = util::TaggedTuple<
 	CpuNextEventBacktracking,
 	CpuVcm, CpuIvcm,
 	GlForward, DebugBvhRenderer,
-	decimaters::silhouette::CpuShadowSilhouettesPT, decimaters::silhouette::CpuSsSilPT, decimaters::silhouette::GpuShadowSilhouettesPT,
+	decimaters::silhouette::CpuShadowSilhouettesPT, decimaters::silhouette::CpuSsSilPT,
 	decimaters::animation::CpuShadowSilhouettesPT,
 	decimaters::silhouette::CpuShadowSilhouettesBPM,
 	decimaters::CpuImportanceDecimater,
 	decimaters::spm::ShadowPhotonVisualizer,
-	decimaters::CpuCombinedReducer
+	decimaters::CpuCombinedReducer,
+
+	decimaters::CpuUniformVertexClusterer, decimaters::CpuOctreeVertexClusterer
 >;
 
 } // namespace mufflon::renderer

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "octree.hpp"
+#include "readonly_octree.hpp"
 #include "util/types.hpp"
 #include "core/memory/unique_device_ptr.hpp"
 #include <ei/3dtypes.hpp>
@@ -13,8 +14,8 @@ template < class T >
 class OctreeManager {
 public:
 	using OctreeType = T;
-	using ReadOnlyType = ReadOnlyOctree<OctreeType>;
 	using NodeType = typename OctreeType::NodeType;
+	using ReadOnlyType = ReadOnlyOctree<NodeType>;
 
 	OctreeManager(const u32 capacity, const u32 octreeCapacity) :
 		m_capacity{ 1u + ((static_cast<std::size_t>(capacity) + 7u) & ~7) },

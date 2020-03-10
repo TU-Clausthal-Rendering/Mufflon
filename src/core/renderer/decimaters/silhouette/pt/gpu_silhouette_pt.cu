@@ -1,3 +1,4 @@
+#if 0
 #include "silhouette_importance_gathering_pt.hpp"
 #include "silhouette_pt_common.hpp"
 #include "silhouette_pt_params.hpp"
@@ -76,3 +77,4 @@ cudaError_t call_impvis_kernel(const dim3& gridDims, const dim3& blockDims,
 } // namespace gpusil_details
 
 }}}}} // namespace mufflon::renderer::decimaters::silhouette::pt
+#endif // 0

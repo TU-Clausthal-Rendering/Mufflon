@@ -9,7 +9,7 @@
 namespace mufflon { namespace renderer { namespace decimaters {
 
 template < class N >
-__host__ Octree<N>::Octree(const ei::Box& bounds, u32 capacity, std::atomic<N>* nodes,
+Octree<N>::Octree(const ei::Box& bounds, u32 capacity, std::atomic<N>* nodes,
 				std::atomic<N>& root, std::atomic_size_t& allocationCounter) :
 	m_diagonal{ (bounds.max - bounds.min) * 1.002f },
 	m_diagonalInv{ 1.f / m_diagonal },
@@ -32,7 +32,7 @@ __host__ Octree<N>::Octree(const ei::Box& bounds, u32 capacity, std::atomic<N>* 
 }
 
 template < class N >
-__host__ Octree<N>::Octree(Octree<N>&& other) noexcept :
+Octree<N>::Octree(Octree<N>&& other) noexcept :
 	m_diagonal{ other.m_diagonal },
 	m_diagonalInv{ other.m_diagonalInv },
 	m_minBound{ other.m_minBound },
@@ -46,7 +46,58 @@ __host__ Octree<N>::Octree(Octree<N>&& other) noexcept :
 {}
 
 template < class N >
-__host__ float Octree<N>::get_samples(const ei::Vec3& pos) const noexcept {
+typename Octree<N>::NodeIndex Octree<N>::get_node_index(const ei::Vec3& pos) const noexcept {
+	const ei::Vec3 offPos = pos - m_minBound;
+	const ei::Vec3 normPos = offPos * m_diagonalInv;
+	// Get the integer position on the finest level.
+	const decltype(m_depth.load()) gridRes = 1u << m_depth.load(std::memory_order_acquire);
+	const ei::UVec3 iPos{ normPos * gridRes };
+	auto currentLvlMask = gridRes;
+	u32 idx = 0u;
+	auto currVal = m_root.load(std::memory_order_consume);
+	while(currVal.is_parent()) {
+		currentLvlMask >>= 1;
+		const auto offset = currVal.get_child_offset();
+		// Get the relative index of the child [0,7] plus the child offset for the node index
+		idx = ((iPos.x & currentLvlMask) ? 1 : 0)
+			+ ((iPos.y & currentLvlMask) ? 2 : 0)
+			+ ((iPos.z & currentLvlMask) ? 4 : 0)
+			+ offset;
+		currVal = m_nodes[idx].load(std::memory_order_acquire);
+	}
+	return NodeIndex{ idx, currentLvlMask };
+}
+
+template < class N >
+std::optional<typename Octree<N>::NodeIndex> Octree<N>::get_node_index(const ei::Vec3& pos,
+																	   const std::vector<bool>& stopMask) const noexcept {
+	const ei::Vec3 offPos = pos - m_minBound;
+	const ei::Vec3 normPos = offPos * m_diagonalInv;
+	// Get the integer position on the finest level.
+	const decltype(m_depth.load()) gridRes = 1u << m_depth.load(std::memory_order_acquire);
+	const ei::UVec3 iPos{ normPos * gridRes };
+	auto currentLvlMask = gridRes;
+	u32 idx = 0u;
+	auto currVal = m_root.load(std::memory_order_consume);
+	while(currVal.is_parent()) {
+		if(stopMask[idx])
+			break;
+		currentLvlMask >>= 1;
+		const auto offset = currVal.get_child_offset();
+		// Get the relative index of the child [0,7] plus the child offset for the node index
+		idx = ((iPos.x & currentLvlMask) ? 1 : 0)
+			+ ((iPos.y & currentLvlMask) ? 2 : 0)
+			+ ((iPos.z & currentLvlMask) ? 4 : 0)
+			+ offset;
+		currVal = m_nodes[idx].load(std::memory_order_acquire);
+	}
+	if(stopMask[idx])
+		return NodeIndex{ idx, currentLvlMask };
+	return std::nullopt;
+}
+
+template < class N >
+float Octree<N>::get_samples(const ei::Vec3& pos) const noexcept {
 	const ei::Vec3 offPos = pos - m_minBound;
 	const ei::Vec3 normPos = offPos * m_diagonalInv;
 	// Get the integer position on the finest level.
@@ -68,7 +119,12 @@ __host__ float Octree<N>::get_samples(const ei::Vec3& pos) const noexcept {
 }
 
 template < class N >
-__host__ float Octree<N>::get_density(const ei::Vec3& pos, const ei::Vec3& normal) const noexcept {
+float Octree<N>::get_samples(const NodeIndex index) const noexcept {
+	return m_nodes[index.index].load(std::memory_order_acquire).get_sample();
+}
+
+template < class N >
+float Octree<N>::get_density(const ei::Vec3& pos, const ei::Vec3& normal) const noexcept {
 	const ei::Vec3 offPos = pos - m_minBound;
 	const ei::Vec3 normPos = offPos * m_diagonalInv;
 	// Get the integer position on the finest level.
@@ -105,7 +161,7 @@ __host__ float Octree<N>::get_density(const ei::Vec3& pos, const ei::Vec3& norma
 }
 
 template < class N >
-__host__ void Octree<N>::add_sample(const ei::Vec3& pos, const ei::Vec3& normal, const float value) noexcept {
+void Octree<N>::add_sample(const ei::Vec3& pos, const ei::Vec3& normal, const float value) noexcept {
 	const ei::Vec3 offPos = pos - m_minBound;
 	const ei::Vec3 normPos = offPos * m_diagonalInv;
 	const ei::UVec3 iPos{ normPos * (1u << 30u) };
@@ -128,7 +184,7 @@ __host__ void Octree<N>::add_sample(const ei::Vec3& pos, const ei::Vec3& normal,
 }
 
 template < class N >
-__host__ double Octree<N>::compute_leaf_sum() const noexcept {
+double Octree<N>::compute_leaf_sum() const noexcept {
 	std::vector<const std::atomic<N>*> queue;
 	queue.push_back(&m_root);
 	double sum = 0.0;
@@ -149,7 +205,29 @@ __host__ double Octree<N>::compute_leaf_sum() const noexcept {
 }
 
 template < class N >
-__host__ std::pair<std::vector<std::pair<u32, float>>, std::size_t> Octree<N>::to_grid(const std::size_t maxDepth) const noexcept {
+std::optional<std::array<typename Octree<N>::NodeIndex, 8u>> Octree<N>::children(const NodeIndex index) const noexcept {
+	mAssert(index.index < m_allocationCounter.load(std::memory_order_acquire));
+	const auto node = m_nodes[index.index].load(std::memory_order_acquire);
+	if(node.is_parent()) {
+		const auto offset = node.get_child_offset();
+		const auto depthMask = index.depthMask >> 1u;
+		return std::array<NodeIndex, 8u>{{
+			NodeIndex{ offset + 0u, depthMask },
+			NodeIndex{ offset + 1u, depthMask },
+			NodeIndex{ offset + 2u, depthMask },
+			NodeIndex{ offset + 3u, depthMask },
+			NodeIndex{ offset + 4u, depthMask },
+			NodeIndex{ offset + 5u, depthMask },
+			NodeIndex{ offset + 6u, depthMask },
+			NodeIndex{ offset + 7u, depthMask },
+		}};
+	} else {
+		return std::nullopt;
+	}
+}
+
+template < class N >
+std::pair<std::vector<std::pair<u32, float>>, std::size_t> Octree<N>::to_grid(const std::size_t maxDepth) const noexcept {
 	std::vector<std::pair<const std::atomic<N>*, ei::UVec4>> queue;
 	queue.reserve(this->leafs());
 	queue.emplace_back(&m_root, ei::UVec4{ 0u, 0u, 0u, 0u });
@@ -208,7 +286,7 @@ __host__ std::pair<std::vector<std::pair<u32, float>>, std::size_t> Octree<N>::t
 }
 
 template < class N >
-__host__ void Octree<N>::export_to_file(const std::string& path, const std::size_t maxDepth) const {
+void Octree<N>::export_to_file(const std::string& path, const std::size_t maxDepth) const {
 	const auto [grid, res] = this->to_grid(maxDepth);
 	gli::texture3d texture{ gli::format::FORMAT_RGBA8_UNORM_PACK8,
 							gli::ivec3{ res, res, res }, 1u };

@@ -1,4 +1,5 @@
-﻿#include "polygon.hpp"
+﻿
+#include "polygon.hpp"
 #include "util/assert.hpp"
 #include "util/log.hpp"
 #include "util/punning.hpp"
@@ -8,6 +9,7 @@
 #include "core/scene/scenario.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/math/curvature.hpp"
+#include "core/scene/clustering/octree_clustering.hpp"
 #include "core/scene/clustering/uniform_clustering.hpp"
 #include "core/scene/tessellation/tessellater.hpp"
 #include "core/scene/tessellation/displacement_mapper.hpp"
@@ -19,54 +21,7 @@
 
 namespace mufflon::scene::geometry {
 
-// Cluster for vertex clustering
-struct VertexCluster {
-	ei::Vec3 posAccum{ 0.f };
-	u32 count{ 0u };
-	OpenMesh::Geometry::Quadricf q{};
-
-	void add_vertex(const ei::Vec3& pos, const OpenMesh::Geometry::Quadricf& quadric) noexcept {
-		count += 1u;
-		posAccum += pos;
-		q += quadric;
-	}
-};
-
 namespace {
-
-// Invert function that returns optional to indicate non-invertability instead of identity matrix
-std::optional<ei::Mat4x4> invert(const ei::Mat4x4& mat0) noexcept {
-	ei::Mat4x4 LU;
-	ei::UVec4 p;
-	if(ei::decomposeLUp(mat0, LU, p))
-		return ei::solveLUp(LU, p, ei::identity4x4());
-	return std::nullopt;
-}
-
-template < class Iter >
-u32 compute_cluster_center(const Iter begin, const Iter end) {
-	u32 clusterCount = 0u;
-	for(auto iter = begin; iter != end; ++iter) {
-		auto& cluster = *iter;
-		if(cluster.count > 0) {
-			// Attempt to compute the optimal contraction point by inverting the quadric matrix
-			const auto q = cluster.q;
-			const ei::Mat4x4 w{
-				q.a(), q.b(), q.c(), q.d(),
-				q.b(), q.e(), q.f(), q.g(),
-				q.c(), q.f(), q.h(), q.i(),
-				0,	   0,	  0,	 1
-			};
-			const auto inverse = invert(w);
-			if(inverse.has_value())
-				cluster.posAccum = ei::Vec3{ inverse.value() * ei::Vec4{ 0.f, 0.f, 0.f, 1.f } };
-			else
-				cluster.posAccum /= static_cast<float>(cluster.count);
-			clusterCount += 1;
-		}
-	}
-	return clusterCount;
-}
 
 template < class Iter >
 void compute_vertex_normals(PolygonMeshType& mesh, const Iter begin, const Iter end) {
@@ -82,7 +37,7 @@ void compute_vertex_normals(PolygonMeshType& mesh, const Iter begin, const Iter 
 	}
 }
 
-}
+} // namespace
 
 // Default construction, creates material-index attribute.
 Polygons::Polygons() :
@@ -546,7 +501,7 @@ OpenMesh::Decimater::DecimaterT<PolygonMeshType> Polygons::create_decimater() {
 	return OpenMesh::Decimater::DecimaterT<PolygonMeshType>(*m_meshData);
 }
 
-std::size_t Polygons::cluster(const data_structs::CountOctree& octree,
+std::size_t Polygons::cluster(const renderer::decimaters::FloatOctree& octree,
 							  const std::size_t targetVertices,
 							  const bool garbageCollect) {
 	using OpenMesh::Geometry::Quadricf;
@@ -555,109 +510,14 @@ std::size_t Polygons::cluster(const data_structs::CountOctree& octree,
 
 	const auto previousVertices = m_meshData->n_vertices();
 
-	// Perform a breadth-first search to bring clusters down in equal levels
-	std::vector<bool> octreeNodeMask(octree.capacity(), false);
-	std::vector<data_structs::CountOctree::NodeId> currLevel;
-	std::vector<data_structs::CountOctree::NodeId> nextLevel;
-	currLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(targetVertices, 1llu))));
-	nextLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(targetVertices, 1llu))));
-	std::size_t finalNodes = 0u;
-	u32 cutoffDepthMask = octree.get_root_depth_mask();
-	
-	currLevel.push_back(octree.get_root_node());
-	while(finalNodes < targetVertices && !currLevel.empty()) {
-		nextLevel.clear();
-		for(const auto& cluster : currLevel) {
-			if(!octree.is_leaf(cluster)) {
-				const auto children = octree.get_children(cluster);
-				for(const auto c : children)
-					nextLevel.push_back(c);
-			} else {
-				octreeNodeMask[cluster.index] = true;
-				finalNodes += 1u;
-			}
-		}
-		cutoffDepthMask >>= 1u;
-		std::swap(currLevel, nextLevel);
-	}
-
-	// TODO: trim if we went over the line
-	if(finalNodes > targetVertices) {
-		// Reduce cutoff depth by one to indicate that the last level shall not get clustered
-		cutoffDepthMask <<= 1u;
-	} else {
-		// Mark all remaining nodes as end-of-the-line
-		for(const auto& cluster : currLevel) {
-			octreeNodeMask[cluster.index] = true;
-			finalNodes += 1u;
-		}
-	}
-	printf("%llu\n", finalNodes);
-	fflush(stdout);
-
-	// We have to track a few things per cluster
-	// TODO: better bound!
-	std::vector<VertexCluster> clusters(octree.capacity());
-
-	const auto aabbMin = m_boundingBox.min;
-	const auto aabbDiag = m_boundingBox.max - m_boundingBox.min;
-	// Convenience function to compute the cluster index from a position
-	auto get_cluster_index = [&octree, &octreeNodeMask](const ei::Vec3& pos) -> data_structs::CountOctree::NodeId {
-		return octree.get_node_id(pos, octreeNodeMask);
-	};
-
-	OpenMesh::VPropHandleT<Quadricf> quadricProps{};
-	m_meshData->add_property(quadricProps);
-	if(!quadricProps.is_valid())
-		throw std::runtime_error("Failed to add error quadric property");
-	// Compute the error quadrics for each vertex
-	// TODO: weight by importance?
-	this->compute_error_quadrics(quadricProps);
-
-	// For each vertex, determine the cluster it belongs to and update its statistics
-	for(const auto vertex : m_meshData->vertices()) {
-		const auto pos = util::pun<ei::Vec3>(m_meshData->point(vertex));
-		const auto clusterIndex = get_cluster_index(pos);
-		if(clusterIndex.levelMask >= cutoffDepthMask)
-			clusters[clusterIndex.index].add_vertex(pos, m_meshData->property(quadricProps, vertex));
-	}
-	m_meshData->remove_property(quadricProps);
-
-	// Calculate the representative cluster position for every cluster
-	u32 clusterCount = compute_cluster_center(clusters.begin(), clusters.end());
-
-	// Then we set the position of every vertex to that of its
-	// cluster representative
-	for(const auto vertex : m_meshData->vertices()) {
-		const auto pos = util::pun<ei::Vec3>(m_meshData->point(vertex));
-		const auto clusterIndex = get_cluster_index(pos);
-		// New cluster position has been previously computed
-		if(clusterIndex.levelMask >= cutoffDepthMask) {
-			const auto newPos = clusters[clusterIndex.index].posAccum;
-			m_meshData->point(vertex) = util::pun<PolygonMeshType::Point>(newPos);
-		}
-	}
-	std::vector<PolygonMeshType::HalfedgeHandle> collapses{};
-	for(const auto vertex : m_meshData->vertices()) {
-		const auto p0 = util::pun<ei::Vec3>(m_meshData->point(vertex));
-		for(auto iter = m_meshData->cvoh_begin(vertex); iter.is_valid(); ++iter) {
-			const auto vh1 = m_meshData->to_vertex_handle(*iter);
-			const auto p1 = util::pun<ei::Vec3>(m_meshData->point(vh1));
-			if(p0 == p1)
-				collapses.push_back(*iter);
-		}
-	}
-	/*for(const auto heh : collapses) {
-		if(m_meshData->is_collapse_ok(heh))
-			m_meshData->collapse(heh);
-	}*/
-
-	compute_vertex_normals(*m_meshData, m_meshData->vertices_sbegin(), m_meshData->vertices_end());
+	clustering::OctreeVertexClusterer<renderer::decimaters::FloatOctree> clusterer{ octree, 32u, targetVertices };
+	const auto clusterCount = clusterer.cluster(*m_meshData, m_boundingBox);
 
 	if(garbageCollect)
 		this->garbage_collect();
 	else
 		this->rebuild_index_buffer();
+	compute_vertex_normals(*m_meshData, m_meshData->vertices_sbegin(), m_meshData->vertices_end());
 	// Do not garbage-collect the mesh yet - only rebuild the index buffer
 
 	// Adjust vertex and face attribute sizes
@@ -667,7 +527,7 @@ std::size_t Polygons::cluster(const data_structs::CountOctree& octree,
 	m_faceAttributes.mark_changed(Device::CPU);
 
 	const auto remainingVertices = std::distance(m_meshData->vertices_sbegin(), m_meshData->vertices_end());
-	logInfo("Clustered polygon mesh (", remainingVertices, " vertices, ", clusterCount, " cluster centres)");
+	logInfo("Octree-clustered polygon mesh (", remainingVertices, " vertices, ", clusterCount, " cluster centres)");
 
 	return clusterCount;
 }
@@ -696,7 +556,7 @@ std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
 	m_faceAttributes.mark_changed(Device::CPU);
 
 	const auto remainingVertices = std::distance(m_meshData->vertices_sbegin(), m_meshData->vertices_end());
-	logInfo("Clustered polygon mesh (", remainingVertices, " vertices, ", clusterCount, " cluster centres)");
+	logInfo("Uniformly clustered polygon mesh (", remainingVertices, " vertices, ", clusterCount, " cluster centres)");
 
 	return clusterCount;
 }

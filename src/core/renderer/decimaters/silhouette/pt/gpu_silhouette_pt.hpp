@@ -1,5 +1,6 @@
 #pragma once
 
+#if 0
 #include "decimation_common_pt.hpp"
 #include "silhouette_pt_common.hpp"
 #include "silhouette_pt_params.hpp"
@@ -54,3 +55,4 @@ private:
 };
 
 } // namespace mufflon::renderer::decimaters::silhouette
+#endif // 0
