@@ -223,14 +223,16 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 		// We parallelize this part for cases with many objects
 		const int objCount = static_cast<int>(m_objects.size());
 		std::atomic_uint32_t lodIndex = 0u;
+		std::atomic_uint32_t actualInstanceCount = 0u;
 
 		const auto t0 = std::chrono::high_resolution_clock::now();
 		const bool objLevelParallelism = dev == Device::CPU && objCount >= 50;
 #pragma PARALLEL_FOR_COND_DYNAMIC(objLevelParallelism)
 		for(int o = 0; o < objCount; ++o) {
 			auto& obj = *(m_objects.begin() + o);
+			if(obj.second.count == 0u)
+				continue;
 			mAssert(obj.first != nullptr);
-			mAssert(obj.second.count != 0u);
 
 			// First gather which LoDs of this objects are used and
 			// collect the instance transformations
@@ -293,6 +295,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 
 				const auto instanceIndex = inst->get_index();
 				lodIndices[instanceIndex] = threadLodIndex + index;
+				++actualInstanceCount;
 				// Expand the scene AABB as well
 				const auto& worldToInst = m_worldToInstanceTransformation[instanceIndex];
 				const auto instToWorld = InstanceData<Device::CPU>::compute_instance_to_world_transformation(worldToInst);
@@ -382,7 +385,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 
 		sceneDescriptor.numLods = static_cast<u32>(lodIndex.load());
 		sceneDescriptor.numInstances = static_cast<i32>(totalInstanceCount);
-		sceneDescriptor.activeInstances = static_cast<i32>(m_instances.size());
+		sceneDescriptor.activeInstances = static_cast<i32>(actualInstanceCount.load());
 		sceneDescriptor.diagSize = len(m_boundingBox.max - m_boundingBox.min);
 		sceneDescriptor.aabb = m_boundingBox;
 		sceneDescriptor.lods = lodDevDesc.get();
@@ -416,7 +419,7 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 			auto scope = Profiler::core().start<CpuProfileState>("build_instance_bvh");
 
 			const auto t0 = std::chrono::high_resolution_clock::now();
-			m_accelStruct.build(sceneDescriptor, static_cast<u32>(m_instances.size()));
+			m_accelStruct.build(sceneDescriptor, sceneDescriptor.activeInstances);
 			m_cameraDescChanged.template get<ChangedFlag<dev>>().changed = true;
 			m_lightTreeNeedsMediaUpdate.template get<ChangedFlag<dev>>().changed = true;
 

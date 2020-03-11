@@ -157,6 +157,18 @@ public:
 		return m_instances;
 	}
 
+	// TODO: care!
+	u32 remove_instance(ObjectHandle object, const u32 objInstIdx) {
+		const auto obj = m_objects.find(object);
+		mAssert(obj != m_objects.cend());
+		mAssert(obj->second.count != 0u);
+		const auto instIdx = obj->second.offset + objInstIdx;
+		const auto endIdx = obj->second.offset + obj->second.count - 1u;
+		const auto otherIdx = m_instances[endIdx]->get_index();
+		std::swap(m_instances[instIdx], m_instances[endIdx]);
+		obj->second.count -= 1u;
+		return otherIdx;
+	}
 
 	/*
 	 * Create a vertex attribute called "mean_curvature" for each polygonal mesh

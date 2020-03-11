@@ -89,8 +89,8 @@ CombinedDecimater::CombinedDecimater(CombinedDecimater&& other) :
 	other.m_collapsedTo.invalidate();
 	other.m_collapsed.invalidate();
 
-	// Remove curvature reference again
-	m_originalPoly.remove_curvature();
+	// Make sure that the curvature isn't actually removed
+	m_originalPoly.compute_curvature();
 }
 
 CombinedDecimater::~CombinedDecimater() {
@@ -107,6 +107,9 @@ CombinedDecimater::~CombinedDecimater() {
 	m_decimatedMesh->release_edge_status();
 	m_decimatedMesh->release_halfedge_status();
 	m_decimatedMesh->release_face_status();
+
+	// Remove curvature reference again
+	m_originalPoly.remove_curvature();
 }
 
 void CombinedDecimater::finish_gather(const u32 frame) {
@@ -172,7 +175,8 @@ void CombinedDecimater::update(const PImpWeightMethod::Values weighting,
 	}
 }
 
-void CombinedDecimater::reduce(const std::size_t targetVertexCount) {
+void CombinedDecimater::reduce(const std::size_t targetVertexCount, const float maxDensity,
+							   const u32 frame) {
 	// Reset the collapse property
 	for(auto vertex : m_originalMesh.vertices()) {
 		m_originalMesh.property(m_collapsed, vertex) = false;
@@ -212,7 +216,9 @@ void CombinedDecimater::reduce(const std::size_t targetVertexCount) {
 		/*if(view != nullptr)
 			collapses = m_decimatedPoly->cluster(*view, targetCount, false);
 		else*/
-		collapses = m_decimatedPoly->decimate(decimater, targetVertexCount, false);
+		collapses = m_decimatedPoly->cluster_decimate(*m_viewImportance[frame], decimater,
+													  targetVertexCount, maxDensity);
+		//collapses = m_decimatedPoly->decimate(decimater, targetVertexCount, false);
 		//const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
 		const auto t1 = std::chrono::high_resolution_clock::now();
 		const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);

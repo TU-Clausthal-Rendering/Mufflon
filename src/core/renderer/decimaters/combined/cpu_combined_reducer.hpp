@@ -55,6 +55,7 @@ private:
 	std::vector<FloatOctree*> m_viewOctreeAccess;
 	std::vector<SampleOctree*> m_irradianceOctreeAccess;
 	std::vector<double> m_importanceSums;
+	std::unique_ptr<std::atomic<double>[]> m_instanceImportanceSums;
 	// Shadow screenspace info
 	unique_device_ptr<Device::CPU, combined::ShadowStatus[]> m_shadowStatus;
 	std::size_t m_lightCount = 0u;

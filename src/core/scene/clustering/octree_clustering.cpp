@@ -33,6 +33,139 @@ u32 compute_cluster_center(const Iter begin, const Iter end) {
 	return clusterCount;
 }
 
+template < class O >
+std::pair<std::vector<bool>, u32> find_clusters(const O& octree, geometry::PolygonMeshType& mesh, const ei::Box& aabb,
+												const std::size_t maxCount) {
+	using NodeIndex = typename O::NodeIndex;
+
+	// Perform a breadth-first search to bring clusters down in equal levels
+	std::vector<bool> octreeNodeMask(octree.capacity(), false);
+	std::vector<NodeIndex> currLevel;
+	std::vector<NodeIndex> nextLevel;
+	currLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(maxCount, 1llu))));
+	nextLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(maxCount, 1llu))));
+	std::size_t finalNodeCount = 0u;
+
+	currLevel.push_back(octree.root_index());
+	u32 maxIndex = currLevel.back().index;
+	while(finalNodeCount < maxCount && !currLevel.empty()) {
+		nextLevel.clear();
+
+		// First, count how many new clusters we'd get from this level
+		std::size_t count = 0u;
+		for(const auto& cluster : currLevel) {
+			if(!octree.children(cluster).has_value())
+				count += 1u;
+		}
+
+		if(finalNodeCount + count > maxCount) {
+			// We have to prioritize the nodes we add
+			std::vector<std::pair<NodeIndex, float>> samples;
+			samples.reserve(count);
+			for(const auto& cluster : currLevel) {
+				if(!octree.children(cluster).has_value())
+					samples.emplace_back(cluster, octree.get_samples(cluster));
+			}
+			std::sort(samples.begin(), samples.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+			const auto remainingCount = maxCount - finalNodeCount;
+			for(std::size_t i = 0u; i < remainingCount; ++i) {
+				octreeNodeMask[samples[i].first.index] = true;
+				maxIndex = std::max(maxIndex, samples[i].first.index);
+			}
+			finalNodeCount = maxCount;
+		} else {
+			// No issue, we can add the entire level
+			for(const auto& cluster : currLevel) {
+				const auto children = octree.children(cluster);
+				if(children.has_value()) {
+					for(const auto& c : children.value())
+						nextLevel.push_back(c);
+				} else {
+					octreeNodeMask[cluster.index] = true;
+					maxIndex = std::max(maxIndex, cluster.index);
+				}
+			}
+			finalNodeCount += count;
+		}
+		std::swap(currLevel, nextLevel);
+	}
+
+	return std::make_pair(octreeNodeMask, maxIndex);
+}
+
+template < class O >
+std::pair<std::vector<bool>, u32> find_clusters_with_max_density(const O& octree, geometry::PolygonMeshType& mesh, const ei::Box& aabb,
+																 const std::size_t maxCount, const float maxDensity) {
+	using NodeIndex = typename O::NodeIndex;
+
+	// Perform a breadth-first search to bring clusters down in equal levels
+	std::vector<bool> octreeNodeMask(octree.capacity(), false);
+	std::vector<NodeIndex> currLevel;
+	std::vector<NodeIndex> nextLevel;
+	currLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(maxCount, 1llu))));
+	nextLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(maxCount, 1llu))));
+	std::size_t finalNodeCount = 0u;
+
+	currLevel.push_back(octree.root_index());
+	u32 maxIndex = currLevel.back().index;
+	while(finalNodeCount < maxCount && !currLevel.empty()) {
+		nextLevel.clear();
+
+		// First, count how many new clusters we'd get from this level
+		std::size_t count = 0u;
+		for(const auto& cluster : currLevel) {
+			if(!octree.children(cluster).has_value())
+				count += 1u;
+		}
+
+		if(finalNodeCount + count > maxCount) {
+			// We have to prioritize the nodes we add
+			std::vector<std::pair<NodeIndex, float>> samples;
+			samples.reserve(count);
+			for(const auto& cluster : currLevel) {
+				if(const auto children = octree.children(cluster); children.has_value()) {
+					// Since it may be that we omit leafs due to density we still track the children
+					for(const auto& c : children.value())
+						nextLevel.push_back(c);
+				} else {
+					const auto volume = octree.get_inverse_cell_volume(cluster);
+					const auto sample = octree.get_samples(cluster);
+					const auto density = sample / volume;
+					if(density < maxDensity)
+						samples.emplace_back(cluster, octree.get_samples(cluster));
+				}
+			}
+			std::sort(samples.begin(), samples.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+			const auto remainingCount = std::min(maxCount - finalNodeCount, samples.size());
+			for(std::size_t i = 0u; i < remainingCount; ++i) {
+				octreeNodeMask[samples[i].first.index] = true;
+				maxIndex = std::max(maxIndex, samples[i].first.index);
+			}
+			finalNodeCount += samples.size();
+		} else {
+			// No issue, we can add the entire level
+			for(const auto& cluster : currLevel) {
+				if(const auto children = octree.children(cluster); children.has_value()) {
+					for(const auto& c : children.value())
+						nextLevel.push_back(c);
+				} else {
+					// Check if the density is low enough
+					const auto volume = octree.get_inverse_cell_volume(cluster);
+					const auto sample = octree.get_samples(cluster);
+					const auto density = sample / volume;
+					if(density < maxDensity) {
+						octreeNodeMask[cluster.index] = true;
+						maxIndex = std::max(maxIndex, cluster.index);
+						finalNodeCount += 1u;
+					}
+				}
+			}
+		}
+		std::swap(currLevel, nextLevel);
+	}
+	return std::make_pair(octreeNodeMask, maxIndex);
+}
+
 } // namespace
 
 struct VertexCluster {
@@ -48,48 +181,15 @@ struct VertexCluster {
 };
 
 template < class O >
-std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, const ei::Box& aabb) {
-	// Perform a breadth-first search to bring clusters down in equal levels
-	std::vector<bool> octreeNodeMask(m_octree.capacity(), false);
-	std::vector<typename OctreeType::NodeIndex> currLevel;
-	std::vector<typename OctreeType::NodeIndex> nextLevel;
-	currLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(m_maxCount, 1llu))));
-	nextLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(m_maxCount, 1llu))));
-	std::size_t finalNodes = 0u;
-
-	currLevel.push_back(m_octree.root_index());
-	u32 cutoffDepthMask = currLevel.back().depthMask;
-	while(finalNodes < m_maxCount && !currLevel.empty()) {
-		nextLevel.clear();
-		for(const auto& cluster : currLevel) {
-			const auto children = m_octree.children(cluster);
-			if(children.has_value()) {
-				for(const auto& c : children.value())
-					nextLevel.push_back(c);
-			} else {
-				octreeNodeMask[cluster.index] = true;
-				finalNodes += 1u;
-			}
-		}
-		cutoffDepthMask >>= 1u;
-		std::swap(currLevel, nextLevel);
-	}
-
-	// TODO: trim if we went over the line
-	if(finalNodes > m_maxCount) {
-		// Reduce cutoff depth by one to indicate that the last level shall not get clustered
-		cutoffDepthMask <<= 1u;
-	} else {
-		// Mark all remaining nodes as end-of-the-line
-		for(const auto& cluster : currLevel) {
-			octreeNodeMask[cluster.index] = true;
-			finalNodes += 1u;
-		}
-	}
+std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, const ei::Box& aabb,
+											  const bool garbageCollect) {
+	const auto [octreeNodeMask, maxIndex] = m_maxDensity.has_value()
+		? find_clusters_with_max_density(m_octree, mesh, aabb, m_maxCount, m_maxDensity.value())
+		: find_clusters(m_octree, mesh, aabb, m_maxCount);
 
 	// We have to track a few things per cluster
 	// TODO: better bound!
-	std::vector<VertexCluster> clusters(m_octree.capacity());
+	std::vector<VertexCluster> clusters(maxIndex + 1u);
 
 	const auto aabbMin = aabb.min;
 	const auto aabbDiag = aabb.max - aabb.min;
@@ -112,7 +212,7 @@ std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, c
 	for(const auto vertex : mesh.vertices()) {
 		const auto pos = util::pun<ei::Vec3>(mesh.point(vertex));
 		const auto clusterIndex = get_cluster_index(pos);
-		if(clusterIndex.has_value() && clusterIndex->depthMask >= cutoffDepthMask)
+		if(clusterIndex.has_value())
 			clusters[clusterIndex->index].add_vertex(pos, mesh.property(quadricProps, vertex));
 	}
 	mesh.remove_property(quadricProps);
@@ -152,9 +252,11 @@ std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, c
 			}
 		}
 	}
-	mesh.request_vertex_status();
-	mesh.request_edge_status();
-	mesh.request_face_status();
+	if(garbageCollect) {
+		mesh.request_vertex_status();
+		mesh.request_edge_status();
+		mesh.request_face_status();
+	}
 
 	// We do up to 10 takes to remove as many as possible
 	for(std::size_t tries = 0u; tries < 10u && !removableHalfedges.empty(); ++tries) {
@@ -168,14 +270,15 @@ std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, c
 		}
 		removableHalfedges.resize(free);
 	}
-	mesh.garbage_collection();
-	logInfo("Remaining: ", mesh.n_vertices(), " (planned: ", clusterCount, ")");
-	mesh.release_vertex_status();
-	mesh.release_edge_status();
-	mesh.release_face_status();
+	if(garbageCollect) {
+		mesh.garbage_collection();
+		mesh.release_vertex_status();
+		mesh.release_edge_status();
+		mesh.release_face_status();
+	}
 
 
-	return mesh.n_vertices();
+	return clusterCount;
 }
 
 template class OctreeVertexClusterer<renderer::decimaters::FloatOctree>;

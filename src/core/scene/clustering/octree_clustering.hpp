@@ -5,6 +5,7 @@
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include <ei/3dtypes.hpp>
 #include <ei/vector.hpp>
+#include <optional>
 
 namespace mufflon::scene::clustering {
 
@@ -13,19 +14,22 @@ class OctreeVertexClusterer {
 public:
 	using OctreeType = O;
 
-	OctreeVertexClusterer(const OctreeType& octree, const std::size_t maxDepth,
-						  const std::size_t maxCount) :
+	OctreeVertexClusterer(const OctreeType& octree, const std::size_t maxCount,
+						  std::optional<float> maxDensity = std::nullopt) :
 		m_octree{ octree },
-		m_maxDepth{ maxDepth },
-		m_maxCount{ maxCount }
+		m_maxCount{ maxCount },
+		m_maxDensity{ maxDensity }
 	{}
 
-	std::size_t cluster(geometry::PolygonMeshType& mesh, const ei::Box& aabb);
+	// Performs the clustering. Note that, if garbageCollect == false, you 
+	// MUST request status for vertices, edges, and faces prior
+	std::size_t cluster(geometry::PolygonMeshType& mesh, const ei::Box& aabb,
+						const bool garbageCollect = true);
 
 private:
 	const OctreeType& m_octree;
-	const std::size_t m_maxDepth;
 	const std::size_t m_maxCount;
+	const std::optional<float> m_maxDensity;
 };
 
 } // namespace mufflon::scene::clustering

@@ -563,7 +563,7 @@ RayIntersectionResult first_intersection(
 				// Don't use the UV tangents to compute the normal, since they may be reversed
 				geoNormal = cross(dx0, dx1);
 
-				mAssert(dot(geoNormal, obj.polygon.normals[ids.x]) > 0.f);
+				//mAssert(dot(geoNormal, obj.polygon.normals[ids.x]) > 0.f);
 
 				uv = uvV[0] * surfParams.barycentric.x + uvV[1] * surfParams.barycentric.y +
 					uvV[2] * (1.f - surfParams.barycentric.x - surfParams.barycentric.y);

@@ -36,7 +36,7 @@ public:
 	void finish_gather(const u32 frame);
 	void update(const PImpWeightMethod::Values weighting,
 				u32 startFrame, u32 endFrame);
-	void reduce(const std::size_t targetVertexCount);
+	void reduce(const std::size_t targetVertexCount, const float maxDensity, const u32 frame);
 
 	StringView get_mesh_name() const noexcept { return m_objectName; }
 	FloatOctree& get_view_octree(const u32 frame) noexcept { return *m_viewImportance[frame]; }

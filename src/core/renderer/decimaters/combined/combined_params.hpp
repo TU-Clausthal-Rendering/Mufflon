@@ -6,23 +6,22 @@
 
 namespace mufflon { namespace renderer { namespace decimaters { namespace combined {
 
-
-struct PClusterSize {
-	int gridRes{ 0 };
+struct PClusterMaxDensity {
+	float maxClusterDensity{ 0.0000005f };
 	static constexpr ParamDesc get_desc() noexcept {
-		return { "Cluster grid resolution", ParameterTypes::INT };
+		return { "Max clustering density", ParameterTypes::FLOAT };
+	}
+};
+struct PInstanceMaxDensity {
+	float maxInstanceDensity{ 5.f };
+	static constexpr ParamDesc get_desc() noexcept {
+		return { "Max instance density", ParameterTypes::FLOAT };
 	}
 };
 struct PImpStructCapacity {
 	int impCapacity{ 1024 * 1024 * 4 };
 	static constexpr ParamDesc get_desc() noexcept {
 		return { "Importance data capacity", ParameterTypes::INT };
-	}
-};
-struct PImpDataStruct {
-	PARAM_ENUM(impDataStruct, VERTEX, HASHGRID, OCTREE) = Values::OCTREE;
-	static constexpr ParamDesc get_desc() noexcept {
-		return { "Importance data structure", ParameterTypes::ENUM };
 	}
 };
 struct PImpSumStrat {
@@ -54,7 +53,7 @@ using CombinedParameters = ParameterHandler <
 	silhouette::PImportanceIterations, silhouette::PTargetReduction,
 	silhouette::PInitialReduction, silhouette::PVertexThreshold,
 	silhouette::PSelectiveImportance, PImpSumStrat,
-	PClusterSize, PImpStructCapacity,
+	PClusterMaxDensity, PInstanceMaxDensity, PImpStructCapacity,
 	PVertexDistMethod, PImpWeightMethod,
 	silhouette::PViewWeight, silhouette::PLightWeight,
 	silhouette::PShadowWeight, silhouette::PShadowSilhouetteWeight,
@@ -78,7 +77,13 @@ struct ImportanceSumTarget {
 	using PixelType = float;
 	static constexpr u32 NUM_CHANNELS = 1u;
 };
+struct InstanceImportanceSumTarget {
+	static constexpr const char NAME[] = "Instance imp. Sum";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 1u;
+};
 
-using CombinedTargets = TargetList<RadianceTarget, silhouette::ImportanceTarget, ImportanceSumTarget, PenumbraTarget>;
+using CombinedTargets = TargetList<RadianceTarget, silhouette::ImportanceTarget, ImportanceSumTarget,
+	InstanceImportanceSumTarget, PenumbraTarget>;
 
 }}}} // namespace mufflon::renderer::decimaters::combined

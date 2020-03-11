@@ -54,6 +54,9 @@ OpenMeshAttributePool<face>::~OpenMeshAttributePool() {
 // Add a new attribute. Overwrites any existing attribute with the same name
 template < bool face >
 typename OpenMeshAttributePool<face>::AttrHandle OpenMeshAttributePool<face>::add_attribute(const AttributeIdentifier& ident) {
+	this->unload<Device::CUDA>();
+	this->unload<Device::OPENGL>();
+
 	std::string name{ ident.name };
 	if constexpr(IS_FACE) {
 		if(m_mesh._get_vprop(name) != nullptr)
@@ -86,6 +89,9 @@ std::optional<typename OpenMeshAttributePool<face>::AttrHandle> OpenMeshAttribut
 
 template < bool face >
 void OpenMeshAttributePool<face>::remove_attribute(const AttrHandle& handle) {
+	this->unload<Device::CUDA>();
+	this->unload<Device::OPENGL>();
+
 	OM_ATTRIB_SWITCH(handle.identifier.type, {
 		PropertyHandleType<BaseType> prop(handle.index);
 		m_mesh.remove_property(prop);
@@ -166,8 +172,9 @@ void OpenMeshAttributePool<face>::shrink_to_fit() {
 
 	if(m_attribElemCount != 0) {
 		std::size_t bytes = m_attribElemCount * m_poolSize / m_attribElemCapacity;
-		if(m_cudaPool != nullptr)
+		if(m_cudaPool != nullptr) {
 			m_cudaPool = Allocator<Device::CUDA>::realloc(m_cudaPool, m_poolSize, bytes);
+		}
 		if(m_openglPool != nullptr)
 			m_openglPool = Allocator<Device::OPENGL>::realloc(m_openglPool, m_poolSize, bytes);
 		m_poolSize = bytes;

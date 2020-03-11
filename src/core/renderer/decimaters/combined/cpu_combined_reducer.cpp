@@ -25,7 +25,7 @@ void CpuCombinedReducer::pre_reset() {
 		}*/
 	}
 
-	if(get_reset_event() & ResetEvent::PARAMETER && !(get_reset_event() & ResetEvent::RENDERER_ENABLE))
+	if(get_reset_event() & ResetEvent::PARAMETER && !(get_reset_event() & (ResetEvent::RENDERER_ENABLE | ResetEvent::CAMERA)))
 		m_stage = Stage::NONE;
 
 	// Initialize the decimaters
@@ -34,18 +34,26 @@ void CpuCombinedReducer::pre_reset() {
 		this->initialize_decimaters();
 		m_stage = Stage::INITIALIZED;
 		m_hasFrameImp = std::vector<bool>(m_world.get_frame_count(), false);
+		m_instanceImportanceSums.reset();
 	}
 
 	RendererBase<Device::CPU, combined::CombinedTargets>::pre_reset();
 }
 
 void CpuCombinedReducer::post_reset() {
-	m_lightCount = 1u + m_sceneDesc.lightTree.posLights.lightCount + m_sceneDesc.lightTree.dirLights.lightCount;
-	const auto statusCount = (m_params.maxPathLength - 1) * m_lightCount
-		* static_cast<std::size_t>(m_outputBuffer.get_num_pixels())
-		* static_cast<std::size_t>(m_world.get_frame_count());
-	m_shadowStatus = make_udevptr_array<Device::CPU, combined::ShadowStatus, false>(statusCount);
-	std::memset(m_shadowStatus.get(), 0, sizeof(combined::ShadowStatus) * statusCount);
+	if(m_stage == Stage::INITIALIZED) {
+		m_lightCount = 1u + m_sceneDesc.lightTree.posLights.lightCount + m_sceneDesc.lightTree.dirLights.lightCount;
+		const auto statusCount = (m_params.maxPathLength - 1) * m_lightCount
+			* static_cast<std::size_t>(m_outputBuffer.get_num_pixels())
+			* static_cast<std::size_t>(m_world.get_frame_count());
+		m_shadowStatus = make_udevptr_array<Device::CPU, combined::ShadowStatus, false>(statusCount);
+		std::memset(m_shadowStatus.get(), 0, sizeof(combined::ShadowStatus) * statusCount);
+
+		// The descriptor already accounts for all instances (over all frames);
+		// unfortunately we do not know which ones are no-animated (ie. over all frames)
+		if(m_instanceImportanceSums == nullptr)
+			m_instanceImportanceSums = std::make_unique<std::atomic<double>[]>(m_sceneDesc.activeInstances * m_world.get_frame_count());
+	}
 }
 
 void CpuCombinedReducer::on_world_clearing() {
@@ -79,8 +87,31 @@ void CpuCombinedReducer::post_iteration(IOutputHandler& outputBuffer) {
 #pragma omp parallel for schedule(dynamic)
 		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
 			m_decimaters[i]->update(m_params.impWeightMethod, startFrame, endFrame);
-			m_decimaters[i]->reduce(m_remainingVertices[i]);
+			m_decimaters[i]->reduce(m_remainingVertices[i], m_params.maxClusterDensity, m_world.get_frame_current());
 		}
+
+		// Remove instances that are below our threshold
+		// TODO: how to get access to other frames? Are they present in the scene?
+
+		const auto& objects = m_currentScene->get_objects();
+		const auto& instances = m_currentScene->get_instances();
+		const auto impOffset = m_sceneDesc.numInstances * m_world.get_frame_current();
+		double currRemovedImp = 0.0;
+		for(auto& obj : objects) {
+			u32 curr = 0u;
+			// Beware: obj is a reference, and the count may be changed in 'remove_instance'!
+			while(curr < obj.second.count) {
+				const auto instIdx = instances[obj.second.offset + curr]->get_index();
+				if(const auto currSum = m_instanceImportanceSums[impOffset + instIdx].load(std::memory_order_acquire);
+				   currSum < m_params.maxInstanceDensity) {
+					const auto otherIdx = m_currentScene->remove_instance(obj.first, curr);
+					currRemovedImp += currSum;
+				} else {
+					curr += 1u;
+				}
+			}
+		}
+
 		m_currentScene->clear_accel_structure();
 		logInfo("Finished decimation iteration (", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
 				"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles)");
@@ -155,6 +186,7 @@ void CpuCombinedReducer::gather_importance() {
 			combined::sample_importance_octree(m_outputBuffer, m_sceneDesc, m_params,
 											   coord, m_rngs[pixel], m_viewOctrees[m_world.get_frame_current()].data(),
 											   m_irradianceOctrees[m_world.get_frame_current()].data(),
+											   &m_instanceImportanceSums[m_sceneDesc.numInstances * m_world.get_frame_current()],
 											   &m_shadowStatus[shadowStatusOffset + pixel * m_lightCount * (m_params.maxPathLength - 1)]);
 		}
 		logPedantic("Finished importance iteration (", iter + 1, " of ", m_params.importanceIterations, ")");
@@ -186,11 +218,15 @@ void CpuCombinedReducer::display_importance(const bool accumulated) {
 		if(accumulated)
 			combined::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord,
 											m_rngs[pixel], m_accumImpAccess.data(),
-											m_importanceSums.data(), m_world.get_frame_current());
+											m_importanceSums.data(),
+											&m_instanceImportanceSums[m_sceneDesc.numInstances * m_world.get_frame_current()],
+											m_world.get_frame_current());
 		else
 			combined::sample_vis_importance_octree(m_outputBuffer, m_sceneDesc, coord,
 												   m_rngs[pixel], m_viewOctrees[m_world.get_frame_current()].data(),
-												   m_importanceSums.data(), m_world.get_frame_current());
+												   m_importanceSums.data(),
+												   &m_instanceImportanceSums[m_sceneDesc.numInstances * m_world.get_frame_current()], 
+												   m_world.get_frame_current());
 	}
 }
 

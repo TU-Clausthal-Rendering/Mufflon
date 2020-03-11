@@ -304,9 +304,12 @@ public:
 	// Implements decimation.
 	std::size_t decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
 						 std::size_t targetVertices, bool garbageCollect);
-	std::size_t cluster(const renderer::decimaters::FloatOctree& octree, const std::size_t targetVertices,
-						const bool garbageCollect);
 	std::size_t cluster(std::size_t gridRes, bool garbageCollect);
+	std::size_t cluster(const renderer::decimaters::FloatOctree& octree, const std::size_t maxCount,
+						const float maxDensity, const bool garbageCollect);
+	std::size_t cluster_decimate(const renderer::decimaters::FloatOctree& octree,
+								 OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
+								 const std::size_t targetVertices, const float maxDensity);
 
 	// Splits a vertex
 	std::pair<FaceHandle, FaceHandle> vertex_split(const VertexHandle v0, const VertexHandle v1,

@@ -6,6 +6,8 @@
 #include "core/renderer/decimaters/util/octree_manager.hpp"
 #include "core/renderer/decimaters/util/octree.inl"
 #include "core/renderer/pt/pt_common.hpp"
+#include <OpenMesh/Tools/Decimater/DecimaterT.hh>
+#include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 #include <random>
 
 namespace mufflon::renderer::decimaters {
@@ -16,10 +18,16 @@ struct PGridRes {
 		return { "Grid res", ParameterTypes::INT };
 	}
 };
-struct PMaxCount {
-	int maxCount{ 2000 };
+struct PTargetCount {
+	int targetCount{ 2000 };
 	static constexpr ParamDesc get_desc() noexcept {
-		return { "Max count", ParameterTypes::INT };
+		return { "Target count", ParameterTypes::INT };
+	}
+};
+struct PMaxDensity {
+	float maxDensity{ 0.05f};
+	static constexpr ParamDesc get_desc() noexcept {
+		return { "Max density", ParameterTypes::FLOAT };
 	}
 };
 struct AlibiTarget {
@@ -29,7 +37,7 @@ struct AlibiTarget {
 };
 
 using UniformClustererParameters = ParameterHandler<PGridRes>;
-using OctreeClustererParameters = ParameterHandler<PMaxCount>;
+using OctreeClustererParameters = ParameterHandler<PTargetCount, PMaxDensity>;
 
 class CpuUniformVertexClusterer final : public RendererBase<Device::CPU, TargetList<AlibiTarget>> {
 public:
@@ -178,13 +186,21 @@ public:
 		}
 	}
 	void post_iteration(IOutputHandler& outputBuffer) final {
+		using namespace std::chrono;
 		// Cluster
 		auto& objects = m_currentScene->get_objects();
 		std::size_t i = 0u;
 		for(auto& obj : objects) {
-			obj.first->get_lod(0).template get_geometry<scene::geometry::Polygons>()
-				.cluster((*m_octrees)[i++], static_cast<std::size_t>(m_params.maxCount), true);
-			obj.first->get_lod(0).clear_accel_structure();
+			auto& lod = obj.first->get_lod(0);
+			auto& poly = lod.template get_geometry<scene::geometry::Polygons>();
+			auto decimater = poly.create_decimater();
+			OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
+			decimater.add(modQuadricHandle);
+			const auto t0 = high_resolution_clock::now();
+			poly.cluster_decimate((*m_octrees)[i++], decimater, static_cast<std::size_t>(m_params.targetCount), m_params.maxDensity);
+			const auto t1 = high_resolution_clock::now();
+			logInfo("Duration: ", duration_cast<milliseconds>(t1 - t0).count(), "ms");
+			lod.clear_accel_structure();
 		}
 
 		m_currentScene->clear_accel_structure();

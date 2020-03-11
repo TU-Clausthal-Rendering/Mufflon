@@ -100,9 +100,10 @@ inline CUDA_FUNCTION void sample_importance_octree(CombinedTargets::RenderBuffer
 												   const scene::SceneDescriptor<CURRENT_DEV>& scene,
 												   const CombinedParameters& params,
 												   const Pixel& coord, math::Rng& rng,
-												   FloatOctree* viewOctrees,
-												   SampleOctree* irradianceOctrees,
-												   ShadowStatus* shadowStatus) {
+												   ArrayDevHandle_t<CURRENT_DEV, FloatOctree> viewOctrees,
+												   ArrayDevHandle_t<CURRENT_DEV, SampleOctree> irradianceOctrees,
+												   ArrayDevHandle_t<CURRENT_DEV, cuda::Atomic<CURRENT_DEV, double>> instanceImpSums,
+												   ArrayDevHandle_t<CURRENT_DEV, ShadowStatus> shadowStatus) {
 	Spectrum throughput{ ei::Vec3{1.0f} };
 	// We gotta keep track of our vertices
 	// TODO: flexible length!
@@ -179,8 +180,12 @@ inline CUDA_FUNCTION void sample_importance_octree(CombinedTargets::RenderBuffer
 						const auto lodIdx = scene.lodIndices[hitId.instanceId];
 						const auto area = compute_area_instance_transformed(scene, scene.lods[lodIdx].polygon, hitId);
 						const auto baseArea = compute_area(scene, scene.lods[lodIdx].polygon, hitId);
-						distribute_sample(scene.lods[lodIdx].polygon, static_cast<u32>(hitId.primId),
-										  objSpacePos, irradianceOctrees[lodIdx], params.lightWeight * baseArea / area);
+						const auto imp = params.lightWeight * baseArea / area;
+						if(!isnan(imp)) {
+							distribute_sample(scene.lods[lodIdx].polygon, static_cast<u32>(hitId.primId),
+											  objSpacePos, irradianceOctrees[lodIdx], imp);
+							cuda::atomic_add<CURRENT_DEV>(instanceImpSums[hitId.instanceId], static_cast<double>(imp));
+						}
 					}
 				} else {
 					shadowStatus[lightIndex * (params.maxPathLength - 1) + pathLen].shadow += scene::get_luminance(contribution) /
@@ -273,9 +278,11 @@ inline CUDA_FUNCTION void sample_importance_octree(CombinedTargets::RenderBuffer
 			const auto lodIdx = scene.lodIndices[hitId.instanceId];
 
 			const auto impDensity = sharpness * (1.f - ei::abs(cosAngle)) * baseArea / area;
-			if(!isnan(impDensity))
+			if(!isnan(impDensity)) {
 				distribute_sample(scene.lods[lodIdx].polygon, static_cast<u32>(hitId.primId),
 								  objSpacePos, viewOctrees[lodIdx], impDensity);
+				cuda::atomic_add<CURRENT_DEV>(instanceImpSums[hitId.instanceId], static_cast<double>(impDensity * area / baseArea));
+			}
 		}
 
 		vertices[pathLen].ext().pathRadiance = ei::Vec3{ 0.f };
@@ -320,11 +327,12 @@ inline CUDA_FUNCTION void sample_importance_octree(CombinedTargets::RenderBuffer
 				const auto area = compute_area_instance_transformed(scene, scene.lods[lodIdx].polygon, hitId);
 				const auto baseArea = compute_area(scene, scene.lods[lodIdx].polygon, hitId);
 
+				const auto imp = params.lightWeight * importance * baseArea / area;
 				distribute_sample(scene.lods[lodIdx].polygon, static_cast<u32>(hitId.primId),
-								  objSpacePos, irradianceOctrees[lodIdx], params.lightWeight * importance * baseArea / area);
+								  objSpacePos, irradianceOctrees[lodIdx], imp);
+				cuda::atomic_add<CURRENT_DEV>(instanceImpSums[hitId.instanceId], static_cast<double>(imp));
 			}
 		}
-
 	}
 }
 
@@ -334,6 +342,7 @@ inline CUDA_FUNCTION void sample_vis_importance_octree(CombinedTargets::RenderBu
 													   const Pixel& coord, math::Rng& rng,
 													   const FloatOctree* view,
 													   const ConstArrayDevHandle_t<CURRENT_DEV, double> importanceSums,
+													   const ConstArrayDevHandle_t<CURRENT_DEV, cuda::Atomic<CURRENT_DEV, double>> instanceImpSums,
 													   const u32 currFrame) {
 	Spectrum throughput{ ei::Vec3{1.0f} };
 	float guideWeight = 1.0f;
@@ -379,6 +388,7 @@ inline CUDA_FUNCTION void sample_vis_importance_octree(CombinedTargets::RenderBu
 		const auto importance = viewImp / (area * distSum);
 		outputBuffer.template set<silhouette::ImportanceTarget>(coord, importance);
 		outputBuffer.template set<ImportanceSumTarget>(coord, static_cast<float>(importanceSums[scene.numLods * currFrame + lodIdx]));
+		outputBuffer.template set<InstanceImportanceSumTarget>(coord, static_cast<float>(cuda::atomic_load<CURRENT_DEV, double>(instanceImpSums[hitId.instanceId])));
 	}
 }
 
@@ -387,6 +397,7 @@ inline CUDA_FUNCTION void sample_vis_importance(CombinedTargets::RenderBufferTyp
 												const Pixel& coord, math::Rng& rng,
 												const ConstArrayDevHandle_t<CURRENT_DEV, ConstArrayDevHandle_t<CURRENT_DEV, float>> importances,
 												const ConstArrayDevHandle_t<CURRENT_DEV, double> importanceSums,
+												const ConstArrayDevHandle_t<CURRENT_DEV, cuda::Atomic<CURRENT_DEV, double>> instanceImpSums,
 												const u32 currFrame) {
 	Spectrum throughput{ ei::Vec3{1.0f} };
 	float guideWeight = 1.0f;
@@ -421,7 +432,7 @@ inline CUDA_FUNCTION void sample_vis_importance(CombinedTargets::RenderBufferTyp
 			}
 		} else {
 			const auto indices = scene::get_quad_vertex_indices(polygon, hitId.primId);
-			const auto quad = scene::get_triangle(polygon, hitId.primId);
+			const auto quad = scene::get_quad(polygon, hitId.primId);
 			for(u32 i = 0u; i < 4u; ++i) {
 				const auto dist = ei::len(quad.v(i) - objSpacePos);
 				imp += dist * importances[lodIdx][indices[i]];
@@ -431,6 +442,7 @@ inline CUDA_FUNCTION void sample_vis_importance(CombinedTargets::RenderBufferTyp
 		const auto importance = imp / distSum;
 		outputBuffer.template set<silhouette::ImportanceTarget>(coord, importance);
 		outputBuffer.template set<ImportanceSumTarget>(coord, static_cast<float>(importanceSums[scene.numLods * currFrame + lodIdx]));
+		outputBuffer.template set<InstanceImportanceSumTarget>(coord, static_cast<float>(cuda::atomic_load<CURRENT_DEV, double>(instanceImpSums[hitId.instanceId])));
 	}
 }
 

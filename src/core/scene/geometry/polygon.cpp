@@ -502,15 +502,18 @@ OpenMesh::Decimater::DecimaterT<PolygonMeshType> Polygons::create_decimater() {
 }
 
 std::size_t Polygons::cluster(const renderer::decimaters::FloatOctree& octree,
-							  const std::size_t targetVertices,
+							  const std::size_t maxCount, const float maxDensity,
 							  const bool garbageCollect) {
 	using OpenMesh::Geometry::Quadricf;
 
 	this->synchronize<Device::CPU>();
 
 	const auto previousVertices = m_meshData->n_vertices();
+	m_meshData->request_vertex_status();
+	m_meshData->request_edge_status();
+	m_meshData->request_face_status();
 
-	clustering::OctreeVertexClusterer<renderer::decimaters::FloatOctree> clusterer{ octree, 32u, targetVertices };
+	clustering::OctreeVertexClusterer<renderer::decimaters::FloatOctree> clusterer{ octree, maxCount, maxDensity };
 	const auto clusterCount = clusterer.cluster(*m_meshData, m_boundingBox);
 
 	if(garbageCollect)
@@ -526,10 +529,46 @@ std::size_t Polygons::cluster(const renderer::decimaters::FloatOctree& octree,
 	m_vertexAttributes.mark_changed(Device::CPU);
 	m_faceAttributes.mark_changed(Device::CPU);
 
-	const auto remainingVertices = std::distance(m_meshData->vertices_sbegin(), m_meshData->vertices_end());
-	logInfo("Octree-clustered polygon mesh (", remainingVertices, " vertices, ", clusterCount, " cluster centres)");
+	logInfo("Octree-clustered polygon mesh (", m_meshData->n_vertices(), " vertices, ", clusterCount, " cluster centres)");
+	return previousVertices - m_meshData->n_vertices();
+}
 
-	return clusterCount;
+std::size_t Polygons::cluster_decimate(const renderer::decimaters::FloatOctree& octree,
+							 OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
+							 const std::size_t targetVertices, const float maxDensity) {
+	if(targetVertices >= decimater.mesh().n_vertices())
+		return 0u;
+	this->synchronize<Device::CPU>();
+	decimater.initialize();
+
+	const auto previousVertices = m_meshData->n_vertices();
+	m_meshData->request_vertex_status();
+	m_meshData->request_edge_status();
+	m_meshData->request_face_status();
+
+	clustering::OctreeVertexClusterer<renderer::decimaters::FloatOctree> clusterer{ octree, targetVertices, maxDensity };
+	const auto clusterCount = clusterer.cluster(*m_meshData, m_boundingBox);
+
+	const std::size_t targetDecimations = decimater.mesh().n_vertices() - std::min(decimater.mesh().n_vertices(), targetVertices);
+	const std::size_t actualDecimations = decimater.decimate_to(targetVertices);
+	this->garbage_collect();
+	m_meshData->release_vertex_status();
+	m_meshData->release_edge_status();
+	m_meshData->release_face_status();
+	compute_vertex_normals(*m_meshData, m_meshData->vertices_sbegin(), m_meshData->vertices_end());
+
+	// Adjust vertex and face attribute sizes
+	m_vertexAttributes.resize(m_meshData->n_vertices());
+	m_faceAttributes.resize(m_meshData->n_faces());
+	m_vertexAttributes.mark_changed(Device::CPU);
+	m_faceAttributes.mark_changed(Device::CPU);
+
+	logInfo("Octree-cluster-decimated polygon mesh (", actualDecimations, "/",
+			targetDecimations, " decimations performed; ", m_meshData->n_vertices(),
+			" vertices remaining, ", clusterCount, " cluster centres)");
+	if(m_meshData->n_vertices() > targetVertices)
+		logWarning("Not enough vertices removed: ", m_meshData->n_vertices(), " > ", targetVertices);
+	return previousVertices - m_meshData->n_vertices();
 }
 
 std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
@@ -557,14 +596,16 @@ std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
 
 	const auto remainingVertices = std::distance(m_meshData->vertices_sbegin(), m_meshData->vertices_end());
 	logInfo("Uniformly clustered polygon mesh (", remainingVertices, " vertices, ", clusterCount, " cluster centres)");
-
-	return clusterCount;
+	return previousVertices - m_meshData->n_vertices();
 }
 
 std::size_t Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-							   std::size_t targetVertices, bool garbageCollect) {
+							   const std::size_t targetVertices, bool garbageCollect) {
+	if(targetVertices >= decimater.mesh().n_vertices())
+		return 0u;
 	this->synchronize<Device::CPU>();
 	decimater.initialize();
+	const std::size_t oldVertexCount = decimater.mesh().n_vertices();
 	const std::size_t targetDecimations = decimater.mesh().n_vertices() - targetVertices;
 	const std::size_t actualDecimations = decimater.decimate_to(targetVertices);
 
@@ -585,7 +626,8 @@ std::size_t Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>&
 				decimater.mesh().n_vertices() - actualDecimations, " vertices remaining)");
 	} else {
 		logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
-				" decimations performed; ", decimater.mesh().n_vertices() - actualDecimations, " vertices remaining)");
+				" decimations performed; ", garbageCollect ? (decimater.mesh().n_vertices()) : (oldVertexCount - actualDecimations),
+				" vertices remaining)");
 	}
 	// TODO: this leaks mesh outside
 

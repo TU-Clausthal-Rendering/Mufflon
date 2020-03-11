@@ -56,6 +56,11 @@ public:
 		return m_nodes[index];
 	}
 	std::optional<std::array<NodeIndex, 8u>> children(const NodeIndex index) const noexcept;
+	float get_inverse_cell_volume(const NodeIndex index) const noexcept {
+		const auto gridRes = 1u << m_depth.load(std::memory_order_acquire);
+		const auto currRes = gridRes / index.depthMask;
+		return static_cast<float>(currRes) * ei::prod(m_diagonalInv);
+	}
 
 	std::size_t capacity() const noexcept { return m_capacity; }
 	std::size_t leafs() const noexcept { return m_childCounter.load(); }
