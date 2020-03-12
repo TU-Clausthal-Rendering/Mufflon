@@ -3318,7 +3318,7 @@ Boolean world_set_dir_light_irradiance(MufflonInstanceHdl instHdl, LightHdl hdl,
 
 const char* world_get_env_light_map(MufflonInstanceHdl instHdl, ConstLightHdl hdl) {
 	TRY
-	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", nullptr);
 	const lights::Background* background = muffInst.world.get_background(hdl.index);
@@ -3573,7 +3573,7 @@ uint32_t render_get_renderer_variations(MufflonInstanceHdl instHdl, uint32_t ind
 
 const char* render_get_renderer_name(MufflonInstanceHdl instHdl, uint32_t index) {
 	TRY
-	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(index < muffInst.renderers.size(), "renderer index out of bounds", nullptr);
 	return &muffInst.renderers.get_key(index)[0u];
@@ -3582,7 +3582,7 @@ const char* render_get_renderer_name(MufflonInstanceHdl instHdl, uint32_t index)
 
 const char* render_get_renderer_short_name(MufflonInstanceHdl instHdl, uint32_t index) {
 	TRY
-	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(index < muffInst.renderers.size(), "renderer index out of bounds", nullptr);
 	return &muffInst.renderers.get(index).front()->get_short_name()[0u];
@@ -3882,7 +3882,7 @@ uint32_t render_get_render_target_count(MufflonInstanceHdl instHdl) {
 }
 
 const char* render_get_render_target_name(MufflonInstanceHdl instHdl, uint32_t index) {
-	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	if(muffInst.imageOutput == nullptr)
 		return "";
@@ -3953,7 +3953,7 @@ uint32_t renderer_get_num_parameters(MufflonInstanceHdl instHdl) {
 
 const char* renderer_get_parameter_desc(MufflonInstanceHdl instHdl, uint32_t idx, ParameterType* type) {
 	TRY
-	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
