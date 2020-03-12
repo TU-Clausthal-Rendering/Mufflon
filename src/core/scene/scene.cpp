@@ -318,7 +318,17 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 					   "(Furthest point of the bounding box should not be further than "
 					   "2^20m away)");
 
-		sceneDescriptor.validInstanceIndex = m_instances.front()->get_index();
+		// Find a valid instance index for determining media
+		{
+			sceneDescriptor.validInstanceIndex = std::numeric_limits<u32>::max();
+			for(std::size_t i = 0u; i < totalInstanceCount; ++i) {
+				if(lodIndices[i] != std::numeric_limits<u32>::max()) {
+					sceneDescriptor.validInstanceIndex = static_cast<u32>(i);
+					break;
+				}
+			}
+			mAssert(sceneDescriptor.validInstanceIndex != std::numeric_limits<u32>::max());
+		}
 		const auto t1 = std::chrono::high_resolution_clock::now();
 		logInfo("[Scene::get_descriptor] Build descriptors for ", lodIndex.load(),
 				" LoDs in ", std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count(),

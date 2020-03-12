@@ -428,13 +428,13 @@ inline CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescri
 }
 inline CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
 													 const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
-													 const ei::Vec3& normal, const float irradiance, Octrees& octrees) {
+													 const ei::Vec3& normal, const float irradiance, Octrees octrees) {
 	if(!isnan(irradiance))	// TODO: with or without increasing sample count?
 		octrees.irradiance.add_sample(hitpoint, normal, irradiance);
 }
 inline CUDA_FUNCTION void record_indirect_irradiance(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
 													 const u32 primId, const u32 vertexCount, const ei::Vec3& hitpoint,
-													 const ei::Vec3&, const float irradiance, Hashgrids& hashgrids) {
+													 const ei::Vec3&, const float irradiance, Hashgrids hashgrids) {
 	if(!isnan(irradiance))
 		hashgrids.irradiance.increase_count(hitpoint, irradiance);
 }

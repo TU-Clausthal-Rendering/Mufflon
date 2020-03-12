@@ -36,6 +36,8 @@
     <ClCompile Include="..\..\src\core\renderer\debug\debug_bvh_renderer.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\animation\pt\animation_decimation_common_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\animation\pt\cpu_animation_pt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\decimaters\combined\combined_decimater.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\decimaters\combined\cpu_combined_reducer.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\importance\cpu_importance.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\importance\importance_decimater.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\importance\importance_map.cpp" />
@@ -48,6 +50,8 @@
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\pt\gpu_silhouette_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\cpu_ss_sil_pt.cpp" />
     <ClCompile Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\gpu_ss_sil_pt.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\decimaters\util\float_octree.cpp" />
+    <ClCompile Include="..\..\src\core\renderer\decimaters\util\sample_octree.cpp" />
     <ClCompile Include="..\..\src\core\renderer\forward\box_pipeline.cpp" />
     <ClCompile Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.cpp" />
     <ClCompile Include="..\..\src\core\renderer\gl_renderer_base.cpp" />
@@ -64,6 +68,8 @@
     <ClCompile Include="..\..\src\core\renderer\wireframe\gl_wireframe.cpp" />
     <ClCompile Include="..\..\src\core\renderer\wireframe\gpu_wireframe.cpp" />
     <ClCompile Include="..\..\src\core\scene\attributes\attribute.cpp" />
+    <ClCompile Include="..\..\src\core\scene\clustering\octree_clustering.cpp" />
+    <ClCompile Include="..\..\src\core\scene\clustering\uniform_clustering.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\polygon.cpp" />
     <ClCompile Include="..\..\src\core\scene\geometry\sphere.cpp" />
     <ClCompile Include="..\..\src\core\scene\instance.cpp" />
@@ -245,6 +251,12 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\animation\pt\animation_decimation_common_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\animation\pt\cpu_animation_pt.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\animation\pt\animation_pt_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\combined\combined_common.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\combined\combined_decimater.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\combined\combined_gathering.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\combined\combined_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\combined\cpu_combined_reducer.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\combined\modules\importance_quadrics.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\importance\cpu_importance.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\importance\importance_decimater.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\importance\importance_map.hpp" />
@@ -276,6 +288,10 @@
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_pt_common.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\screenspace\ss_pt_params.hpp" />
     <ClInclude Include="..\..\src\core\renderer\decimaters\silhouette\silhouette_params.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\util\octree.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\util\octree_manager.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\util\octree_nodes.hpp" />
+    <ClInclude Include="..\..\src\core\renderer\decimaters\util\readonly_octree.hpp" />
     <ClInclude Include="..\..\src\core\renderer\footprint.hpp" />
     <ClInclude Include="..\..\src\core\renderer\forward\box_pipeline.hpp" />
     <ClInclude Include="..\..\src\core\renderer\forward\dynamic_fragment_buffer.hpp" />
@@ -322,6 +338,9 @@
     <ClInclude Include="..\..\src\core\scene\attributes\attribute.hpp" />
     <ClInclude Include="..\..\src\core\scene\attributes\attribute_handles.hpp" />
     <ClInclude Include="..\..\src\core\scene\attributes\attribute_sizes.hpp" />
+    <ClInclude Include="..\..\src\core\scene\clustering\octree_clustering.hpp" />
+    <ClInclude Include="..\..\src\core\scene\clustering\uniform_clustering.hpp" />
+    <ClInclude Include="..\..\src\core\scene\clustering\util.hpp" />
     <ClInclude Include="..\..\src\core\scene\descriptors.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon.hpp" />
     <ClInclude Include="..\..\src\core\scene\geometry\polygon_mesh.hpp" />
@@ -715,6 +734,10 @@
       <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\shader</DestinationFolders>
     </CopyFileToFolders>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\src\core\renderer\decimaters\util\float_octree.inl" />
+    <None Include="..\..\src\core\renderer\decimaters\util\octree.inl" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{15E94C26-7D49-421A-8CE4-7D697349FB79}</ProjectGuid>
@@ -774,7 +797,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\include;$(SolutionDir)external\oidn-0.9\$(Configuration)\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\cub;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\include;$(SolutionDir)external\oidn-0.9\$(Configuration)\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\gli;$(SolutionDir)deps\gli\external;$(SolutionDir)deps\cub;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;CORE_EXPORTS;_CRT_SECURE_NO_WARNINGS;_ENABLE_ATOMIC_ALIGNMENT_FIX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -825,7 +848,7 @@ xcopy /DQY "$(SolutionDir)external\oidn-0.9\$(Configuration)\bin\OpenImageDenois
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\include;$(SolutionDir)external\oidn-0.9\$(Configuration)\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\cub;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)external\OpenMesh-8.0\$(Configuration)\include;$(SolutionDir)external\oidn-0.9\$(Configuration)\include;$(CudaToolkitIncludeDir);$(SolutionDir)src;$(SolutionDir)\deps\epsilon\include;$(SolutionDir)deps\chinoise\include;$(SolutionDir)deps\glad;$(SolutionDir)deps\gli;$(SolutionDir)deps\gli\external;$(SolutionDir)deps\cub;$(SolutionDir)deps\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;_USE_MATH_DEFINES;CORE_EXPORTS;_CRT_SECURE_NO_WARNINGS;_ENABLE_ATOMIC_ALIGNMENT_FIX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>

@@ -1,5 +1,6 @@
 #include "uniform_clustering.hpp"
 #include "util.hpp"
+#include "util/log.hpp"
 #include "util/punning.hpp"
 #include <OpenMesh/Core/Geometry/QuadricT.hh>
 

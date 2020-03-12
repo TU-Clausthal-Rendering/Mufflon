@@ -326,8 +326,8 @@ void CpuShadowSilhouettesPT::update_reduction_factors() {
 		}
 	}
 	const auto totalVertexCount = reducibleVertices + nonReducibleVertices;
-	const std::size_t targetVertexCount = static_cast<std::size_t>((1.f - m_params.reduction) * totalVertexCount);
-	std::size_t reducedVertexPool = targetVertexCount - nonReducibleVertices;
+	const std::size_t totalTargetVertexCount = static_cast<std::size_t>((1.f - m_params.reduction) * totalVertexCount);
+	std::size_t reducedVertexPool = totalTargetVertexCount - nonReducibleVertices;
 
 	for(auto& decimater : m_decimaters) {
 		if(decimater->get_original_vertex_count() > m_params.threshold) {

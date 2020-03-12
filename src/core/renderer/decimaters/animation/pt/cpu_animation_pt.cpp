@@ -369,8 +369,8 @@ void CpuShadowSilhouettesPT::update_reduction_factors(u32 frameStart, u32 frameE
 	
 	// Determine the reduction parameters for each mesh
 	const auto totalVertexCount = reducibleVertices + nonReducibleVertices;
-	const std::size_t targetVertexCount = static_cast<std::size_t>((1.f - m_params.reduction) * totalVertexCount);
-	std::size_t reducedVertexPool = targetVertexCount - nonReducibleVertices;
+	const std::size_t totalTargetVertexCount = static_cast<std::size_t>((1.f - m_params.reduction) * totalVertexCount);
+	std::size_t reducedVertexPool = totalTargetVertexCount - nonReducibleVertices;
 
 	for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 		if(m_decimaters[i]->get_original_vertex_count() > m_params.threshold) {

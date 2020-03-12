@@ -194,6 +194,18 @@
     <Filter Include="Source Files\core\scene\attributes">
       <UniqueIdentifier>{b060c607-044c-41fd-b68c-01a36de93d29}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\core\renderer\decimaters\util">
+      <UniqueIdentifier>{b85f3859-3eb8-42de-95aa-6f2806cebfed}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\renderer\decimaters\combined">
+      <UniqueIdentifier>{d97db1d4-82b8-4043-a059-f81fc645802d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\renderer\decimaters\combined\modules">
+      <UniqueIdentifier>{62c54c87-14de-4fc0-a678-7de66be74703}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\core\scene\clustering">
+      <UniqueIdentifier>{860c7507-e2a5-4aa5-a24f-a35322d4a97a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\deps\chinoise\src\fieldnoise.cpp">
@@ -432,6 +444,24 @@
     </ClCompile>
     <ClCompile Include="..\..\src\core\scene\attributes\attribute.cpp">
       <Filter>Source Files\core\scene\attributes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\util\float_octree.cpp">
+      <Filter>Source Files\core\renderer\decimaters\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\util\sample_octree.cpp">
+      <Filter>Source Files\core\renderer\decimaters\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\combined\combined_decimater.cpp">
+      <Filter>Source Files\core\renderer\decimaters\combined</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\renderer\decimaters\combined\cpu_combined_reducer.cpp">
+      <Filter>Source Files\core\renderer\decimaters\combined</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\clustering\octree_clustering.cpp">
+      <Filter>Source Files\core\scene\clustering</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\core\scene\clustering\uniform_clustering.cpp">
+      <Filter>Source Files\core\scene\clustering</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1326,6 +1356,45 @@
     <ClInclude Include="..\..\src\core\renderer\gl_renderer_base.hpp">
       <Filter>Source Files\core\renderer</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\util\octree.hpp">
+      <Filter>Source Files\core\renderer\decimaters\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\util\octree_manager.hpp">
+      <Filter>Source Files\core\renderer\decimaters\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\util\octree_nodes.hpp">
+      <Filter>Source Files\core\renderer\decimaters\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\util\readonly_octree.hpp">
+      <Filter>Source Files\core\renderer\decimaters\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\combined\modules\importance_quadrics.hpp">
+      <Filter>Source Files\core\renderer\decimaters\combined\modules</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\combined\combined_common.hpp">
+      <Filter>Source Files\core\renderer\decimaters\combined</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\combined\combined_decimater.hpp">
+      <Filter>Source Files\core\renderer\decimaters\combined</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\combined\combined_gathering.hpp">
+      <Filter>Source Files\core\renderer\decimaters\combined</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\combined\combined_params.hpp">
+      <Filter>Source Files\core\renderer\decimaters\combined</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\renderer\decimaters\combined\cpu_combined_reducer.hpp">
+      <Filter>Source Files\core\renderer\decimaters\combined</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\clustering\octree_clustering.hpp">
+      <Filter>Source Files\core\scene\clustering</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\clustering\uniform_clustering.hpp">
+      <Filter>Source Files\core\scene\clustering</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\core\scene\clustering\util.hpp">
+      <Filter>Source Files\core\scene\clustering</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\core\cuda\cu_lib_wrapper.cu">
@@ -1479,5 +1548,13 @@
     <Text Include="..\..\resources\ltc\info.txt">
       <Filter>resources</Filter>
     </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\src\core\renderer\decimaters\util\float_octree.inl">
+      <Filter>Source Files\core\renderer\decimaters\util</Filter>
+    </None>
+    <None Include="..\..\src\core\renderer\decimaters\util\octree.inl">
+      <Filter>Source Files\core\renderer\decimaters\util</Filter>
+    </None>
   </ItemGroup>
 </Project>
