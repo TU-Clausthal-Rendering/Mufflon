@@ -15,7 +15,6 @@ CombinedDecimater::CombinedDecimater(StringView objectName, scene::Lod& original
 									 scene::Lod& decimated, const u32 frameCount,
 									 ArrayDevHandle_t<Device::CPU, FloatOctree*> view,
 									 ArrayDevHandle_t<Device::CPU, SampleOctree*> irradiance,
-									 ArrayDevHandle_t<Device::CPU, double> importanceSums,
 									 const float lightWeight) :
 	m_objectName{ objectName },
 	m_original{ original },
@@ -27,7 +26,6 @@ CombinedDecimater::CombinedDecimater(StringView objectName, scene::Lod& original
 	m_viewImportance{ view },
 	m_irradianceImportance{ irradiance },
 	m_frameCount{ frameCount },
-	m_importanceSums{ importanceSums },
 	m_originalVertex{},
 	m_accumulatedImportanceDensity{},
 	m_collapsedTo{},
@@ -71,7 +69,6 @@ CombinedDecimater::CombinedDecimater(CombinedDecimater&& other) :
 	m_viewImportance{ other.m_viewImportance },
 	m_irradianceImportance{ other.m_irradianceImportance },
 	m_frameCount{ other.m_frameCount },
-	m_importanceSums{ other.m_importanceSums },
 	m_originalVertex{ other .m_originalVertex },
 	m_accumulatedImportanceDensity{ other.m_accumulatedImportanceDensity },
 	m_collapsedTo{ other.m_collapsedTo },
@@ -119,9 +116,6 @@ void CombinedDecimater::finish_gather(const u32 frame) {
 	m_viewImportance[frame]->join(*m_irradianceImportance[frame], m_lightWeight);
 	const auto t1 = std::chrono::high_resolution_clock::now();
 	logPedantic(m_objectName, ": join time ", std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count(), "ms");
-	// Also compute the importance sums
-	// TODO
-	m_importanceSums[frame] = m_viewImportance[frame]->compute_leaf_sum();
 }
 
 void CombinedDecimater::update(const PImpWeightMethod::Values weighting,
@@ -176,7 +170,9 @@ void CombinedDecimater::update(const PImpWeightMethod::Values weighting,
 }
 
 void CombinedDecimater::reduce(const std::size_t targetVertexCount, const float maxDensity,
-							   const u32 frame) {
+							   const u32 frame, std::vector<bool>& octreeNodeMask,
+							   std::vector<renderer::decimaters::FloatOctree::NodeIndex>& currLevel,
+							   std::vector<renderer::decimaters::FloatOctree::NodeIndex>& nextLevel) {
 	// Reset the collapse property
 	for(auto vertex : m_originalMesh.vertices()) {
 		m_originalMesh.property(m_collapsed, vertex) = false;
@@ -212,12 +208,9 @@ void CombinedDecimater::reduce(const std::size_t targetVertexCount, const float 
 	if(targetVertexCount < get_original_vertex_count()) {
 		const auto t0 = std::chrono::high_resolution_clock::now();
 		std::size_t collapses = 0u;
-		// TODO
-		/*if(view != nullptr)
-			collapses = m_decimatedPoly->cluster(*view, targetCount, false);
-		else*/
 		collapses = m_decimatedPoly->cluster_decimate(*m_viewImportance[frame], decimater,
-													  targetVertexCount, maxDensity);
+													  targetVertexCount, maxDensity, &octreeNodeMask,
+													  &currLevel, &nextLevel);
 		//collapses = m_decimatedPoly->decimate(decimater, targetVertexCount, false);
 		//const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
 		const auto t1 = std::chrono::high_resolution_clock::now();

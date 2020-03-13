@@ -2,10 +2,10 @@
 
 namespace mufflon { namespace renderer { namespace decimaters {
 
-__host__ SampleOctree::SampleOctree(const ei::Box& bounds, u32 capacity, std::atomic<NodeType>* nodes,
+__host__ SampleOctree::SampleOctree(const ei::Box& bounds, u32 capacity, u32 fillCapacity, std::atomic<NodeType>* nodes,
 									std::atomic<NodeType>& root, std::atomic_size_t& allocationCounter,
 									const u32 splitCount, const float splitVal) :
-	Octree<SampleOctreeNode>{ bounds, capacity, nodes, root, allocationCounter },
+	Octree<SampleOctreeNode>{ bounds, capacity, fillCapacity, nodes, root, allocationCounter },
 	m_splitCount{ splitCount },
 	m_splitValue{ splitVal }
 {}
@@ -43,10 +43,10 @@ __host__ std::atomic<SampleOctreeNode>* SampleOctree::add_and_split(std::atomic<
 		// We are now the splitting thread - allocate new children
 		const auto offset = m_allocationCounter.fetch_add(8u, std::memory_order::memory_order_consume);
 		// Ensure that we don't overflow our node array
-		if(offset + 8u >= m_capacity) {
+		if(offset + 8u >= m_fillCapacity) {
 			// TODO: to avoid a deadlock here we reset the node count to zero, even though it should
 			// theoretically remain the samples; this may introduce some bias!
-			m_allocationCounter.store(m_capacity);
+			m_allocationCounter.store(m_fillCapacity);
 			m_stopSplitting = true;
 			curr->store(SampleOctreeNode::as_split_child(0u, 0.f), std::memory_order_release);
 			return nullptr;
@@ -76,10 +76,10 @@ __host__ std::atomic<SampleOctreeNode>* SampleOctree::add_and_split(std::atomic<
 			// We are now the splitting thread - allocate new children
 			const auto offset = m_allocationCounter.fetch_add(8u, std::memory_order::memory_order_consume);
 			// Ensure that we don't overflow our node array
-			if(offset + 8u >= m_capacity) {
+			if(offset + 8u >= m_fillCapacity) {
 				// TODO: to avoid a deadlock here we reset the node count to zero, even though it should
 				// theoretically remain the samples; this may introduce some bias!
-				m_allocationCounter.store(m_capacity);
+				m_allocationCounter.store(m_fillCapacity);
 				m_stopSplitting = true;
 				curr->store(SampleOctreeNode::as_split_child(0u, 0.f), std::memory_order_release);
 				return nullptr;

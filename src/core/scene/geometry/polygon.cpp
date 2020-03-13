@@ -534,8 +534,11 @@ std::size_t Polygons::cluster(const renderer::decimaters::FloatOctree& octree,
 }
 
 std::size_t Polygons::cluster_decimate(const renderer::decimaters::FloatOctree& octree,
-							 OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-							 const std::size_t targetVertices, const float maxDensity) {
+									   OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
+									   const std::size_t targetVertices, const float maxDensity,
+									   std::vector<bool>* octreeNodeMask,
+									   std::vector<renderer::decimaters::FloatOctree::NodeIndex>* currLevel,
+									   std::vector<renderer::decimaters::FloatOctree::NodeIndex>* nextLevel) {
 	if(targetVertices >= decimater.mesh().n_vertices())
 		return 0u;
 	this->synchronize<Device::CPU>();
@@ -547,7 +550,7 @@ std::size_t Polygons::cluster_decimate(const renderer::decimaters::FloatOctree& 
 	m_meshData->request_face_status();
 
 	clustering::OctreeVertexClusterer<renderer::decimaters::FloatOctree> clusterer{ octree, targetVertices, maxDensity };
-	const auto clusterCount = clusterer.cluster(*m_meshData, m_boundingBox);
+	const auto clusterCount = clusterer.cluster(*m_meshData, m_boundingBox, true, octreeNodeMask, currLevel, nextLevel);
 
 	const std::size_t targetDecimations = decimater.mesh().n_vertices() - std::min(decimater.mesh().n_vertices(), targetVertices);
 	const std::size_t actualDecimations = decimater.decimate_to(targetVertices);

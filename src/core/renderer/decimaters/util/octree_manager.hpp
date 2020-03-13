@@ -17,8 +17,9 @@ public:
 	using NodeType = typename OctreeType::NodeType;
 	using ReadOnlyType = ReadOnlyOctree<NodeType>;
 
-	OctreeManager(const u32 capacity, const u32 octreeCapacity) :
-		m_capacity{ 1u + ((static_cast<std::size_t>(capacity) + 7u) & ~7) },
+	OctreeManager(const u32 capacity, const u32 octreeCapacity, const bool joinable) :
+		m_fillCapacity{ 1u + ((static_cast<std::size_t>(capacity) + 7u) & ~7) },
+		m_capacity{ (joinable ? 2u : 1u) * m_fillCapacity },
 		m_allocationCounter{ 0u },
 		m_nodeMemory{ std::make_unique<std::atomic<NodeType>[]>(m_capacity) },
 		m_octrees{},
@@ -44,8 +45,8 @@ public:
 	void create(const ei::Box& bounds, Args&& ...args) {
 		if(m_allocationCounter.load() > 9u * m_octrees.size())
 			throw std::runtime_error("Creating new octrees is only allowed before any inserts happen!");
-		m_octrees.emplace_back(bounds, static_cast<u32>(m_capacity), m_nodeMemory.get(),
-							   m_nodeMemory[m_allocationCounter.fetch_add(1u)], m_allocationCounter,
+		m_octrees.emplace_back(bounds, static_cast<u32>(m_capacity), static_cast<u32>(m_fillCapacity),
+							   m_nodeMemory.get(), m_nodeMemory[m_allocationCounter.fetch_add(1u)], m_allocationCounter,
 							   std::forward<Args>(args)...);
 	}
 	void update_readonly() {
@@ -79,12 +80,14 @@ public:
 	typename std::vector<OctreeType>::const_iterator end() const noexcept { return m_octrees.end(); }
 	typename std::vector<OctreeType>::const_iterator cbegin() const noexcept { return m_octrees.cbegin(); }
 	typename std::vector<OctreeType>::const_iterator cend() const noexcept { return m_octrees.cend(); }
-
+	
 	std::size_t capacity() const noexcept { return m_capacity; }
+	std::size_t max_fill_capacity() const noexcept { return m_fillCapacity; }
 	std::size_t size() const noexcept { return m_allocationCounter.load(); }
 	bool empty() const noexcept { return size() == 0u; }
 
 private:
+	std::size_t m_fillCapacity;
 	std::size_t m_capacity;
 	std::atomic_size_t m_allocationCounter;
 	std::unique_ptr<std::atomic<NodeType>[]> m_nodeMemory;

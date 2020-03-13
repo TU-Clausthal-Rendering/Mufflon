@@ -77,38 +77,67 @@ void CpuCombinedReducer::post_iteration(IOutputHandler& outputBuffer) {
 		const u32 endFrame = std::min<u32>(m_world.get_frame_current() + m_params.slidingWindowHalfWidth,
 										   m_world.get_frame_count() - 1u);
 
+		// Remove instances that are below our threshold
+		// TODO: how to get access to other frames? Are they present in the scene?
+		const auto& objects = m_currentScene->get_objects();
+		const auto& instances = m_currentScene->get_instances();
+		const auto impOffset = m_sceneDesc.numInstances * m_world.get_frame_current();
+		std::vector<std::tuple<scene::ObjectHandle, u32, double>> instanceList;
+		instanceList.reserve(instances.size());
+		double currRemovedImp = 0.0;
+		for(auto& obj : objects) {
+			// Beware: obj is a reference, and the count may be changed in 'remove_instance'!
+			for(u32 curr = 0u; curr < obj.second.count; ++curr) {
+				const auto instIdx = instances[obj.second.offset + curr]->get_index();
+				if(const auto currSum = m_instanceImportanceSums[impOffset + instIdx].load(std::memory_order_acquire);
+				   currSum < m_params.maxInstanceDensity)
+					instanceList.emplace_back(obj.first, curr, currSum);
+			}
+		}
+		// Sort by importance sum
+		std::sort(instanceList.begin(), instanceList.end(), [](const auto& a, const auto& b) { return std::get<2>(a) < std::get<2>(b); });
+		// Find the cutoff (all instances to be removed, determined by sum of importance sums)
+		double removedImpSum = 0.f;
+		std::size_t maxIndex;
+		for(maxIndex = 0u; maxIndex < instanceList.size(); ++maxIndex) {
+			removedImpSum += std::get<2>(instanceList[maxIndex]);
+			if(removedImpSum > static_cast<double>(m_params.maxInstanceDensity))
+				break;
+		}
+		// Sort sub-range again by object and index
+		std::sort(instanceList.begin(), instanceList.begin() + maxIndex, [](const auto& a, const auto& b) {
+			if(std::get<0>(a) == std::get<0>(b))
+				return std::get<1>(a) > std::get<1>(b);
+			else
+				return std::get<0>(a) < std::get<0>(b);
+		});
+		// Now we can remove the instances
+		for(std::size_t i = 0u; i < maxIndex; ++i)
+			m_currentScene->remove_instance(std::get<0>(instanceList[i]), std::get<1>(instanceList[i]));
+		logInfo("Removed ", maxIndex, " instances with low importance");
+
 		// Update the reduction factors
 		this->update_reduction_factors(startFrame, endFrame);
 
 		const auto processTime = CpuProfileState::get_process_time();
 		const auto cycles = CpuProfileState::get_cpu_cycle();
-		auto scope = Profiler::core().start<CpuProfileState>("Silhouette decimation");
+
+		std::vector<std::vector<bool>> octreeNodeMasks(get_max_thread_num());
+		std::vector<std::vector<renderer::decimaters::FloatOctree::NodeIndex>> currLevels(get_max_thread_num());
+		std::vector<std::vector<renderer::decimaters::FloatOctree::NodeIndex>> nextLevels(get_max_thread_num());
 
 #pragma omp parallel for schedule(dynamic)
 		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
-			m_decimaters[i]->update(m_params.impWeightMethod, startFrame, endFrame);
-			m_decimaters[i]->reduce(m_remainingVertices[i], m_params.maxClusterDensity, m_world.get_frame_current());
-		}
+			// Only update objects that have instances left
+			if((m_currentScene->get_objects().cbegin() + i)->second.count > 0u) {
+				octreeNodeMasks[get_current_thread_idx()].reserve(m_viewOctrees.front().size());
+				currLevels[get_current_thread_idx()].reserve(50000u);
+				nextLevels[get_current_thread_idx()].reserve(50000u);
 
-		// Remove instances that are below our threshold
-		// TODO: how to get access to other frames? Are they present in the scene?
-
-		const auto& objects = m_currentScene->get_objects();
-		const auto& instances = m_currentScene->get_instances();
-		const auto impOffset = m_sceneDesc.numInstances * m_world.get_frame_current();
-		double currRemovedImp = 0.0;
-		for(auto& obj : objects) {
-			u32 curr = 0u;
-			// Beware: obj is a reference, and the count may be changed in 'remove_instance'!
-			while(curr < obj.second.count) {
-				const auto instIdx = instances[obj.second.offset + curr]->get_index();
-				if(const auto currSum = m_instanceImportanceSums[impOffset + instIdx].load(std::memory_order_acquire);
-				   currSum < m_params.maxInstanceDensity) {
-					const auto otherIdx = m_currentScene->remove_instance(obj.first, curr);
-					currRemovedImp += currSum;
-				} else {
-					curr += 1u;
-				}
+				m_decimaters[i]->update(m_params.impWeightMethod, startFrame, endFrame);
+				m_decimaters[i]->reduce(m_remainingVertices[i], m_params.maxClusterDensity, m_world.get_frame_current(),
+										octreeNodeMasks[get_current_thread_idx()], currLevels[get_current_thread_idx()],
+										nextLevels[get_current_thread_idx()]);
 			}
 		}
 
@@ -218,16 +247,23 @@ void CpuCombinedReducer::display_importance(const bool accumulated) {
 		if(accumulated)
 			combined::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord,
 											m_rngs[pixel], m_accumImpAccess.data(),
-											m_importanceSums.data(),
 											&m_instanceImportanceSums[m_sceneDesc.numInstances * m_world.get_frame_current()],
 											m_world.get_frame_current());
 		else
 			combined::sample_vis_importance_octree(m_outputBuffer, m_sceneDesc, coord,
 												   m_rngs[pixel], m_viewOctrees[m_world.get_frame_current()].data(),
-												   m_importanceSums.data(),
 												   &m_instanceImportanceSums[m_sceneDesc.numInstances * m_world.get_frame_current()], 
 												   m_world.get_frame_current());
 	}
+}
+
+double CpuCombinedReducer::get_lod_importance(const u32 frame, const scene::Scene::InstanceRef obj) const noexcept {
+	double sum = 0.0;
+	for(u32 i = obj.offset; i < (obj.offset + obj.count); ++i) {
+		const auto idx = m_currentScene->get_instances()[i]->get_index();
+		sum += m_instanceImportanceSums[m_world.get_frame_current() * m_sceneDesc.numInstances + idx];
+	}
+	return sum;
 }
 
 void CpuCombinedReducer::initialize_decimaters() {
@@ -240,16 +276,14 @@ void CpuCombinedReducer::initialize_decimaters() {
 
 	m_viewOctrees.clear();
 	m_irradianceOctrees.clear();
-	m_importanceSums.clear();
 	m_viewOctrees.reserve(m_world.get_frame_count());
 	m_irradianceOctrees.reserve(m_world.get_frame_count());
 	m_viewOctreeAccess.resize(m_world.get_frame_count() * objects.size());
 	m_irradianceOctreeAccess.resize(m_world.get_frame_count() * objects.size());
-	m_importanceSums.resize(m_world.get_frame_count() * objects.size());
 
 	for(std::size_t i = 0u; i < m_world.get_frame_count(); ++i) {
-		m_viewOctrees.emplace_back(static_cast<u32>(m_params.impCapacity), static_cast<u32>(objects.size()));
-		m_irradianceOctrees.emplace_back(static_cast<u32>(m_params.impCapacity), static_cast<u32>(objects.size()));
+		m_viewOctrees.emplace_back(static_cast<u32>(m_params.impCapacity), static_cast<u32>(objects.size()), true);
+		m_irradianceOctrees.emplace_back(static_cast<u32>(m_params.impCapacity), static_cast<u32>(objects.size()), false);
 
 		std::size_t o = 0u;
 		for(const auto& obj : objects) {
@@ -310,7 +344,6 @@ void CpuCombinedReducer::initialize_decimaters() {
 																		lod, newLod, m_world.get_frame_count(),
 																		&m_viewOctreeAccess[i * m_world.get_frame_count()],
 																		&m_irradianceOctreeAccess[i * m_world.get_frame_count()],
-																		&m_importanceSums[i * m_world.get_frame_count()],
 																		m_params.lightWeight);
 	}
 	m_currentScene->clear_accel_structure();
@@ -337,6 +370,7 @@ void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) 
 	double importanceSum = 0.0;
 	std::size_t reducibleVertices = 0u;
 	std::size_t nonReducibleVertices = 0u;
+	std::size_t totalVertexCount = 0u;
 
 	std::vector<double> importance(m_decimaters.size());
 
@@ -348,14 +382,19 @@ void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) 
 		case combined::PVertexDistMethod::Values::AVERAGE:
 		{
 			for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
+				auto iter = m_currentScene->get_objects().cbegin();
 				for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 					auto& decimater = m_decimaters[i];
 					if(decimater->get_original_vertex_count() > m_params.threshold)
-						importance[i] += decimater->get_importance_sum(frame);
+						importance[i] += get_lod_importance(frame, (iter++)->second);
 				}
 			}
 
+			auto iter = m_currentScene->get_objects().cbegin();
 			for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+				totalVertexCount += m_decimaters[i]->get_original_vertex_count();
+				if((iter++)->second.count == 0)
+					continue;
 				importance[i] /= static_cast<double>(frameEnd - frameStart + 1u);
 				importanceSum += importance[i];
 				if(m_decimaters[i]->get_original_vertex_count() > m_params.threshold)
@@ -371,10 +410,16 @@ void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) 
 		case combined::PVertexDistMethod::Values::MAX:
 		{
 			for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
+				auto iter = m_currentScene->get_objects().cbegin();
 				for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+					totalVertexCount += m_decimaters[i]->get_original_vertex_count();
+					if(iter->second.count == 0) {
+						++iter;
+						continue;
+					}
 					auto& decimater = m_decimaters[i];
 					if(decimater->get_original_vertex_count() > m_params.threshold) {
-						importance[i] = std::max(importance[i], decimater->get_importance_sum(frame));
+						importance[i] = std::max(importance[i], get_lod_importance(frame, (iter++)->second));
 						reducibleVertices += m_decimaters[i]->get_original_vertex_count();
 					} else {
 						nonReducibleVertices += m_decimaters[i]->get_original_vertex_count();
@@ -388,11 +433,15 @@ void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) 
 	}
 
 	// Determine the reduction parameters for each mesh
-	const auto totalVertexCount = reducibleVertices + nonReducibleVertices;
 	const std::size_t totalTargetVertexCount = static_cast<std::size_t>((1.f - m_params.reduction) * totalVertexCount);
 	std::size_t reducedVertexPool = totalTargetVertexCount - nonReducibleVertices;
 
+	auto iter = m_currentScene->get_objects().cbegin();
 	for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+		if(iter->second.count == 0) {
+			m_remainingVertices.push_back(0u);
+			continue;
+		}
 		if(m_decimaters[i]->get_original_vertex_count() > m_params.threshold) {
 			const auto targetVertexCount = std::min(m_decimaters[i]->get_original_vertex_count(),
 													static_cast<std::size_t>(importance[i]

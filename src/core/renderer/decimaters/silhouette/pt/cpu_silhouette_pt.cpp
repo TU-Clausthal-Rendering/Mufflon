@@ -116,8 +116,8 @@ void CpuShadowSilhouettesPT::iterate() {
 		m_irradianceCountGrid = nullptr;
 
 		if(m_params.impDataStruct == PImpDataStruct::Values::OCTREE) {
-			m_viewOctree = std::make_unique<OctreeManager<FloatOctree>>(static_cast<u32>(m_params.impCapacity), static_cast<u32>(m_decimaters.size()));
-			m_irradianceOctree = std::make_unique<OctreeManager<SampleOctree>>(static_cast<u32>(m_params.impCapacity), static_cast<u32>(m_decimaters.size()));
+			m_viewOctree = std::make_unique<OctreeManager<FloatOctree>>(static_cast<u32>(m_params.impCapacity), static_cast<u32>(m_decimaters.size()), false);
+			m_irradianceOctree = std::make_unique<OctreeManager<SampleOctree>>(static_cast<u32>(m_params.impCapacity), static_cast<u32>(m_decimaters.size()), false);
 			for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
 				m_viewOctree->create(m_sceneDesc.aabbs[i], 40000.f);
 				m_irradianceOctree->create(m_sceneDesc.aabbs[i], 8u, 40000.f);

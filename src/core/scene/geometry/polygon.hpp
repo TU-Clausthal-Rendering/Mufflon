@@ -309,7 +309,10 @@ public:
 						const float maxDensity, const bool garbageCollect);
 	std::size_t cluster_decimate(const renderer::decimaters::FloatOctree& octree,
 								 OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-								 const std::size_t targetVertices, const float maxDensity);
+								 const std::size_t targetVertices, const float maxDensity,
+								 std::vector<bool>* octreeNodeMask = nullptr,
+								 std::vector<renderer::decimaters::FloatOctree::NodeIndex>* currLevel = nullptr,
+								 std::vector<renderer::decimaters::FloatOctree::NodeIndex>* nextLevel = nullptr);
 
 	// Splits a vertex
 	std::pair<FaceHandle, FaceHandle> vertex_split(const VertexHandle v0, const VertexHandle v1,

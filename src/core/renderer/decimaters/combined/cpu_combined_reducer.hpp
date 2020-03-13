@@ -41,6 +41,7 @@ private:
 	void update_reduction_factors(u32 frameStart, u32 frameEnd);
 	void initialize_decimaters();
 	void display_importance(const bool accumulated = false);
+	double get_lod_importance(const u32 frame, const scene::Scene::InstanceRef obj) const noexcept;
 
 	combined::CombinedParameters m_params = {};
 	std::vector<math::Rng> m_rngs;
@@ -54,7 +55,6 @@ private:
 	// Arrays holding the pointers for easier access (ordered by object first)
 	std::vector<FloatOctree*> m_viewOctreeAccess;
 	std::vector<SampleOctree*> m_irradianceOctreeAccess;
-	std::vector<double> m_importanceSums;
 	std::unique_ptr<std::atomic<double>[]> m_instanceImportanceSums;
 	// Shadow screenspace info
 	unique_device_ptr<Device::CPU, combined::ShadowStatus[]> m_shadowStatus;

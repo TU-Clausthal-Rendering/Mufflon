@@ -24,7 +24,9 @@ public:
 	// Performs the clustering. Note that, if garbageCollect == false, you 
 	// MUST request status for vertices, edges, and faces prior
 	std::size_t cluster(geometry::PolygonMeshType& mesh, const ei::Box& aabb,
-						const bool garbageCollect = true);
+						const bool garbageCollect = true, std::vector<bool>* octreeNodeMask = nullptr,
+						std::vector<typename O::NodeIndex>* currLevel = nullptr,
+						std::vector<typename O::NodeIndex>* nextLevel = nullptr);
 
 private:
 	const OctreeType& m_octree;

@@ -3,10 +3,10 @@
 namespace mufflon::renderer::decimaters {
 
 
-__host__ FloatOctree::FloatOctree(const ei::Box& bounds, u32 capacity, std::atomic<NodeType>* nodes,
+__host__ FloatOctree::FloatOctree(const ei::Box& bounds, u32 capacity, u32 fillCapacity, std::atomic<NodeType>* nodes,
 								  std::atomic<NodeType>& root, std::atomic_size_t& allocationCounter,
 								  const float splitVal) :
-	Octree<FloatOctreeNode>{ bounds, capacity, nodes, root, allocationCounter },
+	Octree<FloatOctreeNode>{ bounds, capacity, fillCapacity, nodes, root, allocationCounter },
 	m_splitViewVal{ splitVal }
 {}
 
@@ -48,10 +48,10 @@ __host__ std::atomic<FloatOctreeNode>* FloatOctree::add_and_split(std::atomic<No
 			// We are now the splitting thread - allocate new children
 			const auto offset = m_allocationCounter.fetch_add(8u, std::memory_order::memory_order_consume);
 			// Ensure that we don't overflow our node array
-			if(offset + 8u >= m_capacity) {
+			if(offset + 8u >= m_fillCapacity) {
 				// TODO: to avoid a deadlock here we reset the node count to zero, even though it should
 				// theoretically remain the samples; this may introduce some bias!
-				m_allocationCounter.store(m_capacity);
+				m_allocationCounter.store(m_fillCapacity);
 				m_stopSplitting = true;
 				curr->store(NodeType::as_split_child(0.f), std::memory_order_release);
 				return nullptr;

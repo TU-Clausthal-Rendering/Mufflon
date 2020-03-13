@@ -9,12 +9,13 @@
 namespace mufflon { namespace renderer { namespace decimaters {
 
 template < class N >
-Octree<N>::Octree(const ei::Box& bounds, u32 capacity, std::atomic<N>* nodes,
+Octree<N>::Octree(const ei::Box& bounds, u32 capacity, u32 fillCapacity, std::atomic<N>* nodes,
 				std::atomic<N>& root, std::atomic_size_t& allocationCounter) :
 	m_diagonal{ (bounds.max - bounds.min) * 1.002f },
 	m_diagonalInv{ 1.f / m_diagonal },
 	m_minBound{ bounds.min - m_diagonal * (1.002f - 1.f) / 2.f },
 	m_capacity{ capacity },
+	m_fillCapacity{ fillCapacity },
 	m_nodes{ nodes },
 	m_root{ root },
 	m_allocationCounter{ allocationCounter },
@@ -37,6 +38,7 @@ Octree<N>::Octree(Octree<N>&& other) noexcept :
 	m_diagonalInv{ other.m_diagonalInv },
 	m_minBound{ other.m_minBound },
 	m_capacity{ other.m_capacity },
+	m_fillCapacity{ other.m_fillCapacity },
 	m_nodes{ other.m_nodes },
 	m_root{ other.m_root },
 	m_allocationCounter{ other.m_allocationCounter },

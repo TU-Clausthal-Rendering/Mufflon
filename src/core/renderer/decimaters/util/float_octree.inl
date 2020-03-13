@@ -39,6 +39,7 @@ __host__ void FloatOctree::join(const Octree<O>& other, const float weight) noex
 			const auto newVal = currOur.get_sample() + weight * currOther.get_sample();
 			if(newVal >= m_splitViewVal) {
 				const auto offset = m_allocationCounter.fetch_add(8u);
+				mAssert(offset < m_capacity);
 				m_childCounter += 7u;
 				const auto newNode = NodeType::as_parent(static_cast<u32>(offset));
 				std::get<0>(current)->store(newNode, std::memory_order_release);

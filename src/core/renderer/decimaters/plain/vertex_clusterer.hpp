@@ -96,7 +96,7 @@ public:
 		if(!m_done) {
 			const auto& objects = m_currentScene->get_objects();
 			const auto& instances = m_currentScene->get_instances();
-			m_octrees = std::make_unique<OctreeManager<FloatOctree>>(16'000'000u, static_cast<u32>(objects.size()));
+			m_octrees = std::make_unique<OctreeManager<FloatOctree>>(16'000'000u, static_cast<u32>(objects.size()), false);
 
 			for(const auto& obj : objects) {
 				// TODO: proper bounding box!

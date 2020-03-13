@@ -230,8 +230,6 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 #pragma PARALLEL_FOR_COND_DYNAMIC(objLevelParallelism)
 		for(int o = 0; o < objCount; ++o) {
 			auto& obj = *(m_objects.begin() + o);
-			if(obj.second.count == 0u)
-				continue;
 			mAssert(obj.first != nullptr);
 
 			// First gather which LoDs of this objects are used and

@@ -2,6 +2,7 @@
 
 #include "combined_common.hpp"
 #include "combined_params.hpp"
+#include "shadow_size_estimation.hpp"
 #include "core/math/rng.hpp"
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
@@ -16,6 +17,43 @@
 namespace mufflon { namespace renderer { namespace decimaters { namespace combined {
 
 using namespace scene::lights;
+
+namespace {
+
+std::tuple<bool, std::array<u32, 2u>, std::array<u32, 2u>> get_shared_vertices(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
+																			   const scene::PrimitiveHandle& firstHit,
+																			   const scene::PrimitiveHandle& secondHit) noexcept {
+	const u32 firstNumVertices = polygon.is_triangle(firstHit) ? 3u : 4u;
+	const u32 secondNumVertices = polygon.is_triangle(secondHit) ? 3u : 4u;
+	const u32 firstPrimIndex = firstHit.primId - (polygon.is_triangle(firstHit) ? 0u : polygon.numTriangles);
+	const u32 secondPrimIndex = secondHit.primId - (polygon.is_triangle(secondHit) ? 0u : polygon.numTriangles);
+	const u32 firstVertOffset = polygon.is_triangle(firstHit) ? 0 : 3u * polygon.numTriangles;
+	const u32 secondVertOffset = polygon.is_triangle(secondHit) ? 0 : 3u * polygon.numTriangles;
+
+	std::array<u32, 2u> firstIndices;
+	std::array<u32, 2u> secondIndices;
+
+	// Check if we have "shared" vertices: cannot do it by index, since they might be
+	// split vertices, but instead need to go by proximity
+	u32 sharedVertices = 0u;
+	for(u32 i0 = 0u; i0 < firstNumVertices; ++i0) {
+		for(u32 i1 = 0u; i1 < secondNumVertices; ++i1) {
+			const u32 idx0 = polygon.vertexIndices[firstVertOffset + firstNumVertices * firstPrimIndex + i0];
+			const u32 idx1 = polygon.vertexIndices[secondVertOffset + secondNumVertices * secondPrimIndex + i1];
+			const ei::Vec3& p0 = polygon.vertices[idx0];
+			const ei::Vec3& p1 = polygon.vertices[idx1];
+			if(idx0 == idx1 || p0 == p1) {
+				firstIndices[sharedVertices] = idx0;
+				secondIndices[sharedVertices] = idx1;
+				++sharedVertices;
+			}
+			if(sharedVertices >= 2)
+				return std::make_tuple(true, firstIndices, secondIndices);
+		}
+	}
+
+	return std::make_tuple(false, std::array<u32, 2u>{}, std::array<u32, 2u>{});
+}
 
 template < class Octree >
 inline CUDA_FUNCTION void distribute_sample(const scene::PolygonsDescriptor<CURRENT_DEV>& polygon,
@@ -43,6 +81,68 @@ inline CUDA_FUNCTION void distribute_sample(const scene::PolygonsDescriptor<CURR
 		}
 	}
 }
+
+inline CUDA_FUNCTION bool trace_shadow(const scene::SceneDescriptor<CURRENT_DEV>& scene,
+									   const ei::Ray& shadowRay, CombinedPathVertex& vertex, const float importance,
+									   const scene::PrimitiveHandle& shadowHitId, const float lightDistance,
+									   const float firstShadowDistance, const LightType lightType,
+									   const u32 lightOffset) {
+	if(!scene.is_polygon(shadowHitId))
+		return false;
+	constexpr float DIST_EPSILON = 0.001f;
+
+	// TODO: worry about spheres?
+	// TODO: what about non-manifold meshes?
+	ei::Ray backfaceRay{ shadowRay.origin + shadowRay.direction * (firstShadowDistance + DIST_EPSILON), shadowRay.direction };
+
+	const auto secondHit = scene::accel_struct::first_intersection(scene, backfaceRay, vertex.get_geometric_normal(),
+																   lightDistance - firstShadowDistance + DIST_EPSILON);
+	if(secondHit.hitId.instanceId < 0 || secondHit.hitId == vertex.get_primitive_id())
+		return false;
+	if(!scene.is_polygon(secondHit.hitId))
+		return false;
+
+	ei::Ray silhouetteRay{ shadowRay.origin + shadowRay.direction * (firstShadowDistance + secondHit.distance), shadowRay.direction };
+	const auto thirdHit = scene::accel_struct::first_intersection(scene, silhouetteRay, secondHit.normal,
+																  lightDistance - firstShadowDistance - secondHit.distance + DIST_EPSILON);
+	if(thirdHit.hitId == vertex.get_primitive_id()) {
+		// Compute the (estimated) size of the shadow region
+		const ei::Plane neePlane{ shadowRay.direction, shadowRay.origin };
+		const float shadowRegionSizeEstimate = estimate_shadow_light_size(scene, lightType, lightOffset,
+																		  neePlane, firstShadowDistance,
+																		  lightDistance - firstShadowDistance);
+		// Scale the irradiance with the predicted shadow size
+		const float weightedImportance = importance * ei::sq(1.f / (1.f + shadowRegionSizeEstimate));
+		vertex.ext().neeWeightedIrradiance = weightedImportance;
+		vertex.ext().shadowInstanceId = secondHit.hitId.instanceId;
+
+		// Also check for silhouette interaction here
+		if(secondHit.hitId.instanceId == shadowHitId.instanceId) {
+			const auto& polygon = scene.lods[scene.lodIndices[secondHit.hitId.instanceId]].polygon;
+
+			// Find if the first and second polygons share a ridge
+			const auto shared = get_shared_vertices(polygon, shadowHitId, secondHit.hitId);
+			if(std::get<0>(shared)) {
+				for(u32 i = 0u; i < 2u; ++i) {
+					vertex.ext().silhouetteVerticesFirst[i] = static_cast<i32>(std::get<1>(shared)[i]);
+					vertex.ext().silhouetteVerticesSecond[i] = static_cast<i32>(std::get<2>(shared)[i]);
+				}
+
+				// Compute the (estimated) size of the shadow region. Originally we used the
+				// projected length of the shadow edge, but it isn't well defined and
+				// inconsistent with the shadow importance sum
+				vertex.ext().silhouetteRegionSize = estimate_shadow_light_size(scene, lightType, lightOffset,
+																			   neePlane, firstShadowDistance,
+																			   lightDistance - firstShadowDistance);
+			}
+		}
+
+		return true;
+	}
+	return false;
+}
+
+} // namespace
 
 inline CUDA_FUNCTION void post_process_shadow(CombinedTargets::RenderBufferType<CURRENT_DEV>& outputBuffer,
 											  const scene::SceneDescriptor<CURRENT_DEV>& scene,
@@ -227,6 +327,10 @@ inline CUDA_FUNCTION void sample_importance_octree(CombinedTargets::RenderBuffer
 						}
 
 						vertices[pathLen].ext().otherNeeLuminance = scene::get_luminance(rad);
+						// TODO: use this radiance to conditionally discard importance
+						trace_shadow(scene, shadowRay, vertices[pathLen], weightedRadianceLuminance,
+									 shadowHit.hitId, nee.dist, firstShadowDistance,
+									 lightType, lightOffset);
 
 						// TODO
 					}
@@ -333,6 +437,54 @@ inline CUDA_FUNCTION void sample_importance_octree(CombinedTargets::RenderBuffer
 				cuda::atomic_add<CURRENT_DEV>(instanceImpSums[hitId.instanceId], static_cast<double>(imp));
 			}
 		}
+
+		// TODO: replace with screenspace silhouette detection!
+		const auto& ext = vertices[p].ext();
+		// TODO: what is this for?
+		if(p == 1 && ext.shadowInstanceId >= 0) {
+			constexpr float directIndirectRatio = 0.14f;
+
+			// TODO: factor in background illumination too
+			const float indirectLuminance = scene::get_luminance(accumRadiance) + ext.otherNeeLuminance;
+			const float totalLuminance = scene::get_luminance(ext.pathRadiance) + indirectLuminance;
+			const float ratio = totalLuminance / indirectLuminance - 1.f;
+			if(ratio > directIndirectRatio&& params.show_silhouette()) {
+				// Regular shadow importance
+				const auto lodIdx = scene.lodIndices[ext.shadowInstanceId];
+				cuda::atomic_add<CURRENT_DEV>(instanceImpSums[ext.shadowInstanceId], static_cast<double>(ext.neeWeightedIrradiance));
+
+				if(ext.silhouetteRegionSize >= 0.f) {
+					constexpr float FACTOR = 2'000.f;
+
+					// Idea: we have one NEE for silhouette stuff and n other ones to estimate the
+					// brightness; all of them contribute to the direct irradiance thingy,
+					// but only one acts as a silhouette detector(?)
+					// Kinda sucks though
+
+					/*trace_shadow(scene, sums, shadowRay, vertices[pathLen], weightedIrradianceLuminance,
+						shadowHit.hitId, nee.dist, firstShadowDistance,
+						lightType, lightOffset, params);*/
+
+						// TODO: proper factor!
+					const float silhouetteImportance = ei::sq(1.f / (1.f + ext.silhouetteRegionSize))
+						* params.shadowSilhouetteWeight * FACTOR * (totalLuminance - indirectLuminance);
+					const auto& polygon = scene.lods[lodIdx].polygon;
+
+					for(i32 i = 0; i < 2; ++i) {
+						mAssert(ext.silhouetteVerticesFirst[i] >= 0 && static_cast<u32>(ext.silhouetteVerticesFirst[i]) < scene.lods[lodIdx].polygon.numVertices);
+						viewOctrees[lodIdx].add_sample(polygon.vertices[ext.silhouetteVerticesFirst[i]],
+													   polygon.normals[ext.silhouetteVerticesFirst[i]],
+													   silhouetteImportance);
+						if(ext.silhouetteVerticesSecond[i] >= 0 && ext.silhouetteVerticesFirst[i] != ext.silhouetteVerticesSecond[i]) {
+							mAssert(static_cast<u32>(ext.silhouetteVerticesSecond[i]) < scene.lods[lodIdx].polygon.numVertices);
+							viewOctrees[lodIdx].add_sample(polygon.vertices[ext.silhouetteVerticesSecond[i]],
+														   polygon.normals[ext.silhouetteVerticesSecond[i]],
+														   silhouetteImportance);
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -341,7 +493,6 @@ inline CUDA_FUNCTION void sample_vis_importance_octree(CombinedTargets::RenderBu
 													   const scene::SceneDescriptor<CURRENT_DEV>& scene,
 													   const Pixel& coord, math::Rng& rng,
 													   const FloatOctree* view,
-													   const ConstArrayDevHandle_t<CURRENT_DEV, double> importanceSums,
 													   const ConstArrayDevHandle_t<CURRENT_DEV, cuda::Atomic<CURRENT_DEV, double>> instanceImpSums,
 													   const u32 currFrame) {
 	Spectrum throughput{ ei::Vec3{1.0f} };
@@ -387,7 +538,6 @@ inline CUDA_FUNCTION void sample_vis_importance_octree(CombinedTargets::RenderBu
 
 		const auto importance = viewImp / (area * distSum);
 		outputBuffer.template set<silhouette::ImportanceTarget>(coord, importance);
-		outputBuffer.template set<ImportanceSumTarget>(coord, static_cast<float>(importanceSums[scene.numLods * currFrame + lodIdx]));
 		outputBuffer.template set<InstanceImportanceSumTarget>(coord, static_cast<float>(cuda::atomic_load<CURRENT_DEV, double>(instanceImpSums[hitId.instanceId])));
 	}
 }
@@ -396,7 +546,6 @@ inline CUDA_FUNCTION void sample_vis_importance(CombinedTargets::RenderBufferTyp
 												const scene::SceneDescriptor<CURRENT_DEV>& scene,
 												const Pixel& coord, math::Rng& rng,
 												const ConstArrayDevHandle_t<CURRENT_DEV, ConstArrayDevHandle_t<CURRENT_DEV, float>> importances,
-												const ConstArrayDevHandle_t<CURRENT_DEV, double> importanceSums,
 												const ConstArrayDevHandle_t<CURRENT_DEV, cuda::Atomic<CURRENT_DEV, double>> instanceImpSums,
 												const u32 currFrame) {
 	Spectrum throughput{ ei::Vec3{1.0f} };
@@ -441,7 +590,6 @@ inline CUDA_FUNCTION void sample_vis_importance(CombinedTargets::RenderBufferTyp
 		}
 		const auto importance = imp / distSum;
 		outputBuffer.template set<silhouette::ImportanceTarget>(coord, importance);
-		outputBuffer.template set<ImportanceSumTarget>(coord, static_cast<float>(importanceSums[scene.numLods * currFrame + lodIdx]));
 		outputBuffer.template set<InstanceImportanceSumTarget>(coord, static_cast<float>(cuda::atomic_load<CURRENT_DEV, double>(instanceImpSums[hitId.instanceId])));
 	}
 }

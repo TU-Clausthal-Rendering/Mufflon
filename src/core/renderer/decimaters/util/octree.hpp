@@ -24,8 +24,8 @@ public:
 		u32 depthMask;
 	};
 
-	Octree(const ei::Box& bounds, u32 capacity, std::atomic<NodeType>* nodes,
-					std::atomic<NodeType>& root, std::atomic_size_t& allocationCounter);
+	Octree(const ei::Box& bounds, u32 capacity, u32 fillCapacity, std::atomic<NodeType>* nodes,
+		   std::atomic<NodeType>& root, std::atomic_size_t& allocationCounter);
 	Octree(const Octree&) = delete;
 	Octree(Octree&& other) noexcept;
 	Octree& operator=(const Octree&) = delete;
@@ -63,6 +63,7 @@ public:
 	}
 
 	std::size_t capacity() const noexcept { return m_capacity; }
+	std::size_t fill_capacity() const noexcept { return m_fillCapacity; }
 	std::size_t leafs() const noexcept { return m_childCounter.load(); }
 	const ei::Vec3& diagonal() const noexcept { return m_diagonal; }
 	const ei::Vec3& inverted_diagonal() const noexcept { return m_diagonalInv; }
@@ -88,6 +89,7 @@ protected:
 	ei::Vec3 m_diagonalInv;
 	ei::Vec3 m_minBound;
 	std::size_t m_capacity;
+	std::size_t m_fillCapacity;
 	std::atomic<NodeType>* m_nodes;
 	std::atomic<NodeType>& m_root;
 	std::atomic_size_t& m_allocationCounter;
@@ -100,7 +102,7 @@ class FloatOctree final : public Octree<FloatOctreeNode> {
 public:
 	using NodeType = FloatOctreeNode;
 
-	FloatOctree(const ei::Box& bounds, u32 capacity, std::atomic<NodeType>* nodes,
+	FloatOctree(const ei::Box& bounds, u32 capacity, u32 fillCapacity, std::atomic<NodeType>* nodes,
 						 std::atomic<NodeType>& root, std::atomic_size_t& allocationCounter,
 						 const float splitVal);
 	FloatOctree(const FloatOctree&) = delete;
@@ -130,9 +132,9 @@ class SampleOctree final : public Octree<SampleOctreeNode> {
 public:
 	using NodeType = SampleOctreeNode;
 
-	SampleOctree(const ei::Box& bounds, u32 capacity, std::atomic<NodeType>* nodes,
-						  std::atomic<NodeType>& root, std::atomic_size_t& allocationCounter,
-						  const u32 splitCount, const float splitVal);
+	SampleOctree(const ei::Box& bounds, u32 capacity, u32 fillCapacity, std::atomic<NodeType>* nodes,
+				 std::atomic<NodeType>& root, std::atomic_size_t& allocationCounter,
+				 const u32 splitCount, const float splitVal);
 	SampleOctree(const SampleOctree&) = delete;
 	SampleOctree(SampleOctree&& other) noexcept;
 	SampleOctree& operator=(const SampleOctree&) = delete;

@@ -34,14 +34,16 @@ u32 compute_cluster_center(const Iter begin, const Iter end) {
 }
 
 template < class O >
-std::pair<std::vector<bool>, u32> find_clusters(const O& octree, geometry::PolygonMeshType& mesh, const ei::Box& aabb,
-												const std::size_t maxCount) {
+u32 find_clusters(const O& octree, geometry::PolygonMeshType& mesh, const ei::Box& aabb,
+				  const std::size_t maxCount, std::vector<bool>& octreeNodeMask,
+				  std::vector<typename O::NodeIndex>& currLevel, std::vector<typename O::NodeIndex>& nextLevel) {
 	using NodeIndex = typename O::NodeIndex;
 
 	// Perform a breadth-first search to bring clusters down in equal levels
-	std::vector<bool> octreeNodeMask(octree.capacity(), false);
-	std::vector<NodeIndex> currLevel;
-	std::vector<NodeIndex> nextLevel;
+	octreeNodeMask.resize(octree.capacity());
+	std::fill(octreeNodeMask.begin(), octreeNodeMask.end(), false);
+	currLevel.clear();
+	nextLevel.clear();
 	currLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(maxCount, 1llu))));
 	nextLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(maxCount, 1llu))));
 	std::size_t finalNodeCount = 0u;
@@ -90,18 +92,22 @@ std::pair<std::vector<bool>, u32> find_clusters(const O& octree, geometry::Polyg
 		std::swap(currLevel, nextLevel);
 	}
 
-	return std::make_pair(octreeNodeMask, maxIndex);
+	return maxIndex;
 }
 
 template < class O >
-std::pair<std::vector<bool>, u32> find_clusters_with_max_density(const O& octree, geometry::PolygonMeshType& mesh, const ei::Box& aabb,
-																 const std::size_t maxCount, const float maxDensity) {
+u32 find_clusters_with_max_density(const O& octree, geometry::PolygonMeshType& mesh, const ei::Box& aabb,
+								   const std::size_t maxCount, const float maxDensity,
+								   std::vector<bool>& octreeNodeMask,
+								   std::vector<typename O::NodeIndex>& currLevel,
+								   std::vector<typename O::NodeIndex>& nextLevel) {
 	using NodeIndex = typename O::NodeIndex;
 
 	// Perform a breadth-first search to bring clusters down in equal levels
-	std::vector<bool> octreeNodeMask(octree.capacity(), false);
-	std::vector<NodeIndex> currLevel;
-	std::vector<NodeIndex> nextLevel;
+	octreeNodeMask.resize(octree.capacity());
+	std::fill(octreeNodeMask.begin(), octreeNodeMask.end(), false);
+	currLevel.clear();
+	nextLevel.clear();
 	currLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(maxCount, 1llu))));
 	nextLevel.reserve(static_cast<std::size_t>(ei::log2(std::max(maxCount, 1llu))));
 	std::size_t finalNodeCount = 0u;
@@ -163,7 +169,7 @@ std::pair<std::vector<bool>, u32> find_clusters_with_max_density(const O& octree
 		}
 		std::swap(currLevel, nextLevel);
 	}
-	return std::make_pair(octreeNodeMask, maxIndex);
+	return maxIndex;
 }
 
 } // namespace
@@ -182,20 +188,35 @@ struct VertexCluster {
 
 template < class O >
 std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, const ei::Box& aabb,
-											  const bool garbageCollect) {
-	const auto [octreeNodeMask, maxIndex] = m_maxDensity.has_value()
-		? find_clusters_with_max_density(m_octree, mesh, aabb, m_maxCount, m_maxDensity.value())
-		: find_clusters(m_octree, mesh, aabb, m_maxCount);
+											  const bool garbageCollect, std::vector<bool>* octreeNodeMask,
+											  std::vector<typename O::NodeIndex>* currLevel,
+											  std::vector<typename O::NodeIndex>* nextLevel) {
+	std::vector<bool> localOctreeNodeMask;
+	std::vector<typename O::NodeIndex> localCurrLevel;
+	std::vector<typename O::NodeIndex> localNextLevel;
+	if(octreeNodeMask == nullptr)
+		octreeNodeMask = &localOctreeNodeMask;
+	if(currLevel == nullptr)
+		currLevel = &localCurrLevel;
+	if(nextLevel == nullptr)
+		nextLevel = &localNextLevel;
+
+	const auto maxIndex = m_maxDensity.has_value()
+		? find_clusters_with_max_density(m_octree, mesh, aabb, m_maxCount, m_maxDensity.value(),
+										 *octreeNodeMask, *currLevel, *nextLevel)
+		: find_clusters(m_octree, mesh, aabb, m_maxCount, *octreeNodeMask, *currLevel, *nextLevel);
 
 	// We have to track a few things per cluster
 	// TODO: better bound!
+	printf("Max cluster index: %lu\n", maxIndex);
+	fflush(stdout);
 	std::vector<VertexCluster> clusters(maxIndex + 1u);
 
 	const auto aabbMin = aabb.min;
 	const auto aabbDiag = aabb.max - aabb.min;
 	// Convenience function to compute the cluster index from a position
-	auto get_cluster_index = [this, &octreeNodeMask](const ei::Vec3& pos) -> std::optional<typename O::NodeIndex> {
-		return m_octree.get_node_index(pos, octreeNodeMask);
+	auto get_cluster_index = [this, octreeNodeMask](const ei::Vec3& pos) -> std::optional<typename O::NodeIndex> {
+		return m_octree.get_node_index(pos, *octreeNodeMask);
 	};
 	auto get_cluster_index_no_stop = [this](const ei::Vec3& pos) -> typename O::NodeIndex {
 		return m_octree.get_node_index(pos);

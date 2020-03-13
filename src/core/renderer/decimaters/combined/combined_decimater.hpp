@@ -25,7 +25,6 @@ public:
 					  scene::Lod& decimated, const u32 frameCount,
 					  ArrayDevHandle_t<Device::CPU, FloatOctree*> view,
 					  ArrayDevHandle_t<Device::CPU, SampleOctree*> irradiance,
-					  ArrayDevHandle_t<Device::CPU, double> importanceSums,
 					  const float lightWeight);
 	CombinedDecimater(const CombinedDecimater&) = delete;
 	CombinedDecimater(CombinedDecimater&&);
@@ -36,12 +35,14 @@ public:
 	void finish_gather(const u32 frame);
 	void update(const PImpWeightMethod::Values weighting,
 				u32 startFrame, u32 endFrame);
-	void reduce(const std::size_t targetVertexCount, const float maxDensity, const u32 frame);
+	void reduce(const std::size_t targetVertexCount, const float maxDensity, const u32 frame,
+				std::vector<bool>& octreeNodeMask,
+				std::vector<renderer::decimaters::FloatOctree::NodeIndex>& currLevel,
+				std::vector<renderer::decimaters::FloatOctree::NodeIndex>& nextLevel);
 
 	StringView get_mesh_name() const noexcept { return m_objectName; }
 	FloatOctree& get_view_octree(const u32 frame) noexcept { return *m_viewImportance[frame]; }
 	SampleOctree& get_irradiance_octree(const u32 frame) noexcept { return *m_irradianceImportance[frame]; }
-	double get_importance_sum(const u32 frame) const noexcept { return m_importanceSums[frame]; }
 	std::size_t get_original_vertex_count() const noexcept;
 	std::size_t get_decimated_vertex_count() const noexcept;
 	void get_decimated_importance(ArrayDevHandle_t<Device::CPU, float> buffer) {
@@ -70,7 +71,6 @@ private:
 	// Importance octrees
 	ArrayDevHandle_t<Device::CPU, FloatOctree*> m_viewImportance;
 	ArrayDevHandle_t<Device::CPU, SampleOctree*> m_irradianceImportance;
-	ArrayDevHandle_t<Device::CPU, double> m_importanceSums;			// Stores the importance sum per frame
 
 	const u32 m_frameCount;											// Total frame count in the animation sequence
 
