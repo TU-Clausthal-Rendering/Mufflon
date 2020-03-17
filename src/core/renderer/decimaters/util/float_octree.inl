@@ -34,20 +34,23 @@ __host__ void FloatOctree::join(const Octree<O>& other, const float weight) noex
 			for(int i = 0; i < 8; ++i)
 				queue.emplace_back(&m_nodes[ourOffset + i], &other.node(otherOffset + i), std::get<2>(current) + 1u);
 		} else if(currOur.is_leaf() && currOther.is_leaf()) {
-			// TODO: split!
 			// Add the weighted value to our leaf and terminate this traversal path
 			const auto newVal = currOur.get_sample() + weight * currOther.get_sample();
-			if(newVal >= m_splitViewVal) {
+			if(newVal >= m_splitViewVal && !m_stopSplitting) {
 				const auto offset = m_allocationCounter.fetch_add(8u);
-				mAssert(offset < m_capacity);
-				m_childCounter += 7u;
-				const auto newNode = NodeType::as_parent(static_cast<u32>(offset));
-				std::get<0>(current)->store(newNode, std::memory_order_release);
-				for(u32 i = 0u; i < 8u; ++i)
-					m_nodes[offset + i] = NodeType::as_split_child(newVal / 8.f);
-				m_depth.store(ei::max(m_depth.load(std::memory_order_acquire),
-									   static_cast<u32>(std::get<2>(current)) + 1u),
-							  std::memory_order_release);
+				if(offset + 8u >= m_fillCapacity) {
+					m_allocationCounter.store(m_fillCapacity);
+					m_stopSplitting = true;
+				} else {
+					m_childCounter += 7u;
+					const auto newNode = NodeType::as_parent(static_cast<u32>(offset));
+					std::get<0>(current)->store(newNode, std::memory_order_release);
+					for(u32 i = 0u; i < 8u; ++i)
+						m_nodes[offset + i] = NodeType::as_split_child(newVal / 8.f);
+					m_depth.store(ei::max(m_depth.load(std::memory_order_acquire),
+										  static_cast<u32>(std::get<2>(current)) + 1u),
+								  std::memory_order_release);
+				}
 			} else {
 				const auto newValue = NodeType::as_split_child(newVal);
 				std::get<0>(current)->store(newValue, std::memory_order_release);
@@ -81,16 +84,22 @@ __host__ void FloatOctree::join(const Octree<O>& other, const float weight) noex
 					// Found a leaf, store the appropriate value in the accompanied (own) leaf
 					const auto divisor = static_cast<float>(1u << (3u * std::get<2>(curr)));
 					const auto newVal = baseValue / divisor + weight * otherVal.get_sample();
-					if(newVal >= m_splitViewVal) {
+					if(newVal >= m_splitViewVal && !m_stopSplitting) {
 						const auto offset = m_allocationCounter.fetch_add(8u);
-						m_childCounter += 7u;
-						const auto newNode = NodeType::as_parent(static_cast<u32>(offset));
-						std::get<0>(curr)->store(newNode, std::memory_order_release);
-						for(u32 i = 0u; i < 8u; ++i)
-							m_nodes[offset + i] = NodeType::as_split_child(newVal / 8.f);
-						m_depth.store(ei::max(m_depth.load(std::memory_order_acquire),
-											   static_cast<u32>(std::get<2>(curr)) + 1u),
-									  std::memory_order_release);
+						// Ensure that we don't overflow our node array
+						if(offset + 8u >= m_fillCapacity) {
+							m_allocationCounter.store(m_fillCapacity);
+							m_stopSplitting = true;
+						} else {
+							m_childCounter += 7u;
+							const auto newNode = NodeType::as_parent(static_cast<u32>(offset));
+							std::get<0>(curr)->store(newNode, std::memory_order_release);
+							for(u32 i = 0u; i < 8u; ++i)
+								m_nodes[offset + i] = NodeType::as_split_child(newVal / 8.f);
+							m_depth.store(ei::max(m_depth.load(std::memory_order_acquire),
+												  static_cast<u32>(std::get<2>(curr)) + 1u),
+										  std::memory_order_release);
+						}
 					} else {
 						const auto newNode = NodeType::as_split_child(newVal);
 						std::get<0>(curr)->store(newNode, std::memory_order_release);
