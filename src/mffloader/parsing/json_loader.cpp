@@ -87,6 +87,50 @@ std::enable_if_t<!is_array<T>(), std::vector<T>> read_opt_array(ParserState& sta
 	return vec;
 }
 
+void parse_object_instance_properties(ParserState& state, const rapidjson::Value& scenario,
+									  util::FixedHashMap<StringView, u32>& objProps,
+									  util::FixedHashMap<StringView, binary::InstanceMapping>& instProps,
+									  const u32 defaultGlobalLod) {
+	using namespace rapidjson;
+	if(const auto objPropsIter = get(state, scenario, "objectProperties", false);
+	   objPropsIter != scenario.MemberEnd()) {
+		for(auto propIter = objPropsIter->value.MemberBegin(); propIter != objPropsIter->value.MemberEnd(); ++propIter) {
+			// Read the object name
+			StringView objectName = propIter->name.GetString();
+			if(objProps.find(objectName) != objProps.cend())
+				continue;
+			state.objectNames.push_back(&objectName[0u]);
+			const Value& object = propIter->value;
+			assertObject(state, object);
+			if(auto lodIter = get(state, object, "lod", false); lodIter != object.MemberEnd()) {
+				const u32 localLod = read<u32>(state, lodIter);
+				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod, "' for object '", objectName, "'");
+				objProps.insert(objectName, localLod);
+			}
+			state.objectNames.pop_back();
+		}
+	}
+	if(const auto instPropsIter = get(state, scenario, "instanceProperties", false);
+	   instPropsIter != scenario.MemberEnd()) {
+		for(auto propIter = instPropsIter->value.MemberBegin(); propIter != instPropsIter->value.MemberEnd(); ++propIter) {
+			// Read the instance name
+			StringView instanceName = propIter->name.GetString();
+			if(instProps.find(instanceName) != instProps.cend())
+				continue;
+			state.objectNames.push_back(&instanceName[0u]);
+			const Value& instance = propIter->value;
+			assertObject(state, instance);
+			const u32 localLod = read_opt<u32>(state, instance, "lod", defaultGlobalLod);
+			instProps.insert(instanceName, { localLod, nullptr });
+
+			if(localLod != defaultGlobalLod)
+				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod,
+							"' for object '", instanceName, "'");
+			state.objectNames.pop_back();
+		}
+	}
+}
+
 } // namespace
 
 JsonException::JsonException(const std::string& str, rapidjson::ParseResult res) :
@@ -1058,49 +1102,30 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 	logInfo("[JsonLoader::load_file] Detected global LoD '", defaultGlobalLod, "'");
 
 	sprintf(m_loadingStage.data(), "Parsing object properties%c", '\0');
-	// First parse binary file
-	util::FixedHashMap<StringView, u32> defaultObjectLods;
-	util::FixedHashMap<StringView, binary::InstanceMapping> defaultInstanceLods;
-	auto objPropsIter = get(m_state, defScen, "objectProperties", false);
-	if(objPropsIter != defScen.MemberEnd()) {
-		m_state.objectNames.push_back(&m_defaultScenario[0u]);
-		m_state.objectNames.push_back("objectProperties");
-		defaultObjectLods = util::FixedHashMap<StringView, u32>{ objPropsIter->value.MemberCount() };
-		for(auto propIter = objPropsIter->value.MemberBegin(); propIter != objPropsIter->value.MemberEnd(); ++propIter) {
-			// Read the object name
-			StringView objectName = propIter->name.GetString();
-			m_state.objectNames.push_back(&objectName[0u]);
-			const Value& object = propIter->value;
-			assertObject(m_state, object);
-			if(auto lodIter = get(m_state, object, "lod", false); lodIter != object.MemberEnd()) {
-				const u32 localLod = read<u32>(m_state, lodIter);
-				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod, "' for object '", objectName, "'");
-				defaultObjectLods.insert(objectName, localLod);
-			}
-		}
-		m_state.objectNames.pop_back();
-		m_state.objectNames.pop_back();
+	
+	// First we have to parse how many object/instance properties there are
+	std::size_t objPropCount = 0u;
+	std::size_t instPropCount = 0u;
+	for(auto scenIter = m_scenarios->value.MemberBegin(); scenIter != m_scenarios->value.MemberEnd(); ++scenIter) {
+		const auto& scenario = scenIter->value;
+		if(const auto objPropsIter = get(m_state, scenario, "objectProperties", false);
+		   objPropsIter != scenario.MemberEnd())
+			objPropCount += objPropsIter->value.MemberCount();
+		if(const auto instPropsIter = get(m_state, scenario, "instanceProperties", false);
+		   instPropsIter != scenario.MemberEnd())
+			instPropCount += instPropsIter->value.MemberCount();
 	}
-	sprintf(m_loadingStage.data(), "Parsing instance properties%c", '\0');
-	auto instPropsIter = get(m_state, defScen, "instanceProperties", false);
-	if(instPropsIter != defScen.MemberEnd()) {
-		m_state.objectNames.push_back(&m_defaultScenario[0u]);
-		m_state.objectNames.push_back("instanceProperties");
-		defaultInstanceLods = util::FixedHashMap<StringView, binary::InstanceMapping>{ instPropsIter->value.MemberCount() };
-		for(auto propIter = instPropsIter->value.MemberBegin(); propIter != instPropsIter->value.MemberEnd(); ++propIter) {
-			// Read the instance name
-			StringView instanceName = propIter->name.GetString();
-			m_state.objectNames.push_back(&instanceName[0u]);
-			const Value& instance = propIter->value;
-			assertObject(m_state, instance);
-			const u32 localLod = read_opt<u32>(m_state, instance, "lod", defaultGlobalLod);
-			defaultInstanceLods.insert(instanceName, {  localLod, nullptr });
-
-			if(localLod != defaultGlobalLod)
-				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod,
-							"' for object '", instanceName, "'");
-		}
-		m_state.objectNames.pop_back();
+	util::FixedHashMap<StringView, u32> defaultObjectLods{ objPropCount };
+	util::FixedHashMap<StringView, binary::InstanceMapping> defaultInstanceLods{ instPropCount };
+	// Now we can parse the properties themselves
+	// We have to start with the default scenario, since it defines the LoD level in case of ambiguity
+	m_state.objectNames.push_back(m_defaultScenario.data());
+	parse_object_instance_properties(m_state, defScen, defaultObjectLods, defaultInstanceLods, defaultGlobalLod);
+	m_state.objectNames.pop_back();
+	// Now the rest of the scenarios
+	for(auto scenIter = m_scenarios->value.MemberBegin(); scenIter != m_scenarios->value.MemberEnd(); ++scenIter) {
+		m_state.objectNames.push_back(scenIter->name.GetString());
+		parse_object_instance_properties(m_state, scenIter->value, defaultObjectLods, defaultInstanceLods, defaultGlobalLod);
 		m_state.objectNames.pop_back();
 	}
 	const bool deinstance = read_opt<bool>(m_state, document, "deinstance", false);
