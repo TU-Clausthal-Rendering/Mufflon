@@ -287,7 +287,7 @@ Spectrum CpuIvcm::merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& ph
 
 
 CpuIvcm::CpuIvcm(mufflon::scene::WorldContainer& world) :
-	RendererBase<Device::CPU, IvcmTargets>(world, {
+	RendererBase<Device::CPU, IvcmTargets>(world, std::nullopt, {
 		scene::AttributeIdentifier{scene::AttributeType::FLOAT, "mean_curvature"}
 	}, {}, {})
 {}

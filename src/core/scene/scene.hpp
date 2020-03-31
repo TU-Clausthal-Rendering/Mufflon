@@ -37,7 +37,7 @@ public:
 	};
 
 	Scene(WorldContainer& world, const Scenario& scenario, const u32 frame,
-		  util::FixedHashMap<ObjectHandle, InstanceRef>&& objects,
+		  const ei::Box& aabb, util::FixedHashMap<ObjectHandle, InstanceRef>&& objects,
 		  std::vector<InstanceHandle>&& instances,
 		  const std::vector<ei::Mat3x4>& worldToInstanceTransformation,
 		  const Bone* bones);
@@ -135,6 +135,7 @@ public:
 	 * access to.
 	 * The max. tessellation level determines the max. inner and outer tessellation
 	 * level of any face. It may be 0 if no (re-)tessellation is desired.
+	 * Optionally takes a function that gets called to load missing LoDs.
 	 *
 	 * Usage example:
 	 * scene::SceneDescriptor<Device::CUDA> sceneDesc = m_currentScene->get_descriptor<Device::CUDA>(
@@ -146,7 +147,8 @@ public:
 	template < Device dev >
 	const SceneDescriptor<dev>& get_descriptor(const std::vector<AttributeIdentifier>& vertexAttribs,
 											   const std::vector<AttributeIdentifier>& faceAttribs,
-											   const std::vector<AttributeIdentifier>& sphereAttribs);
+											   const std::vector<AttributeIdentifier>& sphereAttribs,
+											   const std::optional<std::function<bool(WorldContainer&, Object&, u32)>> lodLoader = std::nullopt);
 
 	// Get access to the existing objects in the scene (subset from the world)
 	const util::FixedHashMap<ObjectHandle, InstanceRef>& get_objects() const noexcept {

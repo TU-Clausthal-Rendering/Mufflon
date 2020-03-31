@@ -779,24 +779,22 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 		if(instIter != instanceLods.end())
 			instIter->second.handle = instHdl;
 
-		// We now have a valid instance: time to check if we have the required LoD
-		// Only do so for non-animated instances though to avoid loading all LoDs into memory
-		if((m_keepTrackOfAabb || keyframe == 0xFFFFFFFF) && !object_has_lod(m_objects[objId].objHdl, lod)) {
-			// We don't -> gotta load it
-			lod = read_lod(m_objects[objId], lod);
-		}
+		// Here was the point where we previously would have loaded in the referenced LoD
+		// However, since initial reduction may be needed to load in large scenes,
+		// it is non-sensical to not fetch them on demand (except for negligibly small
+		// scenes, where it doesn't matter anyway).
+
 
 		if(!instance_set_transformation_matrix(m_mffInstHdl, instHdl, &transMat, m_loadWorldToInstTrans))
 			throw std::runtime_error("Failed to set transformation matrix for instance of object ID "
 									 + std::to_string(objId));
-
-		if(m_keepTrackOfAabb) {
-			ei::Box instanceAabb;
-			if(!instance_get_bounding_box(m_mffInstHdl, instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
-				throw std::runtime_error("Failed to get bounding box for instance of object ID "
-										 + std::to_string(objId));
-			m_aabb = ei::Box(m_aabb, instanceAabb);
-		}
+		// We manually calculate the bounding box so that we don't have to actually
+		// load in the LoD, which we would if we'd use the regular interface
+		const auto instToWorld = m_loadWorldToInstTrans
+			? ei::Mat3x4{ ei::invert(ei::Mat4x4{ util::pun<ei::Mat3x4>(transMat) })}
+			: util::pun<ei::Mat3x4>(transMat);
+		const auto instanceAabb = ei::transform(m_objects[objId].aabb, instToWorld);
+		m_aabb = ei::Box(m_aabb, instanceAabb);
 
 		hasInstance[objId] = true;
 	}
@@ -837,13 +835,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 					read_lod(m_objects[i], lod);
 				}
 
-				if(m_keepTrackOfAabb) {
-					ei::Box instanceAabb;
-					if(!instance_get_bounding_box(m_mffInstHdl, instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
-						throw std::runtime_error("Failed to get bounding box for instance of object ID "
-												 + std::to_string(i));
-					m_aabb = ei::Box(m_aabb, instanceAabb);
-				}
+				m_aabb = ei::Box(m_aabb, m_objects[i].aabb);
 				++defaultCreatedInstances;
 			}
 		}
@@ -952,10 +944,9 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 							 const util::FixedHashMap<StringView, mufflon::u32>& objectLods,
 							 util::FixedHashMap<StringView, InstanceMapping>& instanceLods,
 							 const bool deinstance, const bool loadWorldToInstTrans,
-							 const bool keepTrackOfAabb, const bool noDefaultInstances) {
+							 const bool noDefaultInstances) {
 	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::load_file");
 	m_loadWorldToInstTrans = loadWorldToInstTrans;
-	m_keepTrackOfAabb = keepTrackOfAabb;
 	m_filePath = std::move(file);
 	if(!fs::exists(m_filePath))
 		throw std::runtime_error("Binary file '" + m_filePath.u8string() + "' doesn't exist");

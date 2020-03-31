@@ -27,8 +27,8 @@
 namespace mufflon { namespace scene {
 
 Scene::Scene(WorldContainer& world, const Scenario& scenario, const u32 frame,
-			 util::FixedHashMap<ObjectHandle, InstanceRef>&& objects,
-			 std::vector<InstanceHandle>&& instances,
+			 const ei::Box& aabb, util::FixedHashMap<ObjectHandle,
+			 InstanceRef>&& objects, std::vector<InstanceHandle>&& instances,
 			 const std::vector<ei::Mat3x4>& worldToInstanceTransformation,
 			 const Bone* bones) :
 	m_world{ world },
@@ -38,32 +38,8 @@ Scene::Scene(WorldContainer& world, const Scenario& scenario, const u32 frame,
 	m_instances{ std::move(instances) },
 	m_worldToInstanceTransformation{ worldToInstanceTransformation },
 	m_bones{ bones },
-	m_boundingBox{}
-{
-	// Compute preliminary bounding box so we have something for the light tree
-	std::vector<ei::Box> threadAabbs(get_max_thread_num(), []() {
-		ei::Box aabb{};
-		aabb.min = ei::Vec3{ std::numeric_limits<float>::max() };
-		aabb.max = ei::Vec3{ -std::numeric_limits<float>::max() };
-		return aabb;
-	}());
-	const auto instanceCount = static_cast<i32>(m_instances.size());
-#pragma PARALLEL_FOR
-	for(i32 i = 0; i < instanceCount; ++i) {
-		const auto inst = m_instances[i];
-		const u32 instanceLod = m_scenario.get_effective_lod(inst);
-		const auto& worldToInst = m_worldToInstanceTransformation[i];
-		const auto instToWorld = InstanceData<Device::CPU>::compute_instance_to_world_transformation(worldToInst);
-		threadAabbs[get_current_thread_idx()] = ei::Box{
-			threadAabbs[get_current_thread_idx()],
-			inst->get_bounding_box(instanceLod, instToWorld)
-		};
-	}
-	m_boundingBox.min = ei::Vec3{ std::numeric_limits<float>::max() };
-	m_boundingBox.max = ei::Vec3{ -std::numeric_limits<float>::max() };
-	for(const auto& box : threadAabbs)
-		m_boundingBox = ei::Box{ m_boundingBox, box };
-}
+	m_boundingBox{ aabb }
+{}
 
 bool Scene::is_sane() const noexcept {
 	if(m_scenario.get_camera() == nullptr) {
@@ -134,7 +110,8 @@ void Scene::load_materials() {
 template < Device dev >
 const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIdentifier>& vertexAttribs,
 												  const std::vector<AttributeIdentifier>& faceAttribs,
-												  const std::vector<AttributeIdentifier>& sphereAttribs) {
+												  const std::vector<AttributeIdentifier>& sphereAttribs,
+												  const std::optional<std::function<bool(WorldContainer&, Object&, u32)>> lodLoader) {
 	synchronize<dev>();
 	SceneDescriptor<dev>& sceneDescriptor = m_descStore.template get<SceneDescriptor<dev>>();
 	if constexpr(dev == Device::OPENGL) {
@@ -262,13 +239,16 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 				// Now we can do the per-LoD things like displacement mapping and fetching descriptors
 				if(prevLevel != std::numeric_limits<u32>::max())
 					lodDescs[currLodIndex - 1u].next = i;
+				// TODO: option to pre-reduce!
+				if(!(lodLoader.has_value() ? (*lodLoader)(m_world, *obj.first, i) : m_world.load_lod(*obj.first, i)))
+					throw std::runtime_error("Failed to load missing LoD for scene descriptor!");
 				Lod* lod = &obj.first->get_lod(i);
 
 				// Reanimate the LoD if necessary
 				if(lod->has_bone_animation()) {
 					if(lod->was_animated() && lod->get_frame() != m_frame) {
 						obj.first->remove_lod(i);
-						if(!m_world.load_lod(*obj.first, i))
+						if(!(lodLoader.has_value() ? (*lodLoader)(m_world, *obj.first, i) : m_world.load_lod(*obj.first, i)))
 							throw std::runtime_error("Failed to re-load LoD for animation.");
 						lod = &obj.first->get_lod(i);
 					}
@@ -534,7 +514,7 @@ bool Scene::retessellate(const float tessLevel) {
 			// Check if we have displacement or plain tessellation
 			Lod* lod = &obj.first->get_lod(mapping.first);
 
-			if(lod->is_displaced(m_scenario)) {
+			if(lod->is_displaced(m_scenario.get_displaced_mat_indices())) {
 				// First get the relevant instance transformations
 				instTrans.clear();
 				/*for(InstanceHandle inst : mapping.second)
@@ -554,7 +534,7 @@ bool Scene::retessellate(const float tessLevel) {
 				}
 				lod->displace(tess, m_scenario);
 				performedTessellation = true;
-				needLighttreeRebuild |= lod->is_emissive(m_scenario);
+				needLighttreeRebuild |= lod->is_emissive(m_scenario.get_emissive_mat_indices());
 			} else {
 				// We may not have displacement mapping, but still may wanna tessellate the object
 				const auto objTessInfo = m_scenario.get_tessellation_info(obj.first);
@@ -581,7 +561,7 @@ bool Scene::retessellate(const float tessLevel) {
 						lod->tessellate(oracle, nullptr, objTessInfo->usePhong);
 					}
 					performedTessellation = true;
-					needLighttreeRebuild |= lod->is_emissive(m_scenario);
+					needLighttreeRebuild |= lod->is_emissive(m_scenario.get_emissive_mat_indices());
 				}
 			}
 		}
@@ -627,12 +607,15 @@ template void Scene::update_camera_medium<Device::CUDA>(SceneDescriptor<Device::
 template void Scene::update_camera_medium<Device::OPENGL>(SceneDescriptor<Device::OPENGL>& descriptor);
 template const SceneDescriptor<Device::CPU>& Scene::get_descriptor<Device::CPU>(const std::vector<AttributeIdentifier>&,
 																				const std::vector<AttributeIdentifier>&,
-																				const std::vector<AttributeIdentifier>&);
+																				const std::vector<AttributeIdentifier>&,
+																				const std::optional<std::function<bool(WorldContainer&, Object&, u32)>>);
 template const SceneDescriptor<Device::CUDA>& Scene::get_descriptor<Device::CUDA>(const std::vector<AttributeIdentifier>&,
 																				  const std::vector<AttributeIdentifier>&,
-																				  const std::vector<AttributeIdentifier>&);
+																				  const std::vector<AttributeIdentifier>&,
+																				  const std::optional<std::function<bool(WorldContainer&, Object&, u32)>>);
 template const SceneDescriptor<Device::OPENGL>& Scene::get_descriptor<Device::OPENGL>(const std::vector<AttributeIdentifier>&,
 																					  const std::vector<AttributeIdentifier>&,
-																					  const std::vector<AttributeIdentifier>&);
+																					  const std::vector<AttributeIdentifier>&,
+																					  const std::optional<std::function<bool(WorldContainer&, Object&, u32)>>);
 
 }} // namespace mufflon::scene

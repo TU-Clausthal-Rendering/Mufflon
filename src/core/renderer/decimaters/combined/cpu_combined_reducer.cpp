@@ -2,11 +2,42 @@
 #include "combined_gathering.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include <random>
+#include <OpenMesh/Tools/Decimater/DecimaterT.hh>
+#include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
 
 namespace mufflon::renderer::decimaters {
 
+bool CpuCombinedReducer::custom_lod_loader(scene::WorldContainer& world, scene::Object& object, const u32 lodIndex) const {
+	if(!world.load_lod(object, lodIndex))
+		return false;
+
+	if(m_params.initialReduction > 0.f) {
+		if(object.has_reduced_lod_available(lodIndex))
+			return true;
+		const auto& origLod = object.get_original_lod(lodIndex);
+		const auto& origPolys = origLod.template get_geometry<scene::geometry::Polygons>();
+		if(origPolys.get_vertex_count() < m_params.threshold)
+			return true;
+		auto& lod = object.add_reduced_lod(lodIndex);
+		auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+		// Pre-reduce
+		auto decimater = polygons.create_decimater();
+		OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
+		decimater.add(modQuadricHandle);
+		// Possibly repeat until we reached the desired count
+		const auto collapses = static_cast<std::size_t>((1.f - m_params.initialReduction) * static_cast<float>(origPolys.get_vertex_count()));
+		const auto targetVertexCount = origPolys.get_vertex_count() - collapses;
+		const auto performedCollapses = polygons.decimate(decimater, targetVertexCount, true);
+		logInfo("Loaded reduced LoD '", object.get_name(), "' (", origPolys.get_vertex_count(), " -> ", polygons.get_vertex_count(), ")");
+		lod.clear_accel_structure();
+		object.remove_original_lod(lodIndex);
+	}
+	return true;
+}
+
 CpuCombinedReducer::CpuCombinedReducer(mufflon::scene::WorldContainer& world) :
-	RendererBase<Device::CPU, combined::CombinedTargets>{ world }
+	RendererBase<Device::CPU, combined::CombinedTargets>{ world, std::bind(&CpuCombinedReducer::custom_lod_loader, this, std::placeholders::_1,
+																		   std::placeholders::_2, std::placeholders::_3) }
 {
 	std::random_device rndDev;
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));

@@ -354,7 +354,7 @@ CORE_API Boolean CDECL mufflon_get_pixel_info(MufflonInstanceHdl instHdl, uint32
 
 // World loading/clearing
 CORE_API void CDECL world_clear_all(MufflonInstanceHdl instHdl);
-CORE_API Boolean CDECL world_finalize(MufflonInstanceHdl instHdl, const char** msg);
+CORE_API Boolean CDECL world_finalize(MufflonInstanceHdl instHdl, const Vec3 min, const Vec3 max, const char** msg);
 
 // Polygon interface
 CORE_API Boolean CDECL polygon_reserve(LodHdl lvlDtl, size_t vertices, size_t edges, size_t tris, size_t quads);
@@ -513,7 +513,7 @@ CORE_API ScenarioHdl CDECL world_find_scenario(MufflonInstanceHdl instHdl, const
 CORE_API uint32_t CDECL world_get_scenario_count(MufflonInstanceHdl instHdl);
 CORE_API ScenarioHdl CDECL world_get_scenario_by_index(MufflonInstanceHdl instHdl, uint32_t index);
 CORE_API ConstScenarioHdl CDECL world_get_current_scenario(MufflonInstanceHdl instHdl);
-CORE_API Boolean CDECL world_finalize_scenario(MufflonInstanceHdl instHdl, ConstScenarioHdl scenario, const char** msg);
+CORE_API Boolean CDECL world_finalize_scenario(MufflonInstanceHdl instHdl, ScenarioHdl scenario, const char** msg);
 CORE_API SceneHdl CDECL world_load_scenario(MufflonInstanceHdl instHdl, ScenarioHdl scenario);
 CORE_API const char* CDECL scenario_get_name(ScenarioHdl scenario);
 CORE_API LodLevel CDECL scenario_get_global_lod_level(ScenarioHdl scenario);

@@ -7,6 +7,25 @@
 
 namespace mufflon::scene {
 
+namespace {
+
+template < class I1, class I2 >
+constexpr bool sorted_share_elements(const I1 beginA, const I1 endA, const I2 beginB, const I2 endB) noexcept {
+	auto currA = beginA;
+	auto currB = beginB;
+	while(currA != endA && currB != endB) {
+		if(*currA == *currB)
+			return true;
+		if(*currA < *currB)
+			++currA;
+		else
+			++currB;
+	}
+	return false;
+}
+
+} // namespace
+
 void Lod::clear_accel_structure() {
 	m_accelStruct.mark_invalid();
 }
@@ -36,28 +55,34 @@ LodDescriptor<dev> Lod::get_descriptor(const bool allowSerialBvhBuild) {
 	desc.accelStruct = m_accelStruct.acquire_const<dev>();
 	return desc;
 }
-void Lod::update_flags(const Scenario& scenario, std::unordered_set<MaterialIndex>& uniqueMatCache) {
-	auto& polys = this->template get_geometry<geometry::Polygons>();
-	auto& spheres = this->template get_geometry<geometry::Spheres>();
 
-	// Collect the unique material indices of the LoD
+void Lod::update_material_indices() noexcept {
+	auto& polys = m_geometry.template get<geometry::Polygons>();
+	auto& spheres = m_geometry.template get<geometry::Spheres>();
+
+	m_uniqueMatIndices.clear();
+	m_uniqueMatIndices.reserve(polys.get_face_count() + spheres.get_sphere_count());
 	const auto* polyMatIndices = polys.template acquire_const<Device::CPU, MaterialIndex>(polys.get_material_indices_hdl());
 	const auto* sphereMatIndices = spheres.template acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
-	uniqueMatCache.clear();
 	for(std::size_t i = 0u; i < polys.get_face_count(); ++i)
-		uniqueMatCache.insert(polyMatIndices[i]);
+		m_uniqueMatIndices.push_back(polyMatIndices[i]);
 	for(std::size_t i = 0u; i < spheres.get_sphere_count(); ++i)
-		uniqueMatCache.insert(sphereMatIndices[i]);
+		m_uniqueMatIndices.push_back(sphereMatIndices[i]);
+	std::sort(m_uniqueMatIndices.begin(), m_uniqueMatIndices.end());
+	const auto end = std::unique(m_uniqueMatIndices.begin(), m_uniqueMatIndices.end());
+	m_uniqueMatIndices.resize(end - m_uniqueMatIndices.begin());
+}
 
-	// Now check for each scenario if it is emissive and/or displaced
-	// and flag the LoD accordingly
-	for(const auto mat : uniqueMatCache) {
-		const auto* material = scenario.get_assigned_material(mat);
-		if(material->get_properties().is_emissive())
-			m_flags |= (1llu << static_cast<u64>(2u * scenario.get_index()));
-		if(material->get_displacement_map() != nullptr)
-			m_flags |= (1llu << static_cast<u64>(2u * scenario.get_index() + 1u));
-	}
+bool Lod::is_emissive(const std::vector<MaterialIndex>& emissiveMatIndices) const noexcept {
+	mAssert(!m_uniqueMatIndices.empty());
+	return sorted_share_elements(emissiveMatIndices.cbegin(), emissiveMatIndices.cend(),
+								 m_uniqueMatIndices.cbegin(), m_uniqueMatIndices.cend());
+}
+// Is there any displaced polygon in this object
+bool Lod::is_displaced(const std::vector<MaterialIndex>& displacedMatIndices) const noexcept {
+	mAssert(!m_uniqueMatIndices.empty());
+	return sorted_share_elements(displacedMatIndices.cbegin(), displacedMatIndices.cend(),
+								 m_uniqueMatIndices.cbegin(), m_uniqueMatIndices.cend());
 }
 
 void Lod::displace(tessellation::TessLevelOracle& tessellater, const Scenario& scenario) {
@@ -84,6 +109,20 @@ void Lod::update_attribute_descriptor(LodDescriptor<dev>& descriptor,
 	m_geometry.get<geometry::Spheres>().update_attribute_descriptor<dev>(descriptor.spheres, sphereAttribs);
 }
 
+void Lod::apply_animation(u32 frame, const Bone* bones) {
+	if(!has_bone_animation()) return;
+	if(m_appliedFrame == frame) return;
+	if(m_appliedFrame != ~0u)
+		logWarning("[Lod::apply_animation] There is a different animation frame applied. The new animation will be made on top of that.");
+	bool hasChanged = false;
+	m_geometry.for_each([&hasChanged, frame, bones](auto& elem) {
+		hasChanged |= elem.apply_animation(frame, bones);
+	});
+	if(hasChanged)
+		m_accelStruct.mark_invalid();
+	m_appliedFrame = frame;
+}
+
 template LodDescriptor<Device::CPU> Lod::get_descriptor<Device::CPU>(const bool allowSerialBvhBuild);
 template LodDescriptor<Device::CUDA> Lod::get_descriptor<Device::CUDA>(const bool allowSerialBvhBuild);
 template LodDescriptor<Device::OPENGL> Lod::get_descriptor<Device::OPENGL>(const bool allowSerialBvhBuild);
@@ -99,19 +138,5 @@ template void Lod::update_attribute_descriptor<Device::OPENGL>(LodDescriptor<Dev
 																const std::vector<AttributeIdentifier>&,
 																const std::vector<AttributeIdentifier>&,
 																const std::vector<AttributeIdentifier>&);
-
-void Lod::apply_animation(u32 frame, const Bone* bones) {
-	if(!has_bone_animation()) return;
-	if(m_appliedFrame == frame) return;
-	if(m_appliedFrame != ~0u)
-		logWarning("[Lod::apply_animation] There is a different animation frame applied. The new animation will be made on top of that.");
-	bool hasChanged = false;
-	m_geometry.for_each([&hasChanged, frame, bones](auto& elem) {
-		hasChanged |= elem.apply_animation(frame, bones);
-	});
-	if(hasChanged)
-		m_accelStruct.mark_invalid();
-	m_appliedFrame = frame;
-}
 
 } // namespace mufflon::scene

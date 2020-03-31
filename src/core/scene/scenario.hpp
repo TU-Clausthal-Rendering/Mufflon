@@ -60,6 +60,14 @@ public:
 	void assign_material(MaterialIndex index, MaterialHandle material);
 	// Find out if and which material is assigned to a slot. Returns nullptr if nothing is assigned.
 	MaterialHandle get_assigned_material(MaterialIndex index) const;
+	void finalize() noexcept;
+
+	const std::vector<MaterialIndex>& get_emissive_mat_indices() const noexcept {
+		return m_sortedEmissiveMatIndices;
+	}
+	const std::vector<MaterialIndex>& get_displaced_mat_indices() const noexcept {
+		return m_sortedDisplacedMatIndices;
+	}
 
 	// Getter/setters for global LoD level
 	u32 get_global_lod_level() const noexcept {
@@ -212,6 +220,8 @@ private:
 	// for lookups -> uses a map).
 	util::StringPool& m_namePool;
 	util::FixedHashMap<StringView, MaterialIndex> m_materialIndices;
+	std::vector<MaterialIndex> m_sortedEmissiveMatIndices;
+	std::vector<MaterialIndex> m_sortedDisplacedMatIndices;
 	// Map an index to a material including all its names.
 	std::vector<MaterialDesc> m_materialAssignment;
 	// All lights which are enabled in this scenario

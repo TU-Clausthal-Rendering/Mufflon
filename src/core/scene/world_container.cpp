@@ -27,7 +27,8 @@ bool WorldContainer::set_frame_current(const u32 frameCurrent) {
 	return false;
 }
 
-WorldContainer::Sanity WorldContainer::finalize_world() const {
+WorldContainer::Sanity WorldContainer::finalize_world(const ei::Box& aabb) {
+	m_aabb = aabb;
 	// Check for objects
 	if(m_instances.empty())
 		return Sanity::NO_INSTANCES;
@@ -54,52 +55,25 @@ WorldContainer::Sanity WorldContainer::finalize_world() const {
 }
 
 
-WorldContainer::Sanity WorldContainer::finalize_scenario(ConstScenarioHandle hdl) {
-	bool hasEmitters = false;
+WorldContainer::Sanity WorldContainer::finalize_scenario(ScenarioHandle hdl) {
+	hdl->finalize();
+
 	bool hasObjects = false;
-
-	// First update the flags for each LoD
-	std::unordered_set<MaterialIndex> uniqueMatIndices;
-	uniqueMatIndices.reserve(m_materials.size());
-
-	for(auto& obj : m_objects) {
-		for(u32 l = 0u; l < static_cast<u32>(obj.second.get_lod_slot_count()); ++l) {
-			if(!obj.second.has_original_lod_available(l))
-				continue;
-			auto& lod = obj.second.get_original_lod(l);
-			lod.update_flags(*hdl, uniqueMatIndices);
-		}
-	}
-
 	// Check for objects (and check for emitters as well)
-	// Gotta check both animated and stationary instances
+	// Gotta check both animated and stationary instances.
+	// We don't check for emitters anymore since it is
+	// impossible to do so without loading in at least
+	// all LoDs' material indices
 	for(const auto& instance : m_instances) {
 		if(hdl->is_masked(&instance))
 			continue;
 
 		hasObjects = true;
-		const Object& object = instance.get_object();
-		const u32 lodLevel = hdl->get_effective_lod(&instance);
-		if(object.has_original_lod_available(lodLevel)) {
-			const Lod& lod = object.get_original_lod(lodLevel);
-			if(lod.is_emissive(*hdl)) {
-				hasEmitters = true;
-				break;
-			}
-		} else {
-			// TODO: how could we possibly check this?
-			hasEmitters = true;
-			break;
-		}
+		break;
 	}
 
 	if(!hasObjects)
 		return Sanity::NO_OBJECTS;
-	// Check for lights
-	if(!hasEmitters && hdl->get_point_lights().empty() && hdl->get_spot_lights().empty()
-	   && hdl->get_dir_lights().empty() && (m_envLights.get(hdl->get_background()).get_type() == lights::BackgroundType::COLORED
-											&& ei::prod(m_envLights.get(hdl->get_background()).get_monochrom_color()) == 0))
-		return Sanity::NO_LIGHTS;
 	// Check for camera
 	if(hdl->get_camera() == nullptr)
 		return Sanity::NO_CAMERA;
@@ -711,11 +685,7 @@ bool WorldContainer::load_lod(Object& obj, const u32 lodIndex) {
 	if(!obj.has_original_lod_available(lodIndex)) {
 		if(!m_loadLod(m_loadLodUserParams, &obj, lodIndex))
 			return false;
-		// Update the flags for this LoD
-		std::unordered_set<MaterialIndex> uniqueMatIndices;
-		uniqueMatIndices.reserve(m_materials.size());
-		for(const auto& scenario : m_scenarios)
-			obj.get_original_lod(lodIndex).update_flags(scenario.second, uniqueMatIndices);
+		obj.get_original_lod(lodIndex).update_material_indices();
 	}
 	return true;
 }
@@ -797,8 +767,6 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		instanceHandles[index] = &inst;
 		++iter->second.count;
 		const auto lod = m_scenario->get_effective_lod(&inst);
-		if(!load_lod(*iter->first, lod))
-			throw std::runtime_error("Failed to load LoD from disk while loading scene");
 	}
 	for(std::size_t i = 0u; i < animatedInstCount; ++i) {
 		const auto instanceIndex = animatedInstOffset + i;
@@ -815,11 +783,9 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		instanceHandles[index] = &inst;
 		++iter->second.count;
 		const auto lod = m_scenario->get_effective_lod(&inst);
-		if(!load_lod(*iter->first, lod))
-			throw std::runtime_error("Failed to load LoD from disk while loading scene");
 	}
 
-	m_scene = std::make_unique<Scene>(*this, scenario, m_frameCurrent,
+	m_scene = std::make_unique<Scene>(*this, scenario, m_frameCurrent, m_aabb,
 									  std::move(objInstRef), std::move(instanceHandles),
 									  m_worldToInstanceTrans, get_current_keyframe());
 
@@ -899,9 +865,15 @@ bool WorldContainer::load_scene_lights() {
 			const auto endIndex = obj.second.offset + obj.second.count;
 			for(std::size_t idx = obj.second.offset; idx < endIndex; ++idx) {
 				InstanceHandle inst = instances[idx];
-				mAssertMsg(obj.first->has_lod(m_scenario->get_effective_lod(inst)), "Instance references LoD that doesn't exist");
+				const auto lodIndex = m_scenario->get_effective_lod(inst);
+				// We fetch emissive LoDs here because we need the primitive information for the light tree.
+				// Ideally, we'd be able to reduce emissive meshes as well, but for now that's not possible.
+				continue;
+				// TODO:!
+				load_lod(*obj.first, lodIndex);
+				mAssertMsg(obj.first->has_lod(), "Instance references LoD that doesn't exist");
 				Lod& lod = obj.first->get_lod(m_scenario->get_effective_lod(inst));
-				if(!lod.is_emissive(*m_scenario))
+				if(!lod.is_emissive(m_scenario->get_emissive_mat_indices()))
 					continue;
 
 				i32 primIdx = 0;

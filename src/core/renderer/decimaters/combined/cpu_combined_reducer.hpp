@@ -42,6 +42,7 @@ private:
 	void initialize_decimaters();
 	void display_importance(const bool accumulated = false);
 	double get_lod_importance(const u32 frame, const scene::Scene::InstanceRef obj) const noexcept;
+	bool custom_lod_loader(scene::WorldContainer& world, scene::Object& object, const u32 lodIndex) const;
 
 	combined::CombinedParameters m_params = {};
 	std::vector<math::Rng> m_rngs;

@@ -37,7 +37,7 @@ public:
 				   const mufflon::util::FixedHashMap<mufflon::StringView, mufflon::u32>& objectLods,
 				   mufflon::util::FixedHashMap<mufflon::StringView, InstanceMapping>& instanceLods,
 				   const bool deinstance, const bool loadWorldToInstTrans,
-				   const bool keepTrackOfAabb, const bool noDefaultInstances);
+				   const bool noDefaultInstances);
 
 	void load_lod(const fs::path& file, ObjectHdl obj, mufflon::u32 objId, mufflon::u32 lod);
 
@@ -230,7 +230,6 @@ private:
 
 	// These are for aborting a load and keeping track of progress
 	bool m_loadWorldToInstTrans = false;
-	bool m_keepTrackOfAabb = true;
 	std::atomic_bool m_abort = false;
 	std::string& m_loadingStage;
 };

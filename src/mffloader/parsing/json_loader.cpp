@@ -1132,7 +1132,7 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 	const bool noDefaultInstances = read_opt<bool>(m_state, document, "noDefaultInstances", false);
 	// Load the binary file before we load the rest of the JSON
 	if(!m_binLoader.load_file(binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods,
-							  deinstance, hasWorldToInstTrans, !m_absoluteCamNearFar, noDefaultInstances))
+							  deinstance, hasWorldToInstTrans, noDefaultInstances))
 		return false;
 
 	try {
@@ -1151,7 +1151,8 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 		// Before we load scenarios, perform a sanity check for the currently loaded world
 		const char* sanityMsg = "";
 		sprintf(m_loadingStage.data(), "Checking world sanity%c", '\0');
-		if(!world_finalize(m_mffInstHdl, &sanityMsg))
+		if(!world_finalize(m_mffInstHdl, util::pun<Vec3>(m_binLoader.get_bounding_box().min),
+						   util::pun<Vec3>(m_binLoader.get_bounding_box().max), &sanityMsg))
 			throw std::runtime_error("World did not pass sanity check: " + std::string(sanityMsg));
 		// Scenarios
 		m_state.current = ParserState::Level::ROOT;

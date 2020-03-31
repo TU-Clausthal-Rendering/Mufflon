@@ -1790,11 +1790,11 @@ SceneHdl world_get_current_scene(MufflonInstanceHdl instHdl) {
 	CATCH_ALL(nullptr)
 }
 
-Boolean world_finalize(MufflonInstanceHdl instHdl, const char** msg) {
+Boolean world_finalize(MufflonInstanceHdl instHdl, const Vec3 min, const Vec3 max, const char** msg) {
 	TRY
 	CHECK_NULLPTR(instHdl, "mufflon instance", false);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
-	switch(muffInst.world.finalize_world()) {
+	switch(muffInst.world.finalize_world(ei::Box{ util::pun<ei::Vec3>(min), util::pun<ei::Vec3>(max) })) {
 		case WorldContainer::Sanity::SANE: *msg = "";  return true;
 		case WorldContainer::Sanity::NO_CAMERA: *msg = "No camera"; return false;
 		case WorldContainer::Sanity::NO_INSTANCES: *msg = "No instances"; return false;
@@ -2900,12 +2900,12 @@ Boolean scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 	CATCH_ALL(false)
 }
 
-Boolean world_finalize_scenario(MufflonInstanceHdl instHdl, ConstScenarioHdl scenario, const char** msg) {
+Boolean world_finalize_scenario(MufflonInstanceHdl instHdl, ScenarioHdl scenario, const char** msg) {
 	TRY
 	CHECK_NULLPTR(instHdl, "mufflon instance", false);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(scenario, "scenario handle", false);
-	switch(muffInst.world.finalize_scenario(static_cast<ConstScenarioHandle>(scenario))) {
+	switch(muffInst.world.finalize_scenario(static_cast<ScenarioHandle>(scenario))) {
 		case WorldContainer::Sanity::SANE: *msg = "";  return true;
 		case WorldContainer::Sanity::NO_CAMERA: *msg = "No camera"; return false;
 		case WorldContainer::Sanity::NO_INSTANCES: *msg = "No instances"; return false;

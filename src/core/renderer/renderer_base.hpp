@@ -21,13 +21,15 @@ public:
 	static constexpr Device DEVICE = dev;
 
 	RendererBase(mufflon::scene::WorldContainer& world,
+				 std::optional<std::function<bool(scene::WorldContainer&, scene::Object&, u32)>> lodLoader = std::nullopt,
 				 std::vector<::mufflon::scene::AttributeIdentifier> vertexAttribs = {},
 				 std::vector<::mufflon::scene::AttributeIdentifier> faceAttribs = {},
 				 std::vector<::mufflon::scene::AttributeIdentifier> sphereAttribs = {}) :
 		IRenderer{ world },
 		m_vertexAttribs(std::move(vertexAttribs)),
 		m_faceAttribs(std::move(faceAttribs)),
-		m_sphereAttribs(std::move(sphereAttribs))
+		m_sphereAttribs(std::move(sphereAttribs)),
+		m_customLodLoader{ lodLoader }
 	{
 		if constexpr(dev == Device::CUDA)
 			m_sceneDesc = make_udevptr<Device::CUDA, mufflon::scene::SceneDescriptor<Device::CUDA>>();
@@ -47,10 +49,10 @@ public:
 			if(this->m_currentScene == nullptr)
 				throw std::runtime_error("No scene is set!");
 			if constexpr(dev == Device::CUDA) {
-				auto desc = this->m_currentScene->template get_descriptor<dev>(m_vertexAttribs, m_faceAttribs, m_sphereAttribs);
+				auto desc = this->m_currentScene->template get_descriptor<dev>(m_vertexAttribs, m_faceAttribs, m_sphereAttribs, m_customLodLoader);
 				copy(m_sceneDesc.get(), &desc, sizeof(desc));
 			} else {
-				m_sceneDesc = this->m_currentScene->template get_descriptor<dev>(m_vertexAttribs, m_faceAttribs, m_sphereAttribs);
+				m_sceneDesc = this->m_currentScene->template get_descriptor<dev>(m_vertexAttribs, m_faceAttribs, m_sphereAttribs, m_customLodLoader);
 			}
 			this->clear_reset();
 			return true;
@@ -78,6 +80,9 @@ protected:
 	// CPU gets the descriptor directly, everyone else gets a unique_ptr
 	std::conditional_t<DEVICE == Device::CPU || DEVICE == Device::OPENGL, scene::SceneDescriptor<DEVICE>,
 		unique_device_ptr<DEVICE, scene::SceneDescriptor<DEVICE>>> m_sceneDesc;
+
+	// LoD-loader function, by default we don't provide any custom one
+	std::optional<std::function<bool(scene::WorldContainer&, scene::Object&, u32)>> m_customLodLoader;
 };
 
 } // namespace mufflon::renderer

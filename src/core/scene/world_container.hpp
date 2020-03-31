@@ -67,10 +67,10 @@ public:
 	// Reserves animation data. Must have no prior bones added.
 	void reserve_animation(const u32 numBones, const u32 frameCount);
 	// Performs sanity check and marks the end of a loading/modifying process
-	Sanity finalize_world() const;
+	Sanity finalize_world(const ei::Box& aabb);
 	// Performs a sanity check for a given scenario (respects object masking etc.)
 	// while also finalizing it (no more changes allowed)
-	Sanity finalize_scenario(ConstScenarioHandle hdl);
+	Sanity finalize_scenario(ScenarioHandle hdl);
 	// Loads the specified scenario.
 	// This destroys the currently loaded scene and overwrites it with a new one.
 	// Returns nullptr if something goes wrong.
@@ -218,6 +218,7 @@ private:
 	std::vector<ei::Mat3x4> m_worldToInstanceTrans;
 	// Stores the start/end instance indices for each frame
 	std::vector<std::pair<u32, u32>> m_frameInstanceIndices;
+	ei::Box m_aabb;
 
 	// TODO: for improved heap allocation, this should be a single vector/map
 	//std::vector<std::vector<std::unique_ptr<Instance>>> m_animatedInstances;

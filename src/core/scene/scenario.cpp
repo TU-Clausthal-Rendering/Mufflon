@@ -1,3 +1,4 @@
+
 #include "scenario.hpp"
 #include "world_container.hpp"
 #include "util/log.hpp"
@@ -13,6 +14,18 @@ Scenario::Scenario(const u32 index,
 	m_namePool{ namePool }
 {
 	this->remove_background();
+}
+
+void Scenario::finalize() noexcept {
+	// Compute the sorted emissive and displaced material indices
+	m_sortedDisplacedMatIndices.clear();
+	m_sortedEmissiveMatIndices.clear();
+	for(std::size_t i = 0u; i < m_materialAssignment.size(); ++i) {
+		if(m_materialAssignment[i].material->get_properties().is_emissive())
+			m_sortedEmissiveMatIndices.push_back(static_cast<MaterialIndex>(i));
+		if(m_materialAssignment[i].material->get_displacement_map() != nullptr)
+			m_sortedDisplacedMatIndices.push_back(static_cast<MaterialIndex>(i));
+	}
 }
 
 void Scenario::reserve_material_slots(const std::size_t count) {

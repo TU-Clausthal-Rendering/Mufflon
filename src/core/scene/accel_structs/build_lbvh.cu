@@ -719,7 +719,7 @@ void LBVHBuilder::build_lbvh(const DescType& desc,
 		// TODO: re-enable this when bugs are fixed (see issue #124)
 		// Having this run in parallel leads to differing values from single-threaded run
 		// and potentially to a broken BVH
-//#pragma PARALLEL_FOR_COND(parallelize)
+#pragma PARALLEL_FOR_COND(parallelize)
 		for(i32 idx = 0; idx < usedPrimCount; idx++) {
 			calculate_bounding_boxes(desc, idx, primIds[idx],
 									 usedPrimCount, parents.get(), boundingBoxes.get(),
