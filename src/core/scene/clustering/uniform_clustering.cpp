@@ -38,7 +38,7 @@ u32 compute_cluster_center(const Iter begin, const Iter end) {
 } // namespace
 
 // Cluster for vertex clustering
-struct VertexCluster {
+struct UniformVertexCluster {
 	ei::Vec3 posAccum{ 0.f };
 	u32 count{ 0u };
 	OpenMesh::Geometry::Quadricd q{};
@@ -55,7 +55,7 @@ std::size_t UniformVertexClusterer::cluster(geometry::PolygonMeshType& mesh, con
 
 	// we have to track a few things per cluster
 	const auto gridRes = m_gridRes;
-	std::vector<VertexCluster> clusters(ei::prod(m_gridRes));
+	std::vector<UniformVertexCluster> clusters(ei::prod(m_gridRes));
 
 	const auto aabbMin = aabb.min;
 	const auto aabbDiag = aabb.max - aabb.min;
@@ -81,6 +81,7 @@ std::size_t UniformVertexClusterer::cluster(geometry::PolygonMeshType& mesh, con
 	for(const auto vertex : mesh.vertices()) {
 		const auto pos = util::pun<ei::Vec3>(mesh.point(vertex));
 		const auto clusterIndex = get_cluster_index(pos);
+		mAssert(clusterIndex < clusters.size());
 		clusters[clusterIndex].add_vertex(pos, mesh.property(quadricProps, vertex));
 	}
 	mesh.remove_property(quadricProps);
@@ -102,7 +103,7 @@ std::size_t UniformVertexClusterer::cluster(geometry::PolygonMeshType& mesh, con
 	}
 
 	std::vector<geometry::PolygonMeshType::HalfedgeHandle> removableHalfedges;
-	removableHalfedges.reserve(mesh.n_vertices() - clusterCount);	// TODO!
+	removableHalfedges.reserve(mesh.n_vertices() - std::min(static_cast<std::size_t>(clusterCount), mesh.n_vertices()));	// TODO!
 	for(const auto vertex : mesh.vertices()) {
 		const auto pos = util::pun<ei::Vec3>(mesh.point(vertex));
 		const auto clusterIndex = get_cluster_index(pos);
@@ -133,13 +134,12 @@ std::size_t UniformVertexClusterer::cluster(geometry::PolygonMeshType& mesh, con
 		removableHalfedges.resize(free);
 	}
 	mesh.garbage_collection();
-	logInfo("Remaining: ", mesh.n_vertices(), " (planned: ", clusterCount, ")");
 	mesh.release_vertex_status();
 	mesh.release_edge_status();
 	mesh.release_face_status();
 
 
-	return mesh.n_vertices();
+		return mesh.n_vertices();
 }
 
 } // namespace mufflon::scene::clustering

@@ -174,12 +174,12 @@ u32 find_clusters_with_max_density(const O& octree, geometry::PolygonMeshType& m
 
 } // namespace
 
-struct VertexCluster {
+struct OctreeVertexCluster {
 	ei::Vec3 posAccum{ 0.f };
 	u32 count{ 0u };
-	OpenMesh::Geometry::Quadricf q{};
+	OpenMesh::Geometry::Quadricd q{};
 
-	void add_vertex(const ei::Vec3& pos, const OpenMesh::Geometry::Quadricf& quadric) noexcept {
+	void add_vertex(const ei::Vec3& pos, const OpenMesh::Geometry::Quadricd& quadric) noexcept {
 		count += 1u;
 		posAccum += pos;
 		q += quadric;
@@ -210,7 +210,7 @@ std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, c
 	// TODO: better bound!
 	printf("Max cluster index: %lu\n", maxIndex);
 	fflush(stdout);
-	std::vector<VertexCluster> clusters(maxIndex + 1u);
+	std::vector<OctreeVertexCluster> clusters(maxIndex + 1u);
 
 	const auto aabbMin = aabb.min;
 	const auto aabbDiag = aabb.max - aabb.min;
@@ -222,7 +222,7 @@ std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, c
 		return m_octree.get_node_index(pos);
 	};
 
-	OpenMesh::VPropHandleT<OpenMesh::Geometry::Quadricf> quadricProps{};
+	OpenMesh::VPropHandleT<OpenMesh::Geometry::Quadricd> quadricProps{};
 	mesh.add_property(quadricProps);
 	if(!quadricProps.is_valid())
 		throw std::runtime_error("failed to add error quadric property");

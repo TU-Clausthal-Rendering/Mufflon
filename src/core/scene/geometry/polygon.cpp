@@ -566,9 +566,9 @@ std::size_t Polygons::cluster_decimate(const renderer::decimaters::FloatOctree& 
 	m_vertexAttributes.mark_changed(Device::CPU);
 	m_faceAttributes.mark_changed(Device::CPU);
 
-	logInfo("Octree-cluster-decimated polygon mesh (", actualDecimations, "/",
-			targetDecimations, " decimations performed; ", m_meshData->n_vertices(),
-			" vertices remaining, ", clusterCount, " cluster centres)");
+	logPedantic("Octree-cluster-decimated polygon mesh (", actualDecimations, "/",
+				targetDecimations, " decimations performed; ", m_meshData->n_vertices(),
+				" vertices remaining, ", clusterCount, " cluster centres)");
 	if(m_meshData->n_vertices() > targetVertices)
 		logWarning("Not enough vertices removed: ", m_meshData->n_vertices(), " > ", targetVertices);
 	return previousVertices - m_meshData->n_vertices();
@@ -598,7 +598,7 @@ std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
 	m_faceAttributes.mark_changed(Device::CPU);
 
 	const auto remainingVertices = std::distance(m_meshData->vertices_sbegin(), m_meshData->vertices_end());
-	logInfo("Uniformly clustered polygon mesh (", remainingVertices, " vertices, ", clusterCount, " cluster centres)");
+	logPedantic("Uniformly clustered polygon mesh (", remainingVertices, " vertices, ", clusterCount, " cluster centres)");
 	return previousVertices - m_meshData->n_vertices();
 }
 
@@ -625,12 +625,12 @@ std::size_t Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>&
 	m_vertexAttributes.mark_changed(Device::CPU);
 	m_faceAttributes.mark_changed(Device::CPU);
 	if(targetVertices == 0) {
-		logInfo("Decimated polygon mesh (", actualDecimations, " decimations performed; ",
-				decimater.mesh().n_vertices() - actualDecimations, " vertices remaining)");
+		logPedantic("Decimated polygon mesh (", actualDecimations, " decimations performed; ",
+					decimater.mesh().n_vertices() - actualDecimations, " vertices remaining)");
 	} else {
-		logInfo("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
-				" decimations performed; ", garbageCollect ? (decimater.mesh().n_vertices()) : (oldVertexCount - actualDecimations),
-				" vertices remaining)");
+		logPedantic("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
+					" decimations performed; ", garbageCollect ? (decimater.mesh().n_vertices()) : (oldVertexCount - actualDecimations),
+					" vertices remaining)");
 	}
 	// TODO: this leaks mesh outside
 
