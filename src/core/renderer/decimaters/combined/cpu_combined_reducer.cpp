@@ -8,6 +8,8 @@
 namespace mufflon::renderer::decimaters {
 
 bool CpuCombinedReducer::custom_lod_loader(scene::WorldContainer& world, scene::Object& object, const u32 lodIndex) const {
+	if(object.has_lod(lodIndex))
+		return true;
 	if(!world.load_lod(object, lodIndex))
 		return false;
 
@@ -25,8 +27,7 @@ bool CpuCombinedReducer::custom_lod_loader(scene::WorldContainer& world, scene::
 		OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
 		decimater.add(modQuadricHandle);
 		// Possibly repeat until we reached the desired count
-		const auto collapses = static_cast<std::size_t>((1.f - m_params.initialReduction) * static_cast<float>(origPolys.get_vertex_count()));
-		const auto targetVertexCount = origPolys.get_vertex_count() - collapses;
+		const auto targetVertexCount = static_cast<std::size_t>((1.f - m_params.initialReduction) * static_cast<float>(origPolys.get_vertex_count()));
 		const auto performedCollapses = polygons.decimate(decimater, targetVertexCount, true);
 		logInfo("Loaded reduced LoD '", object.get_name(), "' (", origPolys.get_vertex_count(), " -> ", polygons.get_vertex_count(), ")");
 		lod.clear_accel_structure();
@@ -312,13 +313,65 @@ void CpuCombinedReducer::initialize_decimaters() {
 	m_viewOctreeAccess.resize(m_world.get_frame_count() * objects.size());
 	m_irradianceOctreeAccess.resize(m_world.get_frame_count() * objects.size());
 
+	// First we load in the LoDs (possibly reduced version)
+//#pragma PARALLEL_FOR_COND_DYNAMIC(true)
+	for(std::int64_t o = 0; o < static_cast<std::int64_t>(objects.size()); ++o) {
+		auto objIter = objects.begin();
+		for(i32 j = 0; j < o; ++j)
+			++objIter;
+		auto& obj = *objIter;
+		if(o % 100 == 0)
+			logInfo("Progess: ", o, " of ", objects.size());
+		// TODO: proper LoD levels!
+		// Load and pre-reduce the LoDs if applicable
+		const u32 lodIndex = 0u;
+		if(!m_world.load_lod(*obj.first, lodIndex))
+			throw std::runtime_error("Failed to load object LoD!");
+
+		if(m_params.initialReduction > 0.f) {
+			if(!obj.first->has_reduced_lod_available(lodIndex)) {
+				const auto& origLod = obj.first->get_original_lod(lodIndex);
+				const auto& origPolys = origLod.template get_geometry<scene::geometry::Polygons>();
+				if(origPolys.get_vertex_count() >= m_params.threshold) {
+					auto& lod = obj.first->add_reduced_lod(lodIndex);
+					auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+					// Pre-reduce
+					const auto targetVertexCount = static_cast<std::size_t>((1.f - m_params.initialReduction)
+																			* static_cast<float>(origPolys.get_vertex_count()));
+					const auto gridRes = static_cast<std::size_t>(std::ceil(std::cbrt(2.f * static_cast<float>(targetVertexCount))));
+					// TODO: clustering!
+					polygons.cluster(gridRes, true);
+					//auto decimater = polygons.create_decimater();
+					//OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
+					//decimater.add(modQuadricHandle);
+					//polygons.decimate(decimater, targetVertexCount, true);
+
+					/*auto decimater = polygons.create_decimater();
+					OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
+					decimater.add(modQuadricHandle);
+					// Possibly repeat until we reached the desired count
+					const auto performedCollapses = polygons.decimate(decimater, targetVertexCount, true);*/
+					logPedantic("Loaded reduced LoD '", obj.first->get_name(), "' (",
+								origPolys.get_vertex_count(), " -> ", polygons.get_vertex_count(), ")");
+					lod.clear_accel_structure();
+					obj.first->remove_original_lod(lodIndex);
+				}
+			} else {
+				obj.first->remove_original_lod(lodIndex);
+			}
+		}
+	}
+
+
 	for(std::size_t i = 0u; i < m_world.get_frame_count(); ++i) {
 		m_viewOctrees.emplace_back(static_cast<u32>(m_params.impCapacity), static_cast<u32>(objects.size()), true);
 		m_irradianceOctrees.emplace_back(static_cast<u32>(m_params.impCapacity), static_cast<u32>(objects.size()), false);
 
 		std::size_t o = 0u;
 		for(const auto& obj : objects) {
-			// TODO: proper bounding box!
+			// TODO: proper LoD levels!
+			// Load and pre-reduce the LoDs if applicable
+			const u32 lodIndex = 0u;
 			const auto aabb = obj.first->get_lod(0).get_bounding_box();
 
 			// We have to weight the splitting factor with the average instance scaling.
@@ -359,18 +412,22 @@ void CpuCombinedReducer::initialize_decimaters() {
 		}
 
 		// TODO: this only works if instances don't specify LoD levels
-		if(!obj.first->has_reduced_lod_available(lowestLevel))
+		if(!obj.first->has_reduced_lod_available(lowestLevel)) {
 			obj.first->add_reduced_lod(lowestLevel);
-		auto& lod = obj.first->get_or_fetch_original_lod(m_world, lowestLevel);
-		auto& newLod = obj.first->get_reduced_lod(lowestLevel);
-		const auto& polygons = newLod.template get_geometry<scene::geometry::Polygons>();
+			auto& lod = obj.first->get_or_fetch_original_lod(m_world, lowestLevel);
+			auto& newLod = obj.first->get_reduced_lod(lowestLevel);
+			const auto& polygons = newLod.template get_geometry<scene::geometry::Polygons>();
 
-		std::size_t collapses = 0u;
+			std::size_t collapses = 0u;
 
-		if(polygons.get_vertex_count() >= m_params.threshold && m_params.initialReduction > 0.f) {
-			collapses = static_cast<std::size_t>(std::ceil(m_params.initialReduction * polygons.get_vertex_count()));
-			logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
+			if(polygons.get_vertex_count() >= m_params.threshold && m_params.initialReduction > 0.f) {
+				collapses = static_cast<std::size_t>(std::ceil(m_params.initialReduction * polygons.get_vertex_count()));
+				logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
+			}
 		}
+		// TODO!
+		auto& lod = obj.first->get_lod(lowestLevel);
+		auto& newLod = obj.first->get_lod(lowestLevel);
 		m_decimaters[i] = std::make_unique<combined::CombinedDecimater>(obj.first->get_name(),
 																		lod, newLod, m_world.get_frame_count(),
 																		&m_viewOctreeAccess[i * m_world.get_frame_count()],
