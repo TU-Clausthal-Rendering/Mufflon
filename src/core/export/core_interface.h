@@ -344,7 +344,8 @@ CORE_API void CDECL mufflon_destroy(MufflonInstanceHdl instHdl);
 CORE_API Boolean CDECL mufflon_initialize_opengl(MufflonInstanceHdl instHdl);
 CORE_API int32_t CDECL mufflon_get_cuda_device_index();
 CORE_API Boolean CDECL mufflon_is_cuda_available();
-CORE_API Boolean CDECL mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t), void* userParams);
+CORE_API Boolean CDECL mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t),
+											  Boolean(*objFunc)(void*, uint32_t, uint16_t*, uint32_t*), void* userParams);
 
 // Render image functions
 CORE_API Boolean CDECL mufflon_get_target_image(MufflonInstanceHdl instHdl, const char* name, Boolean variance, const float** ptr);
@@ -420,6 +421,7 @@ CORE_API ObjectHdl CDECL world_create_object(MufflonInstanceHdl instHdl, const c
 CORE_API ObjectHdl CDECL world_get_object(MufflonInstanceHdl instHdl, const char* name);
 CORE_API const char* CDECL world_get_object_name(ObjectHdl obj);
 CORE_API Boolean CDECL object_has_lod(ConstObjectHdl obj, LodLevel level);
+CORE_API Boolean CDECL object_allocate_lod_slots(ObjectHdl obj, LodLevel slots);
 CORE_API LodHdl CDECL object_add_lod(ObjectHdl obj, LodLevel level);
 CORE_API Boolean CDECL object_get_id(ObjectHdl obj, uint32_t* id);
 

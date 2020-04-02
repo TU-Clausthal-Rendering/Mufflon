@@ -39,6 +39,7 @@ using namespace mff_loader;
 struct MufflonLoaderInstance {
 	MufflonInstanceHdl mffInst;
 	std::atomic<json::JsonLoader*> jsonLoader = nullptr;
+	json::FileVersion fileVersion;
 	fs::path binPath{};
 };
 
@@ -90,7 +91,7 @@ const char* loader_get_dll_error() {
 }
 
 MufflonLoaderInstanceHdl loader_initialize(MufflonInstanceHdl mffInstHdl) {
-	return new MufflonLoaderInstance{ mffInstHdl, nullptr, fs::path{} };
+	return new MufflonLoaderInstance{ mffInstHdl, nullptr, {}, fs::path{} };
 }
 
 void loader_destroy(MufflonLoaderInstanceHdl mffLoaderInstHdl) {
@@ -120,16 +121,15 @@ LoaderStatus loader_load_json(MufflonLoaderInstanceHdl hdl, const char* path) {
 		// Clear the world
 		world_clear_all(mffLoaderInst.mffInst);
 		json::JsonLoader loader{ mffLoaderInst.mffInst, filePath };
-		mufflon_set_lod_loader(mffLoaderInst.mffInst, loader_load_lod, hdl);
+		mufflon_set_lod_loader(mffLoaderInst.mffInst, loader_load_lod, loader_load_object_material_indices, hdl);
 		mffLoaderInst.jsonLoader.store(&loader);
-		if(!loader.load_file(mffLoaderInst.binPath))
+		if(!loader.load_file(mffLoaderInst.binPath, &mffLoaderInst.fileVersion))
 			return LoaderStatus::LOADER_ABORT;
 	} catch(const std::exception& e) {
 		logError("[", FUNCTION_NAME, "] ", e.what());
 		mffLoaderInst.jsonLoader.store(nullptr);
 		return LoaderStatus::LOADER_ERROR;
 	}
-
 	mffLoaderInst.jsonLoader.store(nullptr);
 	return LoaderStatus::LOADER_SUCCESS;
 	CATCH_ALL(LoaderStatus::LOADER_ERROR)
@@ -182,6 +182,26 @@ Boolean loader_load_lod(MufflonLoaderInstanceHdl hdl, ObjectHdl obj, u32 lod) {
 	std::string status;
 	binary::BinaryLoader loader{ mffLoaderInst.mffInst, status };
 	loader.load_lod(mffLoaderInst.binPath, obj, objId, lod);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean loader_load_object_material_indices(MufflonLoaderInstanceHdl hdl, const uint32_t objId,
+											uint16_t* indexBuffer, uint32_t* readIndices) {
+	TRY
+	CHECK_NULLPTR(hdl, "loader instance handle", false);
+	CHECK_NULLPTR(indexBuffer, "material index buffer", false);
+	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
+	if(mffLoaderInst.fileVersion < json::JsonLoader::PER_OBJECT_UNIQUE_MAT_INDICES) {
+		if(readIndices != nullptr)
+			*readIndices = 0u;
+		return true;
+	}
+	std::string status;
+	binary::BinaryLoader loader{ mffLoaderInst.mffInst, status };
+	const auto count = loader.read_unique_object_material_indices(mffLoaderInst.binPath, objId, indexBuffer);
+	if(readIndices != nullptr)
+		*readIndices = count;
 	return true;
 	CATCH_ALL(false)
 }

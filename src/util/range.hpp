@@ -35,4 +35,20 @@ private:
 	Iterator m_end;
 };
 
+// Checks if two sorted ranges share elements or not
+template < class I1, class I2 >
+constexpr bool share_elements_sorted(const I1 beginA, const I1 endA, const I2 beginB, const I2 endB) noexcept {
+	auto currA = beginA;
+	auto currB = beginB;
+	while(currA != endA && currB != endB) {
+		if(*currA == *currB)
+			return true;
+		if(*currA < *currB)
+			++currA;
+		else
+			++currB;
+	}
+	return false;
+}
+
 }} // namespace mufflon::util

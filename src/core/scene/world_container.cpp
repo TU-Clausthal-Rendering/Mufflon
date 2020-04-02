@@ -1,5 +1,6 @@
 ﻿#include "world_container.hpp"
 #include "util/log.hpp"
+#include "util/range.hpp"
 #include "core/cameras/camera.hpp"
 #include "core/renderer/renderer.hpp"
 #include "core/scene/lod.hpp"
@@ -683,6 +684,7 @@ void WorldContainer::unref_texture(TextureHandle hdl) {
 
 bool WorldContainer::load_lod(Object& obj, const u32 lodIndex) {
 	if(!obj.has_original_lod_available(lodIndex)) {
+		obj.remove_reduced_lod(lodIndex);
 		if(!m_loadLod(m_loadLodUserParams, &obj, lodIndex))
 			return false;
 		obj.get_original_lod(lodIndex).update_material_indices();
@@ -858,86 +860,101 @@ bool WorldContainer::load_scene_lights() {
 		reloaded = true;
 		std::vector<lights::PositionalLights> posLights;
 		std::vector<lights::DirectionalLight> dirLights;
-		for(auto& obj : m_scene->get_objects()) {
-			// Object contains area lights.
-			// Create one light source per polygone and instance
-			const auto& instances = m_scene->get_instances();
-			const auto endIndex = obj.second.offset + obj.second.count;
-			for(std::size_t idx = obj.second.offset; idx < endIndex; ++idx) {
-				InstanceHandle inst = instances[idx];
-				const auto lodIndex = m_scenario->get_effective_lod(inst);
-				// We fetch emissive LoDs here because we need the primitive information for the light tree.
-				// Ideally, we'd be able to reduce emissive meshes as well, but for now that's not possible.
-				continue;
-				// TODO:!
-				load_lod(*obj.first, lodIndex);
-				mAssertMsg(obj.first->has_lod(), "Instance references LoD that doesn't exist");
-				Lod& lod = obj.first->get_lod(m_scenario->get_effective_lod(inst));
-				if(!lod.is_emissive(m_scenario->get_emissive_mat_indices()))
+		const auto emissiveMatIndices = m_scenario->get_emissive_mat_indices();
+		// Check if we have emissive materials
+		if(!emissiveMatIndices.empty()) {
+			auto uniqueIndices = std::make_unique<MaterialIndex[]>(m_scenario->get_num_material_slots());
+			for(auto& obj : m_scene->get_objects()) {
+				// Check if the object has emissive materials. We ideally do that by loading
+				// only the unique material indices from file
+				u32 numIndices = 0u;
+				if(m_objMatLoad(m_loadLodUserParams, obj.first->get_object_id(), uniqueIndices.get(), &numIndices) == 0)
+					throw std::runtime_error("Failed to load unique material indices for object '"
+											 + std::string(obj.first->get_name()) + "'");
+				// Check if none of them is emissive
+				if(numIndices > 0u && !util::share_elements_sorted(emissiveMatIndices.cbegin(), emissiveMatIndices.cend(),
+																   uniqueIndices.get(), uniqueIndices.get() + m_scenario->get_num_material_slots()))
 					continue;
 
-				i32 primIdx = 0;
-				// First search in polygons (PrimitiveHandle expects poly before sphere)
-				auto& polygons = lod.get_geometry<geometry::Polygons>();
-				const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex>(polygons.get_material_indices_hdl());
-				const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point>(polygons.get_points_hdl());
-				const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
-				const ei::Mat3x4 instToWorld = compute_instance_to_world_transformation(inst);
-				bool isMirroring = determinant(ei::Mat3x3{ instToWorld }) < 0.0f;
-				for(const auto& face : polygons.faces()) {
-					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
-					if(mat->get_properties().is_emissive()) {
-						if(std::distance(face.begin(), face.end()) == 3) {
-							lights::AreaLightTriangleDesc al;
-							al.material = materials[primIdx];
-							int i = 0;
-							for(auto vHdl : face) {
-								al.points[i] = ei::transform(positions[vHdl.idx()], instToWorld);
-								al.uv[i] = uvs[vHdl.idx()];
-								++i;
-							}
-							if(isMirroring) {
-								std::swap(al.points[1], al.points[2]);
-								std::swap(al.uv[1], al.uv[2]);
-							}
-							posLights.push_back(lights::PositionalLights{ al, { (i32)inst->get_index(), primIdx } });
-						} else {
-							lights::AreaLightQuadDesc al;
-							al.material = materials[primIdx];
-							int i = 0;
-							for(auto vHdl : face) {
-								al.points[i] = ei::transform(positions[vHdl.idx()], instToWorld);
-								al.uv[i] = uvs[vHdl.idx()];
-								++i;
-							}
-							if(isMirroring) {
-								std::swap(al.points[1], al.points[3]);
-								std::swap(al.uv[1], al.uv[3]);
-							}
-							posLights.push_back(lights::PositionalLights{ al, { (i32)inst->get_index(), primIdx } });
-						}
-					}
-					++primIdx;
-				}
+				// Object contains area lights.
+				// Create one light source per polygone and instance
+				const auto& instances = m_scene->get_instances();
+				const auto endIndex = obj.second.offset + obj.second.count;
+				for(std::size_t idx = obj.second.offset; idx < endIndex; ++idx) {
+					InstanceHandle inst = instances[idx];
+					const auto lodIndex = m_scenario->get_effective_lod(inst);
 
-				// Then get the sphere lights
-				primIdx = (u32)lod.get_geometry<geometry::Polygons>().get_face_count();
-				auto& spheres = lod.get_geometry<geometry::Spheres>();
-				materials = spheres.acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
-				const ei::Sphere* spheresData = spheres.acquire_const<Device::CPU, ei::Sphere>(spheres.get_spheres_hdl());
-				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
-					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[i]);
-					if(mat->get_properties().is_emissive()) {
-						const auto scale = Instance::extract_scale(instToWorld);
-						mAssert(ei::approx(scale.x, scale.y) && ei::approx(scale.x, scale.z));
-						lights::AreaLightSphereDesc al{
-							transform(spheresData[i].center, instToWorld),
-							scale.x * spheresData[i].radius,
-							materials[i]
-						};
-						posLights.push_back({ al, PrimitiveHandle{ (i32)inst->get_index(), primIdx } });
+					// We fetch emissive LoDs here because we need the primitive information for the light tree.
+					// Ideally, we'd be able to reduce emissive meshes as well, but for now that's not possible.
+					load_lod(*obj.first, lodIndex);
+					mAssertMsg(obj.first->has_lod(lodIndex), "Instance references LoD that doesn't exist");
+					Lod& lod = obj.first->get_lod(lodIndex);
+					if(!lod.is_emissive(m_scenario->get_emissive_mat_indices()))
+						continue;
+
+					i32 primIdx = 0;
+					// First search in polygons (PrimitiveHandle expects poly before sphere)
+					auto& polygons = lod.get_geometry<geometry::Polygons>();
+					const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex>(polygons.get_material_indices_hdl());
+					const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point>(polygons.get_points_hdl());
+					const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
+					const ei::Mat3x4 instToWorld = compute_instance_to_world_transformation(inst);
+					bool isMirroring = determinant(ei::Mat3x3{ instToWorld }) < 0.0f;
+					for(const auto& face : polygons.faces()) {
+						ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
+						if(mat->get_properties().is_emissive()) {
+							if(std::distance(face.begin(), face.end()) == 3) {
+								lights::AreaLightTriangleDesc al;
+								al.material = materials[primIdx];
+								int i = 0;
+								for(auto vHdl : face) {
+									al.points[i] = ei::transform(positions[vHdl.idx()], instToWorld);
+									al.uv[i] = uvs[vHdl.idx()];
+									++i;
+								}
+								if(isMirroring) {
+									std::swap(al.points[1], al.points[2]);
+									std::swap(al.uv[1], al.uv[2]);
+								}
+								posLights.push_back(lights::PositionalLights{ al, { (i32)inst->get_index(), primIdx } });
+							} else {
+								lights::AreaLightQuadDesc al;
+								al.material = materials[primIdx];
+								int i = 0;
+								for(auto vHdl : face) {
+									al.points[i] = ei::transform(positions[vHdl.idx()], instToWorld);
+									al.uv[i] = uvs[vHdl.idx()];
+									++i;
+								}
+								if(isMirroring) {
+									std::swap(al.points[1], al.points[3]);
+									std::swap(al.uv[1], al.uv[3]);
+								}
+								posLights.push_back(lights::PositionalLights{ al, { (i32)inst->get_index(), primIdx } });
+							}
+						}
+						++primIdx;
 					}
-					++primIdx;
+
+					// Then get the sphere lights
+					primIdx = (u32)lod.get_geometry<geometry::Polygons>().get_face_count();
+					auto& spheres = lod.get_geometry<geometry::Spheres>();
+					materials = spheres.acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
+					const ei::Sphere* spheresData = spheres.acquire_const<Device::CPU, ei::Sphere>(spheres.get_spheres_hdl());
+					for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
+						ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[i]);
+						if(mat->get_properties().is_emissive()) {
+							const auto scale = Instance::extract_scale(instToWorld);
+							mAssert(ei::approx(scale.x, scale.y) && ei::approx(scale.x, scale.z));
+							lights::AreaLightSphereDesc al{
+								transform(spheresData[i].center, instToWorld),
+								scale.x * spheresData[i].radius,
+								materials[i]
+							};
+							posLights.push_back({ al, PrimitiveHandle{ (i32)inst->get_index(), primIdx } });
+						}
+						++primIdx;
+					}
 				}
 			}
 		}
@@ -977,8 +994,9 @@ bool WorldContainer::load_scene_lights() {
 	return reloaded;
 }
 
-void WorldContainer::set_lod_loader_function(LodLoadFuncPtr func, void* userParams) {
+void WorldContainer::set_lod_loader_function(LodLoadFuncPtr func, ObjMatIndicesFuncPtr matFunc, void* userParams) {
 	m_loadLod = func;
+	m_objMatLoad = matFunc;
 	m_loadLodUserParams = userParams;
 }
 

@@ -38,6 +38,7 @@ public:
 	using EnvLightHandle = std::map<std::string, TextureHandle, std::less<>>::iterator;
 
 	using LodLoadFuncPtr = std::uint32_t(CDECL*)(void* userParams, ObjectHandle obj, u32 lod);
+	using ObjMatIndicesFuncPtr = std::uint32_t(CDECL*)(void* userParams, uint32_t objId, uint16_t* matIndices, uint32_t* count);
 
 
 	enum class Sanity {
@@ -182,7 +183,7 @@ public:
 	// Set the new animation frame. Caution: this invalidates the currently loaded scene
 	// which must thus be set for any active renderer!
 	bool set_frame_current(const u32 frameCurrent);
-	void set_lod_loader_function(LodLoadFuncPtr func, void* userParams);
+	void set_lod_loader_function(LodLoadFuncPtr func, ObjMatIndicesFuncPtr matFunc, void* userParams);
 	void set_tessellation_level(const float tessLevel) { m_tessLevel = tessLevel; }
 
 
@@ -204,6 +205,7 @@ private:
 
 	// Function pointer for loading a LoD from a scene
 	LodLoadFuncPtr m_loadLod = nullptr;
+	ObjMatIndicesFuncPtr m_objMatLoad = nullptr;
 	void* m_loadLodUserParams = nullptr;
 
 	// A pool for all object/instance names (keeps references valid until world clear)

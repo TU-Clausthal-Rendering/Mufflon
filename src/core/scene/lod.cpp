@@ -1,30 +1,12 @@
 #include "lod.hpp"
 #include "object.hpp"
 #include "scenario.hpp"
+#include "util/range.hpp"
 #include "materials/material.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include "core/scene/tessellation/tessellater.hpp"
 
 namespace mufflon::scene {
-
-namespace {
-
-template < class I1, class I2 >
-constexpr bool sorted_share_elements(const I1 beginA, const I1 endA, const I2 beginB, const I2 endB) noexcept {
-	auto currA = beginA;
-	auto currB = beginB;
-	while(currA != endA && currB != endB) {
-		if(*currA == *currB)
-			return true;
-		if(*currA < *currB)
-			++currA;
-		else
-			++currB;
-	}
-	return false;
-}
-
-} // namespace
 
 void Lod::clear_accel_structure() {
 	m_accelStruct.mark_invalid();
@@ -75,14 +57,14 @@ void Lod::update_material_indices() noexcept {
 
 bool Lod::is_emissive(const std::vector<MaterialIndex>& emissiveMatIndices) const noexcept {
 	mAssert(!m_uniqueMatIndices.empty());
-	return sorted_share_elements(emissiveMatIndices.cbegin(), emissiveMatIndices.cend(),
-								 m_uniqueMatIndices.cbegin(), m_uniqueMatIndices.cend());
+	return util::share_elements_sorted(emissiveMatIndices.cbegin(), emissiveMatIndices.cend(),
+									   m_uniqueMatIndices.cbegin(), m_uniqueMatIndices.cend());
 }
 // Is there any displaced polygon in this object
 bool Lod::is_displaced(const std::vector<MaterialIndex>& displacedMatIndices) const noexcept {
 	mAssert(!m_uniqueMatIndices.empty());
-	return sorted_share_elements(displacedMatIndices.cbegin(), displacedMatIndices.cend(),
-								 m_uniqueMatIndices.cbegin(), m_uniqueMatIndices.cend());
+	return util::share_elements_sorted(displacedMatIndices.cbegin(), displacedMatIndices.cend(),
+									   m_uniqueMatIndices.cbegin(), m_uniqueMatIndices.cend());
 }
 
 void Lod::displace(tessellation::TessLevelOracle& tessellater, const Scenario& scenario) {

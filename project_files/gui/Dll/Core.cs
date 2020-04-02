@@ -304,6 +304,7 @@ namespace gui.Dll
 
         public delegate void LogCallback(string message, Severity severity);
         public delegate void LodLoaderFunc(IntPtr userParams, IntPtr objHdl, UInt32 UInt32);
+        public delegate void ObjMatIndicesFunc(IntPtr userParams, UInt32 objId, IntPtr indices, out UInt32 count);
         public delegate Vec4 TextureCallback(UInt32 x, UInt32 y, UInt32 layer, TextureFormat format, Vec4 value, IntPtr userParams);
 
 
@@ -331,8 +332,8 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "mufflon_is_cuda_available")]
         internal static extern Boolean mufflon_is_cuda_available();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "mufflon_set_lod_loader")]
-        private static extern Boolean mufflon_set_lod_loader_(IntPtr instHdl, LodLoaderFunc loader, IntPtr userParams);
-        internal static Boolean mufflon_set_lod_loader(LodLoaderFunc loader, IntPtr userParams) { return mufflon_set_lod_loader_(muffInstHdl, loader, userParams); }
+        private static extern Boolean mufflon_set_lod_loader_(IntPtr instHdl, LodLoaderFunc loader, ObjMatIndicesFunc objFunc, IntPtr userParams);
+        internal static Boolean mufflon_set_lod_loader(LodLoaderFunc loader, ObjMatIndicesFunc objFunc, IntPtr userParams) { return mufflon_set_lod_loader_(muffInstHdl, loader, objFunc, userParams); }
 
         // Render image functions
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "mufflon_get_target_image")]

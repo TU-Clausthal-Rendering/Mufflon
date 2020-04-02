@@ -225,12 +225,14 @@ Boolean core_set_log_level(LogLevel level) {
 	}
 }
 
-Boolean mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t), void* userParams) {
+Boolean mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t),
+							   Boolean(*objFunc)(void*, uint32_t, uint16_t*, uint32_t*), void* userParams) {
 	TRY
 	CHECK_NULLPTR(instHdl, "mufflon instance", false);
 	MufflonInstance& instance = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(func, "LoD loader function", false);
-	instance.world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(void*, ObjectHandle, u32)>(func), userParams);
+	instance.world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(void*, ObjectHandle, u32)>(func),
+										   objFunc, userParams);
 	return true;
 	CATCH_ALL(false)
 }
@@ -995,6 +997,15 @@ Boolean object_has_lod(ConstObjectHdl obj, LodLevel level) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
 	return static_cast<const Object*>(obj)->has_original_lod_available(level);
+	CATCH_ALL(false)
+}
+
+Boolean object_allocate_lod_slots(ObjectHdl obj, LodLevel slots) {
+	TRY
+	CHECK_NULLPTR(obj, "object handle", false);
+	Object& object = *static_cast<Object*>(obj);
+	object.allocate_lod_levels(slots);
+	return true;
 	CATCH_ALL(false)
 }
 

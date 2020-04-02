@@ -118,6 +118,12 @@ public:
 		}
 	}
 
+	// Allocates the LoD slots, but keeps them evicted
+	void allocate_lod_levels(u32 count) {
+		if(m_lods.size() < count)
+			m_lods.resize(count);
+	}
+
 	// Adds a new (or overwrites, if already existing) LoD
 	Lod& add_lod(u32 level) {
 		if(m_lods.size() <= level)

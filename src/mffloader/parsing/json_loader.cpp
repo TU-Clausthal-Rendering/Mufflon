@@ -1034,7 +1034,7 @@ void JsonLoader::selective_replace_keys(const rapidjson::Value& objectToCopy, ra
 }
 
 
-bool JsonLoader::load_file(fs::path& binaryFile) {
+bool JsonLoader::load_file(fs::path& binaryFile, FileVersion* version) {
 	using namespace rapidjson;
 	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_file");
 
@@ -1058,6 +1058,7 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 	auto versionIter = get(m_state, document, "version", false);
 	if(versionIter == document.MemberEnd()) {
 		logWarning("[JsonLoader::load_file] Scene file: no version specified (current one assumed)");
+		m_version = CURRENT_FILE_VERSION;
 	} else {
 		m_version = FileVersion{ read<const char*>(m_state, versionIter) };
 		if(m_version > CURRENT_FILE_VERSION)
@@ -1067,6 +1068,8 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 		m_absoluteCamNearFar = m_version >= ABSOLUTE_CAM_NEAR_FAR_FILE_VERSION;
 		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");
 	}
+	if(version != nullptr)
+		*version = m_version;
 	// Binary file path
 	binaryFile = read<const char*>(m_state, get(m_state, document, "binary"));
 	if(binaryFile.empty())
