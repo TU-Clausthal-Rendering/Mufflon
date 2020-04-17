@@ -49,7 +49,7 @@ protected:
 
 class Tessellater {
 public:
-	Tessellater(TessLevelOracle& oracle) :
+	Tessellater(TessLevelOracle& oracle) noexcept :
 		m_tessLevelOracle(oracle) {}
 	Tessellater(const Tessellater&) = delete;
 	Tessellater(Tessellater&&) = delete;
@@ -60,7 +60,14 @@ public:
 	void set_phong_tessellation(bool enabled) {
 		m_usePhongTessellation = enabled;
 	}
-	void tessellate(geometry::PolygonMeshType& mesh);
+
+	// Returns the handle of the temporary face used for property copies.
+	// Doesn't garbage collect. Also stores the old face handle for all new faces (get_old_face_property()).
+	OpenMesh::FaceHandle tessellate(geometry::PolygonMeshType& mesh);
+
+	OpenMesh::FPropHandleT<OpenMesh::FaceHandle> get_old_face_property() const noexcept {
+		return m_oldFace;
+	}
 
 protected:
 	// Stores the number of added vertices per edge. Also stores the offset into
@@ -129,6 +136,8 @@ protected:
 	// Handle or mesh property storing the offset and count of edge vertices
 	// Offset indexes into m_edgeVertexHandles
 	OpenMesh::EPropHandleT<AddedVertices> m_addedVertexProp;
+	// Keeps track of inserted faces/vertices
+	OpenMesh::FPropHandleT<OpenMesh::FaceHandle> m_oldFace;
 
 	bool m_usePhongTessellation = false;
 

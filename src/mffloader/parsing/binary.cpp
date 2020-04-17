@@ -669,7 +669,7 @@ void BinaryLoader::read_compressed_sphere_attributes(const ObjectState& object, 
 				lod.numSpheres, " deflated sphere material indices");
 }
 
-u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
+u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod, bool asReduced) {
 	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_lod");
 
 	// Remember where we were in the file
@@ -698,14 +698,13 @@ u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 	lodState.numVertAttribs = read<u32>();
 	lodState.numFaceAttribs = read<u32>();
 	lodState.numSphereAttribs = read<u32>();
-	lodState.lodHdl = object_add_lod(object.objHdl, actualLod);
+	lodState.lodHdl = object_add_lod(object.objHdl, actualLod, asReduced);
 
 	logPedantic("[BinaryLoader::read_lod] Loading LoD ", actualLod, " for object '", object.name, "'...");
 
 	// Reserve memory for the current LOD
 	if(!polygon_reserve(lodState.lodHdl, lodState.numVertices,
-					   lodState.numEdges, lodState.numTriangles,
-					   lodState.numQuads))
+						lodState.numTriangles, lodState.numQuads))
 		throw std::runtime_error("Failed to reserve LoD polygon memory");
 	if (!spheres_reserve(lodState.lodHdl, lodState.numSpheres))
 		throw std::runtime_error("Failed to reserve LoD sphere memory");
@@ -899,7 +898,8 @@ void BinaryLoader::deinstance() {
 		applyTranformation(frames);
 }
 
-void BinaryLoader::load_lod(const fs::path& file, ObjectHdl obj, mufflon::u32 objId, mufflon::u32 lod) {
+void BinaryLoader::load_lod(const fs::path& file, ObjectHdl obj, mufflon::u32 objId, mufflon::u32 lod,
+							const bool asReduced) {
 	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::load_lod");
 	m_filePath = file;
 
@@ -967,7 +967,7 @@ void BinaryLoader::load_lod(const fs::path& file, ObjectHdl obj, mufflon::u32 ob
 			throw std::runtime_error("Unknown object '" + std::string(object.name) + ")");
 		// Read the LoD
 		if(!object_has_lod(object.objHdl, lod))
-			read_lod(object, lod);
+			read_lod(object, lod, asReduced);
 
 		this->clear_state();
 	} catch(const std::exception&) {

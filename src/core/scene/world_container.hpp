@@ -37,7 +37,7 @@ public:
 	using DirLightHandle = std::map<std::string, lights::DirectionalLight, std::less<>>::iterator;
 	using EnvLightHandle = std::map<std::string, TextureHandle, std::less<>>::iterator;
 
-	using LodLoadFuncPtr = std::uint32_t(CDECL*)(void* userParams, ObjectHandle obj, u32 lod);
+	using LodLoadFuncPtr = std::uint32_t(CDECL*)(void* userParams, ObjectHandle obj, u32 lod, u32);
 	using ObjMatIndicesFuncPtr = std::uint32_t(CDECL*)(void* userParams, uint32_t objId, uint16_t* matIndices, uint32_t* count);
 
 
@@ -79,9 +79,12 @@ public:
 	// Reloads the scene from the current scenario if necessary
 	void reload_scene(renderer::IRenderer* renderer);
 	// Loads a specific LoD from file, if not already present
-	bool load_lod(Object& obj, const u32 lodIndex);
+	bool load_lod(Object& obj, const u32 lodIndex, const bool asReduced = false);
 	// Ejects a specific LoD
 	bool unload_lod(Object& obj, const u32 lodIndex);
+	// Loads the material indices of an object
+	std::vector<MaterialIndex> load_object_material_indices(const u32 objectId);
+	std::size_t load_object_material_indices(const u32 objectId, MaterialIndex* buffer);
 	// Discards any already applied tessellation/displacement for the current scene
 	// and re-tessellates/-displaces with the current max. tessellation level
 	void retessellate();

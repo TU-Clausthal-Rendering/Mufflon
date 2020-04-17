@@ -49,7 +49,13 @@ public:
 		return m_handle;
 	}
 	void reset() {
-		(*this) = unique_device_ptr<Device::OPENGL, T>();
+		(*this) = unique_device_ptr<Device::OPENGL, T>{};
+	}
+	gl::BufferHandle<TType> release() {
+		const auto hdl = m_handle;
+		m_handle = gl::BufferHandle<TType>{0, 0};
+		m_deleter = {};
+		return hdl;
 	}
 	bool empty() const noexcept {
 		return m_handle == 0;

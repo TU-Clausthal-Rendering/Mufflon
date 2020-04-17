@@ -168,7 +168,7 @@ LoaderStatus loader_save_scene(MufflonLoaderInstanceHdl hdl, const char* path) {
 	CATCH_ALL(LoaderStatus::LOADER_ERROR)
 }
 
-Boolean loader_load_lod(MufflonLoaderInstanceHdl hdl, ObjectHdl obj, u32 lod) {
+Boolean loader_load_lod(MufflonLoaderInstanceHdl hdl, ObjectHdl obj, u32 lod, Boolean asReduced) {
 	TRY
 	CHECK_NULLPTR(hdl, "loader instance handle", false);
 	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
@@ -181,7 +181,7 @@ Boolean loader_load_lod(MufflonLoaderInstanceHdl hdl, ObjectHdl obj, u32 lod) {
 		return false;
 	std::string status;
 	binary::BinaryLoader loader{ mffLoaderInst.mffInst, status };
-	loader.load_lod(mffLoaderInst.binPath, obj, objId, lod);
+	loader.load_lod(mffLoaderInst.binPath, obj, objId, lod, asReduced != 0u);
 	return true;
 	CATCH_ALL(false)
 }

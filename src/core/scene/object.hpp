@@ -135,7 +135,7 @@ public:
 		if(m_lods.size() <= level)
 			m_lods.resize(level + 1u);
 		if(!m_lods[level].original.is_admitted())
-			throw std::runtime_error("Original LoD to base reduced one off is not present");
+			return m_lods[level].reduced.admit(this);
 		return m_lods[level].reduced.admit(*m_lods[level].original);
 	}
 

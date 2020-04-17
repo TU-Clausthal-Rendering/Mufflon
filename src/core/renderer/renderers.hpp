@@ -4,15 +4,6 @@
 #include "core/renderer/pt/cpu_pt.hpp"
 #include "core/renderer/pt/gpu_pt.hpp"
 #include "core/renderer/pt/hybrid_pt.hpp"
-#include "core/renderer/decimaters/importance/cpu_importance.hpp"
-#include "core/renderer/decimaters/silhouette/pt/cpu_silhouette_pt.hpp"
-#include "core/renderer/decimaters/silhouette/pt/gpu_silhouette_pt.hpp"
-#include "core/renderer/decimaters/silhouette/screenspace/cpu_ss_sil_pt.hpp"
-#include "core/renderer/decimaters/silhouette/screenspace/gpu_ss_sil_pt.hpp"
-#include "core/renderer/decimaters/silhouette/bpm/cpu_silhouette_bpm.hpp"
-#include "core/renderer/decimaters/silhouette/bpm/gpu_silhouette_bpm.hpp"
-#include "core/renderer/decimaters/shadow_photons/cpu_shadow_photons.hpp"
-#include "core/renderer/decimaters/animation/pt/cpu_animation_pt.hpp"
 #include "core/renderer/decimaters/combined/cpu_combined_reducer.hpp"
 #include "core/renderer/lt/cpu_lt.hpp"
 #include "core/renderer/lt/gpu_lt.hpp"
@@ -40,11 +31,6 @@ using Renderers = util::TaggedTuple<
 	CpuNextEventBacktracking,
 	CpuVcm, CpuIvcm,
 	GlForward, DebugBvhRenderer,
-	decimaters::silhouette::CpuShadowSilhouettesPT, decimaters::silhouette::CpuSsSilPT,
-	decimaters::animation::CpuShadowSilhouettesPT,
-	decimaters::silhouette::CpuShadowSilhouettesBPM,
-	decimaters::CpuImportanceDecimater,
-	decimaters::spm::ShadowPhotonVisualizer,
 	decimaters::CpuCombinedReducer,
 
 	decimaters::CpuUniformVertexClusterer, decimaters::CpuOctreeVertexClusterer

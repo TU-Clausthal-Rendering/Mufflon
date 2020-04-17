@@ -225,13 +225,13 @@ Boolean core_set_log_level(LogLevel level) {
 	}
 }
 
-Boolean mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t),
+Boolean mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t, Boolean),
 							   Boolean(*objFunc)(void*, uint32_t, uint16_t*, uint32_t*), void* userParams) {
 	TRY
 	CHECK_NULLPTR(instHdl, "mufflon instance", false);
 	MufflonInstance& instance = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(func, "LoD loader function", false);
-	instance.world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(void*, ObjectHandle, u32)>(func),
+	instance.world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(void*, ObjectHandle, u32, u32)>(func),
 										   objFunc, userParams);
 	return true;
 	CATCH_ALL(false)
@@ -313,10 +313,10 @@ Boolean mufflon_get_pixel_info(MufflonInstanceHdl instHdl, uint32_t x, uint32_t 
 	CATCH_ALL(false)
 }
 
-Boolean polygon_reserve(LodHdl lvlDtl, size_t vertices, size_t edges, size_t tris, size_t quads) {
+Boolean polygon_reserve(LodHdl lvlDtl, size_t vertices, size_t tris, size_t quads) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", false);
-	static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().reserve(vertices, edges, tris, quads);
+	static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().reserve(vertices, tris, quads);
 	return true;
 	CATCH_ALL(false)
 }
@@ -349,11 +349,7 @@ VertexHdl polygon_add_vertex(LodHdl lvlDtl, Vec3 point, Vec3 normal, Vec2 uv) {
 	PolyVHdl hdl = static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().add(
 		util::pun<ei::Vec3>(point), util::pun<ei::Vec3>(normal),
 		util::pun<ei::Vec2>(uv));
-	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding vertex to polygon");
-		return VertexHdl{ INVALID_INDEX };
-	}
-	return VertexHdl{ static_cast<IndexType>(hdl.idx()) };
+	return VertexHdl{ static_cast<IndexType>(hdl) };
 	CATCH_ALL(VertexHdl{ INVALID_INDEX })
 }
 
@@ -362,15 +358,10 @@ FaceHdl polygon_add_triangle(LodHdl lvlDtl, UVec3 vertices) {
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
-		PolyVHdl{ static_cast<int>(vertices.x) },
-		PolyVHdl{ static_cast<int>(vertices.y) },
-		PolyVHdl{ static_cast<int>(vertices.z) });
-	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon (object '",
-				 lod.get_parent()->get_name(), "')");
-		return FaceHdl{ INVALID_INDEX };
-	}
-	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
+		PolyVHdl{ vertices.x },
+		PolyVHdl{ vertices.y },
+		PolyVHdl{ vertices.z });
+	return FaceHdl{ static_cast<IndexType>(hdl) };
 	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
@@ -380,16 +371,11 @@ FaceHdl polygon_add_triangle_material(LodHdl lvlDtl, UVec3 vertices,
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
-		PolyVHdl{ static_cast<int>(vertices.x) },
-		PolyVHdl{ static_cast<int>(vertices.y) },
-		PolyVHdl{ static_cast<int>(vertices.z) },
+		PolyVHdl{ vertices.x },
+		PolyVHdl{ vertices.y },
+		PolyVHdl{ vertices.z },
 		MaterialIndex{ idx });
-	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon (object '",
-				 lod.get_parent()->get_name(), "')");
-		return FaceHdl{ INVALID_INDEX };
-	}
-	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
+	return FaceHdl{ static_cast<IndexType>(hdl) };
 	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
@@ -398,16 +384,11 @@ FaceHdl polygon_add_quad(LodHdl lvlDtl, UVec4 vertices) {
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
-		PolyVHdl{ static_cast<int>(vertices.x) },
-		PolyVHdl{ static_cast<int>(vertices.y) },
-		PolyVHdl{ static_cast<int>(vertices.z) },
-		PolyVHdl{ static_cast<int>(vertices.w) });
-	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding quad to polygon (object '",
-				 lod.get_parent()->get_name(), "')");
-		return FaceHdl{ INVALID_INDEX };
-	}
-	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
+		PolyVHdl{ vertices.x },
+		PolyVHdl{ vertices.y },
+		PolyVHdl{ vertices.z },
+		PolyVHdl{ vertices.w });
+	return FaceHdl{ static_cast<IndexType>(hdl) };
 	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
@@ -417,17 +398,12 @@ FaceHdl polygon_add_quad_material(LodHdl lvlDtl, UVec4 vertices,
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
-		PolyVHdl{ static_cast<int>(vertices.x) },
-		PolyVHdl{ static_cast<int>(vertices.y) },
-		PolyVHdl{ static_cast<int>(vertices.z) },
-		PolyVHdl{ static_cast<int>(vertices.w) },
+		PolyVHdl{ vertices.x },
+		PolyVHdl{ vertices.y },
+		PolyVHdl{ vertices.z },
+		PolyVHdl{ vertices.w },
 		MaterialIndex{ idx });
-	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding quad to polygon (object '",
-				 lod.get_parent()->get_name(), "')");
-		return FaceHdl{ INVALID_INDEX };
-	}
-	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
+	return FaceHdl{ static_cast<IndexType>(hdl) };
 	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
@@ -493,7 +469,7 @@ VertexHdl polygon_add_vertex_bulk(LodHdl lvlDtl, size_t count, const BulkLoader*
 		*normalsRead = info.readNormals;
 	if(uvsRead != nullptr)
 		*uvsRead = info.readUvs;
-	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
+	return VertexHdl{ static_cast<IndexType>(info.handle) };
 	CATCH_ALL(VertexHdl{ INVALID_INDEX })
 }
 
@@ -651,7 +627,7 @@ size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const VertexAttributeHdl
 		logError("[", FUNCTION_NAME, "] Could not retrieve vertex attribute handle");
 		return false;
 	}
-	polys.add_bulk(hdl.value(), PolyVHdl{ static_cast<int>(startVertex) },
+	polys.add_bulk(hdl.value(), static_cast<PolyVHdl>(startVertex),
 				   count, *attrReader);
 	return true;
 	CATCH_ALL(INVALID_SIZE)
@@ -691,7 +667,7 @@ size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const FaceAttributeHdl att
 		logError("[", FUNCTION_NAME, "] Could not retrieve vertex attribute handle");
 		return false;
 	}
-	polys.add_bulk(hdl.value(), PolyFHdl{ static_cast<int>(startFace) },
+	polys.add_bulk(hdl.value(), static_cast<PolyFHdl>(startFace),
 				   count, *attrReader);
 	return true;
 	CATCH_ALL(INVALID_SIZE)
@@ -724,7 +700,7 @@ size_t polygon_set_material_idx_bulk(LodHdl lvlDtl, FaceHdl startFace, size_t co
 	}
 
 	FaceAttributeHandle hdl = lod.template get_geometry<Polygons>().get_material_indices_hdl();
-	return lod.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
+	return lod.template get_geometry<Polygons>().add_bulk(hdl, static_cast<PolyFHdl>(startFace),
 															 count, *matReader);
 	CATCH_ALL(INVALID_SIZE)
 }
@@ -734,14 +710,6 @@ size_t polygon_get_vertex_count(LodHdl lvlDtl) {
 	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_SIZE);
 	const Lod& lod = *static_cast<const Lod*>(lvlDtl);
 	return lod.template get_geometry<Polygons>().get_vertex_count();
-	CATCH_ALL(INVALID_SIZE)
-}
-
-size_t polygon_get_edge_count(LodHdl lvlDtl) {
-	TRY
-	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_SIZE);
-	const Lod& lod = *static_cast<const Lod*>(lvlDtl);
-	return lod.template get_geometry<Polygons>().get_edge_count();
 	CATCH_ALL(INVALID_SIZE)
 }
 
@@ -1009,10 +977,12 @@ Boolean object_allocate_lod_slots(ObjectHdl obj, LodLevel slots) {
 	CATCH_ALL(false)
 }
 
-LodHdl object_add_lod(ObjectHdl obj, LodLevel level) {
+LodHdl object_add_lod(ObjectHdl obj, LodLevel level, Boolean asReduced) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", nullptr);
 	Object& object = *static_cast<Object*>(obj);
+	if(asReduced)
+		return &object.add_reduced_lod(level);
 	return &object.add_lod(level);
 	CATCH_ALL(nullptr)
 }

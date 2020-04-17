@@ -682,12 +682,12 @@ void WorldContainer::unref_texture(TextureHandle hdl) {
 	}
 }
 
-bool WorldContainer::load_lod(Object& obj, const u32 lodIndex) {
-	if(!obj.has_original_lod_available(lodIndex)) {
-		obj.remove_reduced_lod(lodIndex);
-		if(!m_loadLod(m_loadLodUserParams, &obj, lodIndex))
+bool WorldContainer::load_lod(Object& obj, const u32 lodIndex, const bool asReduced) {
+	obj.remove_reduced_lod(lodIndex);
+	if(asReduced || !obj.has_original_lod_available(lodIndex)) {
+		if(!m_loadLod(m_loadLodUserParams, &obj, lodIndex, asReduced))
 			return false;
-		obj.get_original_lod(lodIndex).update_material_indices();
+		obj.get_lod(lodIndex).update_material_indices();
 	}
 	return true;
 }
@@ -695,7 +695,24 @@ bool WorldContainer::load_lod(Object& obj, const u32 lodIndex) {
 bool WorldContainer::unload_lod(Object& obj, const u32 lodIndex) {
 	//if(obj.has_lod_available(lodIndex))
 	//	obj.remove_lod(lodIndex);
+	throw std::runtime_error("Unsupported operation");
 	return true;
+}
+
+std::vector<MaterialIndex> WorldContainer::load_object_material_indices(const u32 objectId) {
+	std::vector<MaterialIndex> indices;
+	indices.resize(m_scenario->get_num_material_slots());
+	const auto count = this->load_object_material_indices(objectId, indices.data());
+	indices.resize(count);
+	return indices;
+}
+
+std::size_t WorldContainer::load_object_material_indices(const u32 objectId, MaterialIndex* buffer) {
+	u32 numIndices = 0u;
+	if(m_objMatLoad(m_loadLodUserParams, objectId, buffer, &numIndices) == 0)
+		throw std::runtime_error("Failed to load unique material indices for object '"
+								 + std::string((m_objects.cbegin() + objectId)->first) + "'");
+	return numIndices;
 }
 
 SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* renderer) {
@@ -867,10 +884,7 @@ bool WorldContainer::load_scene_lights() {
 			for(auto& obj : m_scene->get_objects()) {
 				// Check if the object has emissive materials. We ideally do that by loading
 				// only the unique material indices from file
-				u32 numIndices = 0u;
-				if(m_objMatLoad(m_loadLodUserParams, obj.first->get_object_id(), uniqueIndices.get(), &numIndices) == 0)
-					throw std::runtime_error("Failed to load unique material indices for object '"
-											 + std::string(obj.first->get_name()) + "'");
+				const auto numIndices = load_object_material_indices(obj.first->get_object_id(), uniqueIndices.get());
 				// Check if none of them is emissive
 				if(numIndices > 0u && !util::share_elements_sorted(emissiveMatIndices.cbegin(), emissiveMatIndices.cend(),
 																   uniqueIndices.get(), uniqueIndices.get() + m_scenario->get_num_material_slots()))
@@ -900,38 +914,38 @@ bool WorldContainer::load_scene_lights() {
 					const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
 					const ei::Mat3x4 instToWorld = compute_instance_to_world_transformation(inst);
 					bool isMirroring = determinant(ei::Mat3x3{ instToWorld }) < 0.0f;
-					for(const auto& face : polygons.faces()) {
+					for(const auto tri : polygons.triangles()) {
 						ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
 						if(mat->get_properties().is_emissive()) {
-							if(std::distance(face.begin(), face.end()) == 3) {
-								lights::AreaLightTriangleDesc al;
-								al.material = materials[primIdx];
-								int i = 0;
-								for(auto vHdl : face) {
-									al.points[i] = ei::transform(positions[vHdl.idx()], instToWorld);
-									al.uv[i] = uvs[vHdl.idx()];
-									++i;
-								}
-								if(isMirroring) {
-									std::swap(al.points[1], al.points[2]);
-									std::swap(al.uv[1], al.uv[2]);
-								}
-								posLights.push_back(lights::PositionalLights{ al, { (i32)inst->get_index(), primIdx } });
-							} else {
-								lights::AreaLightQuadDesc al;
-								al.material = materials[primIdx];
-								int i = 0;
-								for(auto vHdl : face) {
-									al.points[i] = ei::transform(positions[vHdl.idx()], instToWorld);
-									al.uv[i] = uvs[vHdl.idx()];
-									++i;
-								}
-								if(isMirroring) {
-									std::swap(al.points[1], al.points[3]);
-									std::swap(al.uv[1], al.uv[3]);
-								}
-								posLights.push_back(lights::PositionalLights{ al, { (i32)inst->get_index(), primIdx } });
+							lights::AreaLightTriangleDesc al;
+							al.material = materials[primIdx];
+							int i = 0;
+							for(u32 i = 0u; i < 3u; ++i) {
+								al.points[i] = ei::transform(positions[tri[i]], instToWorld);
+								al.uv[i] = uvs[tri[i]];
 							}
+							if(isMirroring) {
+								std::swap(al.points[1], al.points[2]);
+								std::swap(al.uv[1], al.uv[2]);
+							}
+							posLights.push_back(lights::PositionalLights{ al, { (i32)inst->get_index(), primIdx } });
+						}
+						++primIdx;
+					}
+					for(const auto quad : polygons.quads()) {
+						ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
+						if(mat->get_properties().is_emissive()) {
+							lights::AreaLightQuadDesc al;
+							al.material = materials[primIdx];
+							for(u32 i = 0u; i < 4u; ++i) {
+								al.points[i] = ei::transform(positions[quad[i]], instToWorld);
+								al.uv[i] = uvs[quad[i]];
+							}
+							if(isMirroring) {
+								std::swap(al.points[1], al.points[3]);
+								std::swap(al.uv[1], al.uv[3]);
+							}
+							posLights.push_back(lights::PositionalLights{ al, { (i32)inst->get_index(), primIdx } });
 						}
 						++primIdx;
 					}

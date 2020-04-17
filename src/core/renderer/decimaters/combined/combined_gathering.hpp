@@ -537,7 +537,7 @@ inline CUDA_FUNCTION void sample_vis_importance_octree(CombinedTargets::RenderBu
 		const auto area = scene::compute_area(scene, polygon, hitId);
 
 		const auto importance = viewImp / (area * distSum);
-		outputBuffer.template set<silhouette::ImportanceTarget>(coord, importance);
+		outputBuffer.template set<ImportanceTarget>(coord, importance);
 		outputBuffer.template set<InstanceImportanceSumTarget>(coord, static_cast<float>(cuda::atomic_load<CURRENT_DEV, double>(instanceImpSums[hitId.instanceId])));
 	}
 }
@@ -589,7 +589,7 @@ inline CUDA_FUNCTION void sample_vis_importance(CombinedTargets::RenderBufferTyp
 			}
 		}
 		const auto importance = imp / distSum;
-		outputBuffer.template set<silhouette::ImportanceTarget>(coord, importance);
+		outputBuffer.template set<ImportanceTarget>(coord, importance);
 		outputBuffer.template set<InstanceImportanceSumTarget>(coord, static_cast<float>(cuda::atomic_load<CURRENT_DEV, double>(instanceImpSums[hitId.instanceId])));
 	}
 }

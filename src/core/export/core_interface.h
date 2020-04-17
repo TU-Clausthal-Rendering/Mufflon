@@ -344,7 +344,7 @@ CORE_API void CDECL mufflon_destroy(MufflonInstanceHdl instHdl);
 CORE_API Boolean CDECL mufflon_initialize_opengl(MufflonInstanceHdl instHdl);
 CORE_API int32_t CDECL mufflon_get_cuda_device_index();
 CORE_API Boolean CDECL mufflon_is_cuda_available();
-CORE_API Boolean CDECL mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t),
+CORE_API Boolean CDECL mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t, Boolean),
 											  Boolean(*objFunc)(void*, uint32_t, uint16_t*, uint32_t*), void* userParams);
 
 // Render image functions
@@ -358,7 +358,7 @@ CORE_API void CDECL world_clear_all(MufflonInstanceHdl instHdl);
 CORE_API Boolean CDECL world_finalize(MufflonInstanceHdl instHdl, const Vec3 min, const Vec3 max, const char** msg);
 
 // Polygon interface
-CORE_API Boolean CDECL polygon_reserve(LodHdl lvlDtl, size_t vertices, size_t edges, size_t tris, size_t quads);
+CORE_API Boolean CDECL polygon_reserve(LodHdl lvlDtl, size_t vertices, size_t tris, size_t quads);
 CORE_API VertexAttributeHdl CDECL polygon_request_vertex_attribute(LodHdl lvlDtl, const char* name,
 																   GeomAttributeType type);
 CORE_API FaceAttributeHdl CDECL polygon_request_face_attribute(LodHdl lvlDtl, const char* name,
@@ -390,7 +390,6 @@ CORE_API size_t CDECL polygon_set_face_attribute_bulk(LodHdl lvlDtl, const FaceA
 CORE_API size_t CDECL polygon_set_material_idx_bulk(LodHdl lvlDtl, FaceHdl startFace, size_t count,
 													const BulkLoader* stream);
 CORE_API size_t CDECL polygon_get_vertex_count(LodHdl lvlDtl);
-CORE_API size_t CDECL polygon_get_edge_count(LodHdl lvlDtl);
 CORE_API size_t CDECL polygon_get_face_count(LodHdl lvlDtl);
 CORE_API size_t CDECL polygon_get_triangle_count(LodHdl lvlDtl);
 CORE_API size_t CDECL polygon_get_quad_count(LodHdl lvlDtl);
@@ -422,7 +421,7 @@ CORE_API ObjectHdl CDECL world_get_object(MufflonInstanceHdl instHdl, const char
 CORE_API const char* CDECL world_get_object_name(ObjectHdl obj);
 CORE_API Boolean CDECL object_has_lod(ConstObjectHdl obj, LodLevel level);
 CORE_API Boolean CDECL object_allocate_lod_slots(ObjectHdl obj, LodLevel slots);
-CORE_API LodHdl CDECL object_add_lod(ObjectHdl obj, LodLevel level);
+CORE_API LodHdl CDECL object_add_lod(ObjectHdl obj, LodLevel level, Boolean asReduced);
 CORE_API Boolean CDECL object_get_id(ObjectHdl obj, uint32_t* id);
 
 // Instance interface

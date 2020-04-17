@@ -361,7 +361,7 @@ namespace gui.Dll
 
         // Polygon interface
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_reserve")]
-        internal static extern Boolean polygon_reserve(IntPtr lvlDtl, ulong vertices, ulong edges, ulong tris, ulong quads);
+        internal static extern Boolean polygon_reserve(IntPtr lvlDtl, ulong vertices, ulong tris, ulong quads);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_request_vertex_attribute")]
         internal static extern VertexAttributeHdl polygon_request_vertex_attribute(IntPtr lvlDtl, IntPtr name, GeomAttributeType type);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_request_face_attribute")]
@@ -395,8 +395,6 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_set_material_idx_bulk")]
         internal static extern ulong polygon_set_material_idx_bulk(IntPtr lvlDtl, IntPtr stream);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_get_vertex_count")]
-        internal static extern ulong polygon_get_vertex_count(IntPtr lvlDtl);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_get_edge_count")]
         internal static extern ulong polygon_get_edge_count(IntPtr lvlDtl);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_get_face_count")]
         internal static extern ulong polygon_get_face_count(IntPtr lvlDtl);
@@ -444,7 +442,7 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "object_has_lod")]
         internal static extern Boolean object_has_lod(IntPtr obj, UInt32 level);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "object_add_lod")]
-        internal static extern IntPtr object_add_lod(IntPtr obj, UInt32 level);
+        internal static extern IntPtr object_add_lod(IntPtr obj, UInt32 level, UInt32 asReduced);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "object_get_id")]
         internal static extern Boolean object_get_id(IntPtr obj, IntPtr id);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_reserve_objects_instances")]

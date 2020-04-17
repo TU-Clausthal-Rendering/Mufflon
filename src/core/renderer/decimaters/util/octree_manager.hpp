@@ -80,7 +80,8 @@ public:
 	typename std::vector<OctreeType>::const_iterator end() const noexcept { return m_octrees.end(); }
 	typename std::vector<OctreeType>::const_iterator cbegin() const noexcept { return m_octrees.cbegin(); }
 	typename std::vector<OctreeType>::const_iterator cend() const noexcept { return m_octrees.cend(); }
-	
+
+	std::size_t octree_count() const noexcept { return m_octrees.size(); }
 	std::size_t capacity() const noexcept { return m_capacity; }
 	std::size_t max_fill_capacity() const noexcept { return m_fillCapacity; }
 	std::size_t size() const noexcept { return m_allocationCounter.load(); }

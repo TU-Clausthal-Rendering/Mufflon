@@ -1,5 +1,7 @@
 #include "cpu_combined_reducer.hpp"
 #include "combined_gathering.hpp"
+#include "core/scene/geometry/util.hpp"
+#include "core/renderer/decimaters/combined/modules/importance_quadrics.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include <random>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
@@ -7,38 +9,8 @@
 
 namespace mufflon::renderer::decimaters {
 
-bool CpuCombinedReducer::custom_lod_loader(scene::WorldContainer& world, scene::Object& object, const u32 lodIndex) const {
-	if(object.has_lod(lodIndex))
-		return true;
-	if(!world.load_lod(object, lodIndex))
-		return false;
-
-	if(m_params.initialReduction > 0.f) {
-		if(object.has_reduced_lod_available(lodIndex))
-			return true;
-		const auto& origLod = object.get_original_lod(lodIndex);
-		const auto& origPolys = origLod.template get_geometry<scene::geometry::Polygons>();
-		if(origPolys.get_vertex_count() < m_params.threshold)
-			return true;
-		auto& lod = object.add_reduced_lod(lodIndex);
-		auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-		// Pre-reduce
-		auto decimater = polygons.create_decimater();
-		OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
-		decimater.add(modQuadricHandle);
-		// Possibly repeat until we reached the desired count
-		const auto targetVertexCount = static_cast<std::size_t>((1.f - m_params.initialReduction) * static_cast<float>(origPolys.get_vertex_count()));
-		const auto performedCollapses = polygons.decimate(decimater, targetVertexCount, true);
-		logInfo("Loaded reduced LoD '", object.get_name(), "' (", origPolys.get_vertex_count(), " -> ", polygons.get_vertex_count(), ")");
-		lod.clear_accel_structure();
-		object.remove_original_lod(lodIndex);
-	}
-	return true;
-}
-
 CpuCombinedReducer::CpuCombinedReducer(mufflon::scene::WorldContainer& world) :
-	RendererBase<Device::CPU, combined::CombinedTargets>{ world, std::bind(&CpuCombinedReducer::custom_lod_loader, this, std::placeholders::_1,
-																		   std::placeholders::_2, std::placeholders::_3) }
+	RendererBase<Device::CPU, combined::CombinedTargets>{ world }
 {
 	std::random_device rndDev;
 	m_rngs.emplace_back(static_cast<u32>(rndDev()));
@@ -48,20 +20,10 @@ void CpuCombinedReducer::pre_reset() {
 	if((get_reset_event() & ResetEvent::CAMERA) != ResetEvent::NONE || get_reset_event().resolution_changed())
 		init_rngs(m_outputBuffer.get_num_pixels());
 
-	if((get_reset_event() & ResetEvent::SCENARIO) != ResetEvent::NONE && m_stage == Stage::IMPORTANCE_GATHERED) {
-		// At least activate the created LoDs
-		/*for(auto& obj : m_currentScene->get_objects()) {
-			const u32 newLodLevel = static_cast<u32>(obj.first->get_lod_slot_count() - 1u);
-			// TODO: this reeeeally breaks instancing
-			m_world.get_current_scenario()->set_custom_lod(obj.first, newLodLevel);
-		}*/
-	}
-
 	if(get_reset_event() & ResetEvent::PARAMETER && !(get_reset_event() & (ResetEvent::RENDERER_ENABLE | ResetEvent::CAMERA)))
 		m_stage = Stage::NONE;
 
 	// Initialize the decimaters
-	// TODO: how to deal with instancing
 	if(m_stage == Stage::NONE) {
 		this->initialize_decimaters();
 		m_stage = Stage::INITIALIZED;
@@ -89,7 +51,6 @@ void CpuCombinedReducer::post_reset() {
 }
 
 void CpuCombinedReducer::on_world_clearing() {
-	m_decimaters.clear();
 	m_stage = Stage::NONE;
 }
 
@@ -111,7 +72,7 @@ void CpuCombinedReducer::post_iteration(IOutputHandler& outputBuffer) {
 
 		// Remove instances that are below our threshold
 		// TODO: how to get access to other frames? Are they present in the scene?
-		const auto& objects = m_currentScene->get_objects();
+		auto& objects = m_currentScene->get_objects();
 		const auto& instances = m_currentScene->get_instances();
 		const auto impOffset = m_sceneDesc.numInstances * m_world.get_frame_current();
 		std::vector<std::tuple<scene::ObjectHandle, u32, double>> instanceList;
@@ -153,23 +114,122 @@ void CpuCombinedReducer::post_iteration(IOutputHandler& outputBuffer) {
 
 		const auto processTime = CpuProfileState::get_process_time();
 		const auto cycles = CpuProfileState::get_cpu_cycle();
-
+		
 		std::vector<std::vector<bool>> octreeNodeMasks(get_max_thread_num());
 		std::vector<std::vector<renderer::decimaters::FloatOctree::NodeIndex>> currLevels(get_max_thread_num());
 		std::vector<std::vector<renderer::decimaters::FloatOctree::NodeIndex>> nextLevels(get_max_thread_num());
+		std::vector<scene::geometry::PolygonMeshType> meshes(get_max_thread_num());
+		std::vector<std::vector<u32>> vertexPositions(get_max_thread_num());
+
+		// Create curvature and importance properties for the meshes
+		std::vector<OpenMesh::VPropHandleT<float>> curvProps;
+		std::vector<OpenMesh::VPropHandleT<float>> accumImpProps;
+		curvProps.reserve(get_max_thread_num());
+		accumImpProps.reserve(get_max_thread_num());
+		for(auto& mesh : meshes) {
+			curvProps.emplace_back();
+			accumImpProps.emplace_back();
+			mesh.add_property(curvProps.back());
+			mesh.add_property(accumImpProps.back());
+		}
 
 #pragma omp parallel for schedule(dynamic)
-		for(i32 i = 0; i < static_cast<i32>(m_decimaters.size()); ++i) {
+		for(i32 i = 0; i < static_cast<i32>(m_viewOctrees[m_world.get_frame_current()].octree_count()); ++i) {
 			// Only update objects that have instances left
-			if((m_currentScene->get_objects().cbegin() + i)->second.count > 0u) {
-				octreeNodeMasks[get_current_thread_idx()].reserve(m_viewOctrees.front().size());
-				currLevels[get_current_thread_idx()].reserve(50000u);
-				nextLevels[get_current_thread_idx()].reserve(50000u);
+			auto& obj = objects.cbegin() + i;
+			if(obj->second.count > 0u) {
+				const auto threadIdx = get_current_thread_idx();
+				octreeNodeMasks[threadIdx].reserve(m_viewOctrees.front().size());
+				currLevels[threadIdx].reserve(50000u);
+				nextLevels[threadIdx].reserve(50000u);
 
-				m_decimaters[i]->update(m_params.impWeightMethod, startFrame, endFrame);
-				m_decimaters[i]->reduce(m_remainingVertices[i], m_params.maxClusterDensity, m_world.get_frame_current(),
-										octreeNodeMasks[get_current_thread_idx()], currLevels[get_current_thread_idx()],
-										nextLevels[get_current_thread_idx()]);
+				// First create the mesh
+				auto& mesh = meshes[threadIdx];
+				mesh.clean_keep_reservation();
+				// Reload the original LoD
+				const auto lodLevel = 0u;
+				if(!m_world.load_lod(*obj->first, lodLevel, true))
+					throw std::runtime_error("Failed to reload LoD " + std::to_string(lodLevel) + " for object '"
+											 + std::string(obj->first->get_name()) + "'");
+				auto& lod = obj->first->get_lod(lodLevel);
+				auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+				polygons.create_halfedge_structure(mesh);
+
+				// Compute the per-vertex importance
+				// TODO
+				for(const auto vertex : mesh.vertices())
+					mesh.property(curvProps[threadIdx], vertex) = 1.f;
+
+				// Map the importance back to the original mesh
+				for(const auto vertex : mesh.vertices()) {
+					// Put importance into temporary storage
+					// TODO: end of frame sequence!
+					float importance = 0.f;
+					const auto area = compute_area(mesh, vertex);
+					const auto curv = std::abs(mesh.property(curvProps[threadIdx], vertex));
+
+					auto actualStartFrame = startFrame;
+					auto actualEndFrame = endFrame;
+
+					switch(m_params.impWeightMethod) {
+						case combined::PImpWeightMethod::Values::AVERAGE_ALL:
+							actualStartFrame = 0u;
+							actualEndFrame = m_world.get_frame_count() - 1u;
+							[[fallthrough]];
+						case combined::PImpWeightMethod::Values::AVERAGE:
+							for(u32 f = actualStartFrame; f <= actualEndFrame; ++f) {
+								// Fetch octree value (TODO)
+								const auto imp = m_viewOctrees[f][i].get_density(util::pun<ei::Vec3>(mesh.point(vertex)),
+																				 util::pun<ei::Vec3>(mesh.normal(vertex)));
+								importance += imp;
+							}
+							importance /= static_cast<float>(actualEndFrame - actualStartFrame + 1u);
+							break;
+						case combined::PImpWeightMethod::Values::MAX_ALL:
+							actualStartFrame = 0u;
+							actualEndFrame = m_world.get_frame_count() - 1u;
+							[[fallthrough]];
+						case combined::PImpWeightMethod::Values::MAX:
+							for(u32 f = actualStartFrame; f <= actualEndFrame; ++f) {
+								// Fetch octree value (TODO)
+								const auto imp = m_viewOctrees[f][i].get_density(util::pun<ei::Vec3>(mesh.point(vertex)),
+																				 util::pun<ei::Vec3>(mesh.normal(vertex)));
+								importance = std::max<float>(importance, imp);
+							}
+							break;
+					}
+					const auto weightedImportance = std::sqrt(importance * curv) / area;
+					mesh.property(accumImpProps[threadIdx], vertex) = weightedImportance;
+				}
+
+				if(m_remainingVertices[i] < mesh.n_vertices()) {
+					const auto t0 = std::chrono::high_resolution_clock::now();
+
+					// Perform decimation
+					OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
+					combined::modules::ImportanceDecimationModule<>::Handle impHandle;
+					decimater.add(impHandle);
+					decimater.module(impHandle).set_properties(mesh, accumImpProps[threadIdx]);
+					decimater.initialize();
+
+					// TODO: cluster!
+					/*
+					collapses = m_decimatedPoly->cluster_decimate(*m_viewImportance[frame], decimater,
+																  targetVertexCount, maxDensity, &octreeNodeMask,
+																  &currLevel, &nextLevel);*/
+					//collapses = m_decimatedPoly->decimate(decimater, targetVertexCount, false);
+					//const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
+					const auto collapses = decimater.decimate_to(m_remainingVertices[i]);
+					const auto t1 = std::chrono::high_resolution_clock::now();
+					const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
+					logInfo("Collapse duration: ", duration.count(), "ms");
+					if(collapses > 0u) {
+						polygons.reconstruct_from_reduced_mesh(mesh, &vertexPositions[threadIdx]);
+						lod.clear_accel_structure();
+					}
+					logInfo("Performed ", collapses, " collapses for object '", obj->first->get_name(),
+								"', remaining vertices: ", polygons.get_vertex_count());
+				}
 			}
 		}
 
@@ -186,8 +246,8 @@ void CpuCombinedReducer::post_iteration(IOutputHandler& outputBuffer) {
 void CpuCombinedReducer::iterate() {
 	if(m_stage == Stage::INITIALIZED) {
 		if(m_hasFrameImp[m_world.get_frame_current()]) {
-			if(m_params.reduction == 0)
-				display_importance();
+			//if(m_params.reduction == 0)
+			//	display_importance();
 		} else {
 			logInfo("Gathering importance for frame ", m_world.get_frame_current());
 
@@ -198,23 +258,26 @@ void CpuCombinedReducer::iterate() {
 			gather_importance();
 
 			// Update the importance sums
-			for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-				m_decimaters[i]->finish_gather(m_world.get_frame_current());
+			{
+				const auto t0 = std::chrono::high_resolution_clock::now();
+				// Join the irradiance octrees into our main octrees
+				for(std::size_t i = 0u; i < m_viewOctrees[m_world.get_frame_current()].octree_count(); ++i)
+					m_viewOctrees[m_world.get_frame_current()][i].join(m_irradianceOctrees[m_world.get_frame_current()][i], m_params.lightWeight);
+				const auto t1 = std::chrono::high_resolution_clock::now();
+				logPedantic("Join time ", std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count(), "ms");
 			}
-
-			if(m_decimaters.size() == 0u)
-				return;
 
 			m_hasFrameImp[m_world.get_frame_current()] = true;
 			logInfo("Finished importance gathering (",
 					std::chrono::duration_cast<std::chrono::milliseconds>(processTime).count(),
 					"ms, ", cycles / 1'000'000, " MCycles)");
-			if(m_params.reduction == 0) {
-				display_importance();
-			}
+			//if(m_params.reduction == 0) {
+			//	display_importance();
+			//}
 		}
 	} else if(m_stage == Stage::IMPORTANCE_GATHERED && m_params.reduction == 0) {
-		std::size_t vertices = 0u;
+		// TODO: re-enable?
+		/*std::size_t vertices = 0u;
 		for(const auto& decimater : m_decimaters)
 			vertices += decimater->get_decimated_vertex_count();
 		// TODO: uses quite a bit of memory
@@ -227,7 +290,7 @@ void CpuCombinedReducer::iterate() {
 			decimater->get_decimated_importance(m_accumImpAccess.back());
 			vertices += decimater->get_decimated_vertex_count();
 		}
-		display_importance(true);
+		display_importance(true);*/
 	}
 }
 
@@ -270,6 +333,7 @@ void CpuCombinedReducer::gather_importance() {
 	// TODO: allow for this with proper reset "events"
 }
 
+#if 0
 void CpuCombinedReducer::display_importance(const bool accumulated) {
 	// TODO: accumulated!
 	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
@@ -288,6 +352,7 @@ void CpuCombinedReducer::display_importance(const bool accumulated) {
 												   m_world.get_frame_current());
 	}
 }
+#endif // 0
 
 double CpuCombinedReducer::get_lod_importance(const u32 frame, const scene::Scene::InstanceRef obj) const noexcept {
 	double sum = 0.0;
@@ -301,8 +366,7 @@ double CpuCombinedReducer::get_lod_importance(const u32 frame, const scene::Scen
 void CpuCombinedReducer::initialize_decimaters() {
 	auto& objects = m_currentScene->get_objects();
 	const auto& instances = m_currentScene->get_instances();
-	m_decimaters.clear();
-	m_decimaters.resize(objects.size());
+	m_originalVertices.resize(objects.size());
 
 	const auto timeBegin = CpuProfileState::get_process_time();
 
@@ -310,11 +374,17 @@ void CpuCombinedReducer::initialize_decimaters() {
 	m_irradianceOctrees.clear();
 	m_viewOctrees.reserve(m_world.get_frame_count());
 	m_irradianceOctrees.reserve(m_world.get_frame_count());
-	m_viewOctreeAccess.resize(m_world.get_frame_count() * objects.size());
-	m_irradianceOctreeAccess.resize(m_world.get_frame_count() * objects.size());
+
+	std::vector<scene::geometry::PolygonMeshType> meshes(get_max_thread_num());
+	for(auto& mesh : meshes) {
+		mesh.request_vertex_status();
+		mesh.request_face_status();
+		mesh.request_edge_status();
+	}
 
 	// First we load in the LoDs (possibly reduced version)
-//#pragma PARALLEL_FOR_COND_DYNAMIC(true)
+	// TODO: sort them to keep memory budget?
+#pragma PARALLEL_FOR_COND_DYNAMIC(true)
 	for(std::int64_t o = 0; o < static_cast<std::int64_t>(objects.size()); ++o) {
 		auto objIter = objects.begin();
 		for(i32 j = 0; j < o; ++j)
@@ -327,6 +397,7 @@ void CpuCombinedReducer::initialize_decimaters() {
 		const u32 lodIndex = 0u;
 		if(!m_world.load_lod(*obj.first, lodIndex))
 			throw std::runtime_error("Failed to load object LoD!");
+		m_originalVertices[o] = obj.first->get_lod(lodIndex).template get_geometry<scene::geometry::Polygons>().get_vertex_count();
 
 		if(m_params.initialReduction > 0.f) {
 			if(!obj.first->has_reduced_lod_available(lodIndex)) {
@@ -339,20 +410,18 @@ void CpuCombinedReducer::initialize_decimaters() {
 					const auto targetVertexCount = static_cast<std::size_t>((1.f - m_params.initialReduction)
 																			* static_cast<float>(origPolys.get_vertex_count()));
 					const auto gridRes = static_cast<std::size_t>(std::ceil(std::cbrt(2.f * static_cast<float>(targetVertexCount))));
-					// TODO: clustering!
-					polygons.cluster(gridRes, true);
-					//auto decimater = polygons.create_decimater();
-					//OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
-					//decimater.add(modQuadricHandle);
-					//polygons.decimate(decimater, targetVertexCount, true);
-
-					/*auto decimater = polygons.create_decimater();
+					auto& mesh = meshes[get_current_thread_idx()];
+					mesh.clean_keep_reservation();
+					polygons.create_halfedge_structure(mesh);
+					OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
 					OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
 					decimater.add(modQuadricHandle);
+					decimater.initialize();
 					// Possibly repeat until we reached the desired count
-					const auto performedCollapses = polygons.decimate(decimater, targetVertexCount, true);*/
-					logPedantic("Loaded reduced LoD '", obj.first->get_name(), "' (",
-								origPolys.get_vertex_count(), " -> ", polygons.get_vertex_count(), ")");
+					const auto performedCollapses = decimater.decimate_to(targetVertexCount);
+					polygons.reconstruct_from_reduced_mesh(mesh);
+					logInfo("Loaded reduced LoD '", obj.first->get_name(), "' (",
+							origPolys.get_vertex_count(), " -> ", polygons.get_vertex_count(), ")");
 					lod.clear_accel_structure();
 					obj.first->remove_original_lod(lodIndex);
 				}
@@ -367,7 +436,6 @@ void CpuCombinedReducer::initialize_decimaters() {
 		m_viewOctrees.emplace_back(static_cast<u32>(m_params.impCapacity), static_cast<u32>(objects.size()), true);
 		m_irradianceOctrees.emplace_back(static_cast<u32>(m_params.impCapacity), static_cast<u32>(objects.size()), false);
 
-		std::size_t o = 0u;
 		for(const auto& obj : objects) {
 			// TODO: proper LoD levels!
 			// Load and pre-reduce the LoDs if applicable
@@ -387,11 +455,6 @@ void CpuCombinedReducer::initialize_decimaters() {
 			// TODO: proper splitting factors!
 			m_viewOctrees.back().create(aabb, 8.f * splitScale);
 			m_irradianceOctrees.back().create(aabb, 8u, 8.f * splitScale);
-
-			m_viewOctreeAccess[m_world.get_frame_count() * o + i] = m_viewOctrees.back().data() + o;
-			m_irradianceOctreeAccess[m_world.get_frame_count() * o + i] = m_irradianceOctrees.back().data() + o;
-
-			++o;
 		}
 	}
 
@@ -410,29 +473,8 @@ void CpuCombinedReducer::initialize_decimaters() {
 			if(const auto level = scenario.get_effective_lod(instance); level < lowestLevel)
 				lowestLevel = level;
 		}
-
-		// TODO: this only works if instances don't specify LoD levels
-		if(!obj.first->has_reduced_lod_available(lowestLevel)) {
-			obj.first->add_reduced_lod(lowestLevel);
-			auto& lod = obj.first->get_or_fetch_original_lod(m_world, lowestLevel);
-			auto& newLod = obj.first->get_reduced_lod(lowestLevel);
-			const auto& polygons = newLod.template get_geometry<scene::geometry::Polygons>();
-
-			std::size_t collapses = 0u;
-
-			if(polygons.get_vertex_count() >= m_params.threshold && m_params.initialReduction > 0.f) {
-				collapses = static_cast<std::size_t>(std::ceil(m_params.initialReduction * polygons.get_vertex_count()));
-				logInfo("Reducing LoD 0 of object '", obj.first->get_name(), "' by ", collapses, " vertices");
-			}
-		}
-		// TODO!
-		auto& lod = obj.first->get_lod(lowestLevel);
-		auto& newLod = obj.first->get_lod(lowestLevel);
-		m_decimaters[i] = std::make_unique<combined::CombinedDecimater>(obj.first->get_name(),
-																		lod, newLod, m_world.get_frame_count(),
-																		&m_viewOctreeAccess[i * m_world.get_frame_count()],
-																		&m_irradianceOctreeAccess[i * m_world.get_frame_count()],
-																		m_params.lightWeight);
+		if(lowestLevel != 0u)
+			throw std::runtime_error("Unsupported LoD level (will be fixed soonTM)!");
 	}
 	m_currentScene->clear_accel_structure();
 	logInfo("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - timeBegin).count(), "ms");
@@ -449,8 +491,8 @@ void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) 
 	m_remainingVertices.clear();
 	if(m_params.reduction == 0.f) {
 		// Do not reduce anything
-		for(const auto& decimater : m_decimaters)
-			m_remainingVertices.push_back(decimater->get_original_vertex_count());
+		for(const auto count : m_originalVertices)
+			m_remainingVertices.push_back(count);
 		return;
 	}
 
@@ -460,7 +502,7 @@ void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) 
 	std::size_t nonReducibleVertices = 0u;
 	std::size_t totalVertexCount = 0u;
 
-	std::vector<double> importance(m_decimaters.size());
+	std::vector<double> importance(m_viewOctrees[m_world.get_frame_current()].octree_count());
 
 	switch(m_params.vertexDistMethod) {
 		case combined::PVertexDistMethod::Values::AVERAGE_ALL:
@@ -471,24 +513,23 @@ void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) 
 		{
 			for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
 				auto iter = m_currentScene->get_objects().cbegin();
-				for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-					auto& decimater = m_decimaters[i];
-					if(decimater->get_original_vertex_count() > m_params.threshold)
+				for(std::size_t i = 0u; i < m_originalVertices.size(); ++i) {
+					if(m_originalVertices[i] > m_params.threshold)
 						importance[i] += get_lod_importance(frame, (iter++)->second);
 				}
 			}
 
 			auto iter = m_currentScene->get_objects().cbegin();
-			for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-				totalVertexCount += m_decimaters[i]->get_original_vertex_count();
+			for(std::size_t i = 0u; i < m_originalVertices.size(); ++i) {
+				totalVertexCount += m_originalVertices[i];
 				if((iter++)->second.count == 0)
 					continue;
 				importance[i] /= static_cast<double>(frameEnd - frameStart + 1u);
 				importanceSum += importance[i];
-				if(m_decimaters[i]->get_original_vertex_count() > m_params.threshold)
-					reducibleVertices += m_decimaters[i]->get_original_vertex_count();
+				if(m_originalVertices[i] > m_params.threshold)
+					reducibleVertices += m_originalVertices[i];
 				else
-					nonReducibleVertices += m_decimaters[i]->get_original_vertex_count();
+					nonReducibleVertices += m_originalVertices[i];
 			}
 		}	break;
 		case combined::PVertexDistMethod::Values::MAX_ALL:
@@ -499,18 +540,17 @@ void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) 
 		{
 			for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
 				auto iter = m_currentScene->get_objects().cbegin();
-				for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
-					totalVertexCount += m_decimaters[i]->get_original_vertex_count();
+				for(std::size_t i = 0u; i < m_originalVertices.size(); ++i) {
+					totalVertexCount += m_originalVertices[i];
 					if(iter->second.count == 0) {
 						++iter;
 						continue;
 					}
-					auto& decimater = m_decimaters[i];
-					if(decimater->get_original_vertex_count() > m_params.threshold) {
+					if(m_originalVertices[i] > m_params.threshold) {
 						importance[i] = std::max(importance[i], get_lod_importance(frame, (iter++)->second));
-						reducibleVertices += m_decimaters[i]->get_original_vertex_count();
+						reducibleVertices += m_originalVertices[i];
 					} else {
-						nonReducibleVertices += m_decimaters[i]->get_original_vertex_count();
+						nonReducibleVertices += m_originalVertices[i];
 					}
 				}
 			}
@@ -525,20 +565,20 @@ void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) 
 	std::size_t reducedVertexPool = totalTargetVertexCount - nonReducibleVertices;
 
 	auto iter = m_currentScene->get_objects().cbegin();
-	for(std::size_t i = 0u; i < m_decimaters.size(); ++i) {
+	for(std::size_t i = 0u; i < m_originalVertices.size(); ++i) {
 		if(iter->second.count == 0) {
 			m_remainingVertices.push_back(0u);
 			continue;
 		}
-		if(m_decimaters[i]->get_original_vertex_count() > m_params.threshold) {
-			const auto targetVertexCount = std::min(m_decimaters[i]->get_original_vertex_count(),
+		if(m_originalVertices[i] > m_params.threshold) {
+			const auto targetVertexCount = std::min(m_originalVertices[i],
 													static_cast<std::size_t>(importance[i]
 																			 * static_cast<double>(reducedVertexPool) / importanceSum));
 			reducedVertexPool -= targetVertexCount;
 			importanceSum -= importance[i];
 			m_remainingVertices.push_back(targetVertexCount);
 		} else {
-			m_remainingVertices.push_back(m_decimaters[i]->get_original_vertex_count());
+			m_remainingVertices.push_back(m_originalVertices[i]);
 		}
 	}
 }

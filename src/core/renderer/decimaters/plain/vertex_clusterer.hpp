@@ -5,6 +5,8 @@
 #include "core/scene/geometry/polygon.hpp"
 #include "core/renderer/decimaters/util/octree_manager.hpp"
 #include "core/renderer/decimaters/util/octree.inl"
+#include "core/scene/clustering/octree_clustering.hpp"
+#include "core/scene/clustering/uniform_clustering.hpp"
 #include "core/renderer/pt/pt_common.hpp"
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
@@ -51,17 +53,31 @@ public:
 
 		if(!m_done) {
 			logInfo("[CpuUniformVertexClusterer::pre_reset()] Starting clustering...");
+			scene::geometry::PolygonMeshType mesh{};
+			std::vector<u32> vertexIndexBuffer{};
+			mesh.request_vertex_status();
+			mesh.request_face_status();
+			mesh.request_edge_status();
 			auto& objects = m_currentScene->get_objects();
 			for(auto& obj : objects) {
 				const auto lodCount = obj.first->get_lod_slot_count();
 				for(std::size_t i = 0u; i < lodCount; ++i) {
-					if(!obj.first->has_lod(static_cast<u32>(i)))
-						continue;
-
-					logInfo("Object: ", obj.first->get_name());
-					obj.first->get_lod(static_cast<u32>(i)).template get_geometry<scene::geometry::Polygons>()
-						.cluster(static_cast<std::size_t>(m_params.gridRes), true);
-					obj.first->get_lod(0).clear_accel_structure();
+					using namespace std::chrono;
+					const auto t0 = high_resolution_clock::now();
+					mesh.clean_keep_reservation();
+					if(!m_world.load_lod(*obj.first, static_cast<u32>(i)))
+						throw std::runtime_error("Failed to load LoD " + std::to_string(i)
+												 + " of object '" + std::string(obj.first->get_name()) + "'");
+					auto& lod = obj.first->add_reduced_lod(static_cast<u32>(i));
+					auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+					polygons.create_halfedge_structure(mesh);
+					scene::clustering::UniformVertexClusterer clusterer{ ei::UVec3{ static_cast<u32>(m_params.gridRes) } };
+					const auto clusterCount = clusterer.cluster(mesh, polygons.get_bounding_box());
+					polygons.reconstruct_from_reduced_mesh(mesh, &vertexIndexBuffer);
+					lod.clear_accel_structure();
+					obj.first->remove_original_lod(i);
+					logInfo("Object '", obj.first->get_name(), "': ",
+							duration_cast<milliseconds>(high_resolution_clock::now() - t0).count(), "ms");
 				}
 			}
 			m_currentScene->clear_accel_structure();
@@ -100,6 +116,9 @@ public:
 
 			for(const auto& obj : objects) {
 				// TODO: proper bounding box!
+				if(!m_world.load_lod(*obj.first, 0u))
+					throw std::runtime_error("Failed to load LoD 0 of object '"
+											 + std::string(obj.first->get_name()) + "'");
 				const auto aabb = obj.first->get_lod(0).get_bounding_box();
 
 				// We have to weight the splitting factor with the average instance scaling.
@@ -115,8 +134,6 @@ public:
 				m_octrees->create(obj.first->get_lod(0).get_bounding_box(), splitScale * 8.f);
 			}
 			m_currentScene->clear_accel_structure();
-			m_done = true;
-			logInfo("[CpuUniformVertexClusterer::pre_reset()] Finished clustering");
 		}
 	}
 	void iterate() final {
@@ -186,24 +203,36 @@ public:
 		}
 	}
 	void post_iteration(IOutputHandler& outputBuffer) final {
-		using namespace std::chrono;
-		// Cluster
-		auto& objects = m_currentScene->get_objects();
-		std::size_t i = 0u;
-		for(auto& obj : objects) {
-			auto& lod = obj.first->get_lod(0);
-			auto& poly = lod.template get_geometry<scene::geometry::Polygons>();
-			auto decimater = poly.create_decimater();
-			OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
-			decimater.add(modQuadricHandle);
-			const auto t0 = high_resolution_clock::now();
-			poly.cluster_decimate((*m_octrees)[i++], decimater, static_cast<std::size_t>(m_params.targetCount), m_params.maxDensity);
-			const auto t1 = high_resolution_clock::now();
-			logInfo("Duration: ", duration_cast<milliseconds>(t1 - t0).count(), "ms");
-			lod.clear_accel_structure();
+		if(!m_done) {
+			logInfo("[CpuOctreeVertexClusterer::post_iteration()] Starting clustering...");
+			scene::geometry::PolygonMeshType mesh{};
+			std::vector<u32> vertexIndexBuffer{};
+			mesh.request_vertex_status();
+			mesh.request_face_status();
+			mesh.request_edge_status();
+			auto& objects = m_currentScene->get_objects();
+			for(auto& obj : objects) {
+				const auto lodCount = obj.first->get_lod_slot_count();
+				for(std::size_t i = 0u; i < lodCount; ++i) {
+					using namespace std::chrono;
+					const auto t0 = high_resolution_clock::now();
+					mesh.clean_keep_reservation();
+					auto& lod = obj.first->add_reduced_lod(static_cast<u32>(i));
+					auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+					polygons.create_halfedge_structure(mesh);
+					scene::clustering::OctreeVertexClusterer clusterer{ (*m_octrees)[i++], static_cast<std::size_t>(m_params.targetCount), m_params.maxDensity };
+					const auto clusterCount = clusterer.cluster(mesh, polygons.get_bounding_box());
+					polygons.reconstruct_from_reduced_mesh(mesh, &vertexIndexBuffer);
+					lod.clear_accel_structure();
+					obj.first->remove_original_lod(i);
+					logInfo("Object '", obj.first->get_name(), "': ",
+							duration_cast<milliseconds>(high_resolution_clock::now() - t0).count(), "ms");
+				}
+			}
+			m_currentScene->clear_accel_structure();
+			m_done = true;
+			logInfo("[CpuOctreeVertexClusterer::post_iteration()] Finished clustering");
 		}
-
-		m_currentScene->clear_accel_structure();
 	}
 	IParameterHandler& get_parameters() final { return m_params; }
 	static constexpr StringView get_name_static() noexcept { return "Octree vertex clusterer"; }

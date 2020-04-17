@@ -87,14 +87,6 @@ public:
 	void synchronize() {
 		m_attributes.synchronize<dev>();
 	}
-	/*template < Device dev >
-	void synchronize(StringView name) {
-		m_attributes.synchronize<dev>(name);
-	}
-	template < Device dev >
-	void synchronize(SphereAttributeHandle hdl) {
-		m_attributes.synchronize<dev>(hdl);
-	}*/
 
 	template < Device dev >
 	void unload() {

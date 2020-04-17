@@ -239,9 +239,9 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 				// Now we can do the per-LoD things like displacement mapping and fetching descriptors
 				if(prevLevel != std::numeric_limits<u32>::max())
 					lodDescs[currLodIndex - 1u].next = i;
-				// TODO: option to pre-reduce!
-				if(!(lodLoader.has_value() ? (*lodLoader)(m_world, *obj.first, i) : m_world.load_lod(*obj.first, i)))
-					throw std::runtime_error("Failed to load missing LoD for scene descriptor!");
+				if(!obj.first->has_lod(i))
+					if(!(lodLoader.has_value() ? (*lodLoader)(m_world, *obj.first, i) : m_world.load_lod(*obj.first, i)))
+						throw std::runtime_error("Failed to load missing LoD for scene descriptor!");
 				Lod* lod = &obj.first->get_lod(i);
 
 				// Reanimate the LoD if necessary
@@ -499,6 +499,8 @@ bool Scene::retessellate(const float tessLevel) {
 	// TODO: get rid of the mapping (too low performance)
 	std::unordered_map<u32, std::vector<InstanceHandle>> lodMapping;
 	std::vector<ei::Mat3x4> instTrans;
+	const auto displacedMatIndices = m_scenario.get_displaced_mat_indices();
+	auto uniqueIndices = std::make_unique<MaterialIndex[]>(m_scenario.get_num_material_slots());
 	for(auto& obj : m_objects) {
 		lodMapping.clear();
 
@@ -511,14 +513,23 @@ bool Scene::retessellate(const float tessLevel) {
 		}
 
 		for(const auto& mapping : lodMapping) {
+			Lod* lod = nullptr;
 			// Check if we have displacement or plain tessellation
-			Lod* lod = &obj.first->get_lod(mapping.first);
+			const auto numIndices = m_world.load_object_material_indices(obj.first->get_object_id(), uniqueIndices.get());
+			// Check if one of them is displaced
+			if(numIndices == 0u || util::share_elements_sorted(displacedMatIndices.cbegin(), displacedMatIndices.cend(),
+															   uniqueIndices.get(), uniqueIndices.get() + m_scenario.get_num_material_slots())) {
+				if(!m_world.load_lod(*obj.first, mapping.first))
+					throw std::runtime_error("Failed to load missing LoD for scene descriptor!");
+				lod = &obj.first->get_lod(mapping.first);
+			}
 
-			if(lod->is_displaced(m_scenario.get_displaced_mat_indices())) {
+
+			if(lod != nullptr) {
 				// First get the relevant instance transformations
 				instTrans.clear();
-				/*for(InstanceHandle inst : mapping.second)
-					instTrans.push_back(inst->get_transformation_matrix());*/
+				for(InstanceHandle inst : mapping.second)
+					instTrans.push_back(m_world.compute_instance_to_world_transformation(inst));
 				// Then we may adaptively tessellate
 
 				// TODO: more adequate tessellation level and more adequate tessellator
@@ -539,6 +550,9 @@ bool Scene::retessellate(const float tessLevel) {
 				// We may not have displacement mapping, but still may wanna tessellate the object
 				const auto objTessInfo = m_scenario.get_tessellation_info(obj.first);
 				if(objTessInfo.has_value()) {
+					if(!m_world.load_lod(*obj.first, mapping.first))
+						throw std::runtime_error("Failed to load missing LoD for scene descriptor!");
+					lod = &obj.first->get_lod(mapping.first);
 					// Reload the LoD if it has been modified previously
 					if(lod->was_displacement_mapping_applied()) {
 						obj.first->remove_lod(mapping.first);
@@ -551,8 +565,8 @@ bool Scene::retessellate(const float tessLevel) {
 					if(objTessInfo->adaptive) {
 						// First get the relevant instance transformations
 						instTrans.clear();
-						/*for(InstanceHandle inst : mapping.second)
-							instTrans.push_back(inst->get_transformation_matrix());*/
+						for(InstanceHandle inst : mapping.second)
+							instTrans.push_back(m_world.compute_instance_to_world_transformation(inst));
 						tessellation::CameraDistanceOracle oracle{ objTessLevel, get_camera(), m_frame,
 																	  m_scenario.get_resolution(), instTrans };
 						lod->tessellate(oracle, &m_scenario, objTessInfo->usePhong);

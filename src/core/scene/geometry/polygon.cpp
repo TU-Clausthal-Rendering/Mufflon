@@ -9,8 +9,6 @@
 #include "core/scene/scenario.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/math/curvature.hpp"
-#include "core/scene/clustering/octree_clustering.hpp"
-#include "core/scene/clustering/uniform_clustering.hpp"
 #include "core/scene/tessellation/tessellater.hpp"
 #include "core/scene/tessellation/displacement_mapper.hpp"
 #include <OpenMesh/Core/Mesh/Handles.hh>
@@ -41,14 +39,13 @@ void compute_vertex_normals(PolygonMeshType& mesh, const Iter begin, const Iter 
 
 // Default construction, creates material-index attribute.
 Polygons::Polygons() :
-	m_meshData(std::make_unique<PolygonMeshType>()),
-	m_vertexAttributes(*m_meshData),
-	m_faceAttributes(*m_meshData),
-	m_pointsHdl(m_vertexAttributes.register_point_attribute()),
-	m_normalsHdl(m_vertexAttributes.register_normal_attribute()),
-	m_uvsHdl(m_vertexAttributes.register_uv_attribute()),
+	m_vertexAttributes(),
+	m_faceAttributes(),
+	m_pointsHdl{ this->template add_vertex_attribute<ei::Vec3>("points") },
+	m_normalsHdl{ this->template add_vertex_attribute<ei::Vec3>("normals") },
+	m_uvsHdl{ this->template add_vertex_attribute<ei::Vec2>("uvs") },
 	m_curvatureHdl{},
-	m_matIndicesHdl{ this->template add_face_attribute<u16>("materials") }
+	m_matIndicesHdl{ this->template add_face_attribute<MaterialIndex>("materials") }
 {
 	// Invalidate bounding box
 	m_boundingBox.min = {
@@ -64,30 +61,27 @@ Polygons::Polygons() :
 }
 
 Polygons::Polygons(const Polygons& poly) :
-	m_meshData(std::make_unique<PolygonMeshType>(*poly.m_meshData)),
-	m_vertexAttributes(*m_meshData),
-	m_faceAttributes(*m_meshData),
-	m_pointsHdl(m_vertexAttributes.register_point_attribute()),
-	m_normalsHdl(m_vertexAttributes.register_normal_attribute()),
-	m_uvsHdl(m_vertexAttributes.register_uv_attribute()),
-	m_curvatureHdl{},
+	m_vertexAttributes{ poly.m_vertexAttributes },
+	m_faceAttributes{ poly.m_faceAttributes },
+	m_pointsHdl{ poly.m_pointsHdl },
+	m_normalsHdl{ poly.m_normalsHdl },
+	m_uvsHdl{ poly.m_uvsHdl },
+	m_curvatureHdl{ poly.m_curvatureHdl },
 	m_matIndicesHdl{ poly.m_matIndicesHdl },
-	m_boundingBox(poly.m_boundingBox),
-	m_triangles(poly.m_triangles),
-	m_quads(poly.m_quads)
+	m_boundingBox{ poly.m_boundingBox },
+	m_triangles{ poly.m_triangles },
+	m_quads{ poly.m_quads }
 {
-	m_vertexAttributes.copy(poly.m_vertexAttributes);
-	m_faceAttributes.copy(poly.m_faceAttributes);
 	// Copy the index and attribute buffers
 	poly.m_indexBuffer.for_each([&](const auto& buffer) {
 		using ChangedBuffer = std::decay_t<decltype(buffer)>;
 		auto& idxBuffer = m_indexBuffer.template get<ChangedBuffer>();
 		idxBuffer.reserved = buffer.reserved;
-		if(buffer.reserved == 0u || buffer.indices == ArrayDevHandle_t<ChangedBuffer::DEVICE, u32>{}) {
-			idxBuffer.indices = ArrayDevHandle_t<ChangedBuffer::DEVICE, u32>{};
+		if(buffer.reserved == 0u || buffer.indices.get() == nullptr) {
+			idxBuffer.indices.reset();
 		} else {
-			idxBuffer.indices = Allocator<ChangedBuffer::DEVICE>::template alloc_array<u32>(buffer.reserved);
-			copy(idxBuffer.indices, buffer.indices, sizeof(u32) * buffer.reserved);
+			idxBuffer.indices = make_udevptr_array<ChangedBuffer::DEVICE, u32, false>(buffer.reserved);
+			copy(idxBuffer.indices.get(), buffer.indices.get(), sizeof(u32) * buffer.reserved);
 		}
 	});
 	poly.m_attribBuffer.for_each([&](auto& buffer) {
@@ -95,83 +89,50 @@ Polygons::Polygons(const Polygons& poly) :
 		auto& attribBuffer = m_attribBuffer.template get<ChangedBuffer>();
 		attribBuffer.vertSize = buffer.vertSize;
 		attribBuffer.faceSize = buffer.faceSize;
-		if(buffer.vertSize == 0u || buffer.vertex == ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{}) {
-			attribBuffer.vertex = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
+		if(buffer.vertSize == 0u || buffer.vertex.get() == nullptr) {
+			attribBuffer.vertex.reset();
 		} else {
-			attribBuffer.vertex = Allocator<ChangedBuffer::DEVICE>::template alloc_array<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.vertSize);
-			copy(attribBuffer.vertex, buffer.vertex, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.vertSize);
+			attribBuffer.vertex = make_udevptr_array<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>, false>(buffer.vertSize);
+			copy(attribBuffer.vertex.get(), buffer.vertex.get(), sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.vertSize);
 		}
-		if(buffer.faceSize == 0u || buffer.face == ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{}) {
-			attribBuffer.face = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
+		if(buffer.faceSize == 0u || buffer.face.get() == nullptr) {
+			attribBuffer.face.reset();
 		} else {
-			attribBuffer.face = Allocator<ChangedBuffer::DEVICE>::template alloc_array<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.faceSize);
-			copy(attribBuffer.face, buffer.face, sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.faceSize);
+			attribBuffer.face = make_udevptr_array<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>, false>(buffer.faceSize);
+			copy(attribBuffer.face.get(), buffer.face.get(), sizeof(ArrayDevHandle_t<ChangedBuffer::DEVICE, void>) * buffer.faceSize);
 		}
 	});
 }
 
 Polygons::Polygons(Polygons&& poly) :
-	m_meshData(std::move(poly.m_meshData)),
-	m_vertexAttributes(std::move(poly.m_vertexAttributes)),
-	m_faceAttributes(std::move(poly.m_faceAttributes)),
-	m_pointsHdl(std::move(poly.m_pointsHdl)),
-	m_normalsHdl(std::move(poly.m_normalsHdl)),
-	m_uvsHdl(std::move(poly.m_uvsHdl)),
-	m_curvatureHdl(std::move(poly.m_curvatureHdl)),
-	m_matIndicesHdl(std::move(poly.m_matIndicesHdl)),
-	m_boundingBox(std::move(poly.m_boundingBox)),
-	m_triangles(poly.m_triangles),
-	m_quads(poly.m_quads)
-{
-	// Move the index and attribute buffers
-	poly.m_indexBuffer.for_each([&](auto& buffer) {
-		using ChangedBuffer = std::decay_t<decltype(buffer)>;
-		m_indexBuffer.template get<ChangedBuffer>() = buffer;
-		buffer.reserved = 0u;
-		buffer.indices = ArrayDevHandle_t<ChangedBuffer::DEVICE, u32>{};
-	});
-	poly.m_attribBuffer.for_each([&](auto& buffer) {
-		using ChangedBuffer = std::decay_t<decltype(buffer)>;
-		m_attribBuffer.template get<ChangedBuffer>() = buffer;
-		buffer.vertSize = 0u;
-		buffer.faceSize = 0u;
-		buffer.vertex = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
-		buffer.face = ArrayDevHandle_t<ChangedBuffer::DEVICE, ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>{};
-	});
-}
-
-Polygons::~Polygons() {
-	m_indexBuffer.for_each([&](auto& buffer) {
-		using ChangedBuffer = std::decay_t<decltype(buffer)>;
-		if(buffer.reserved != 0)
-			Allocator<ChangedBuffer::DEVICE>::template free<u32>(buffer.indices, buffer.reserved);
-	});
-	m_attribBuffer.for_each([&](auto& buffer) {
-		using ChangedBuffer = std::decay_t<decltype(buffer)>;
-		if(buffer.vertSize != 0)
-			Allocator<ChangedBuffer::DEVICE>::template free<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.vertex, buffer.vertSize);
-		if(buffer.faceSize != 0)
-			Allocator<ChangedBuffer::DEVICE>::template free<ArrayDevHandle_t<ChangedBuffer::DEVICE, void>>(buffer.face, buffer.faceSize);
-	});
-}
+	m_vertexAttributes{ std::move(poly.m_vertexAttributes) },
+	m_faceAttributes{ std::move(poly.m_faceAttributes) },
+	m_pointsHdl{ poly.m_pointsHdl },
+	m_normalsHdl{ poly.m_normalsHdl },
+	m_uvsHdl{ poly.m_uvsHdl },
+	m_curvatureHdl{ poly.m_curvatureHdl },
+	m_matIndicesHdl{ poly.m_matIndicesHdl },
+	m_indexBuffer{ std::move(poly.m_indexBuffer) },
+	m_attribBuffer{ std::move(poly.m_attribBuffer) },
+	m_boundingBox{ poly.m_boundingBox },
+	m_triangles{ poly.m_triangles },
+	m_quads{ poly.m_quads }
+{}
 
 std::size_t Polygons::add_bulk(const VertexAttributeHandle& hdl, const VertexHandle& startVertex,
 							   std::size_t count, util::IByteReader& attrStream) {
-	mAssert(startVertex.is_valid() && static_cast<std::size_t>(startVertex.idx()) < m_meshData->n_vertices());
-	return m_vertexAttributes.restore(hdl, attrStream, static_cast<std::size_t>(startVertex.idx()), count);
+	mAssert(static_cast<std::size_t>(startVertex) < this->get_vertex_count());
+	return m_vertexAttributes.restore(hdl, attrStream, static_cast<std::size_t>(startVertex), count);
 }
 
 std::size_t Polygons::add_bulk(const FaceAttributeHandle& hdl, const FaceHandle& startFace,
 							   std::size_t count, util::IByteReader& attrStream) {
-	mAssert(startFace.is_valid() && static_cast<std::size_t>(startFace.idx()) < m_meshData->n_faces());
-	return m_faceAttributes.restore(hdl, attrStream, static_cast<std::size_t>(startFace.idx()), count);
+	mAssert(static_cast<std::size_t>(startFace) < this->get_face_count());
+	return m_faceAttributes.restore(hdl, attrStream, static_cast<std::size_t>(startFace), count);
 }
 
 
-void Polygons::reserve(std::size_t vertices, std::size_t edges,
-					   std::size_t tris, std::size_t quads) {
-	// TODO: reserve attributes
-	m_meshData->reserve(vertices, edges, tris + quads);
+void Polygons::reserve(std::size_t vertices, std::size_t tris, std::size_t quads) {
 	m_vertexAttributes.reserve(vertices);
 	m_faceAttributes.reserve(tris + quads);
 	this->reserve_index_buffer<Device::CPU>(3u * tris + 4u * quads);
@@ -179,15 +140,13 @@ void Polygons::reserve(std::size_t vertices, std::size_t edges,
 
 Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 									 const UvCoordinate& uv) {
-	mAssert(m_meshData->has_vertex_normals());
-	mAssert(m_meshData->has_vertex_texcoords2D());
-	VertexHandle vh = m_meshData->add_vertex(util::pun<OpenMesh::Vec3f>(point));
+	const auto vh = static_cast<VertexHandle>(this->get_vertex_count());
 	// Resize the attribute and set the vertex data
 	m_vertexAttributes.resize(m_vertexAttributes.get_attribute_elem_count() + 1u);
 
-	m_vertexAttributes.template acquire<Device::CPU, OpenMesh::Vec3f>(m_pointsHdl)[vh.idx()] = util::pun<OpenMesh::Vec3f>(point);
-	m_vertexAttributes.template acquire<Device::CPU, OpenMesh::Vec3f>(m_normalsHdl)[vh.idx()] = util::pun<OpenMesh::Vec3f>(normal);
-	m_vertexAttributes.template acquire<Device::CPU, OpenMesh::Vec2f>(m_uvsHdl)[vh.idx()] = util::pun<OpenMesh::Vec2f>(uv);
+	m_vertexAttributes.template acquire<Device::CPU, ei::Vec3>(m_pointsHdl)[vh] = point;
+	m_vertexAttributes.template acquire<Device::CPU, ei::Vec3>(m_normalsHdl)[vh] = normal;
+	m_vertexAttributes.template acquire<Device::CPU, ei::Vec2>(m_uvsHdl)[vh] = uv;
 	m_vertexAttributes.mark_changed(Device::CPU);
 	// Expand the mesh's bounding box
 	m_boundingBox = ei::Box(m_boundingBox, ei::Box(point));
@@ -197,19 +156,18 @@ Polygons::VertexHandle Polygons::add(const Point& point, const Normal& normal,
 
 Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
 									   const VertexHandle& v2) {
-	mAssert(v0.is_valid() && static_cast<std::size_t>(v0.idx()) < m_meshData->n_vertices());
-	mAssert(v1.is_valid() && static_cast<std::size_t>(v1.idx()) < m_meshData->n_vertices());
-	mAssert(v2.is_valid() && static_cast<std::size_t>(v2.idx()) < m_meshData->n_vertices());
+	mAssert(static_cast<std::size_t>(v0) < this->get_vertex_count());
+	mAssert(static_cast<std::size_t>(v1) < this->get_vertex_count());
+	mAssert(static_cast<std::size_t>(v2) < this->get_vertex_count());
 	mAssert(m_quads == 0u); // To keep the order implicitly
-	FaceHandle hdl = m_meshData->add_face(v0, v1, v2);
-	mAssert(hdl.is_valid());
+	const auto hdl = static_cast<FaceHandle>(this->get_face_count());
 	// Expand the index buffer
 	this->reserve_index_buffer<Device::CPU>(3u * (m_triangles + 1u));
-	auto indexBuffer = m_indexBuffer.get<IndexBuffer<Device::CPU>>().indices;
+	auto indexBuffer = m_indexBuffer.get<IndexBuffer<Device::CPU>>().indices.get();
 	std::size_t currIndexCount = 3u * m_triangles;
-	indexBuffer[currIndexCount + 0u] = static_cast<u32>(v0.idx());
-	indexBuffer[currIndexCount + 1u] = static_cast<u32>(v1.idx());
-	indexBuffer[currIndexCount + 2u] = static_cast<u32>(v2.idx());
+	indexBuffer[currIndexCount + 0u] = v0;
+	indexBuffer[currIndexCount + 1u] = v1;
+	indexBuffer[currIndexCount + 2u] = v2;
 
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_attribute_elem_count() + 1u);
@@ -220,7 +178,7 @@ Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandl
 Polygons::TriangleHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
 									   const VertexHandle& v2, MaterialIndex idx) {
 	TriangleHandle hdl = this->add(v0, v1, v2);
-	m_faceAttributes.template acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
+	m_faceAttributes.template acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl] = idx;
 	m_faceAttributes.mark_changed(Device::CPU);
 	return hdl;
 }
@@ -234,31 +192,21 @@ Polygons::TriangleHandle Polygons::add(const Triangle& tri, MaterialIndex idx) {
 					 VertexHandle(tri[2u]), idx);
 }
 
-Polygons::TriangleHandle Polygons::add(const std::array<VertexHandle, 3u>& vertices) {
-	return this->add(vertices[0u], vertices[1u], vertices[2u]);
-}
-
-Polygons::TriangleHandle Polygons::add(const std::array<VertexHandle, 3u>& vertices,
-									   MaterialIndex idx) {
-	return this->add(vertices[0u], vertices[1u], vertices[2u], idx);
-}
-
 Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v1,
 								   const VertexHandle& v2, const VertexHandle& v3) {
-	mAssert(v0.is_valid() && static_cast<std::size_t>(v0.idx()) < m_meshData->n_vertices());
-	mAssert(v1.is_valid() && static_cast<std::size_t>(v1.idx()) < m_meshData->n_vertices());
-	mAssert(v2.is_valid() && static_cast<std::size_t>(v2.idx()) < m_meshData->n_vertices());
-	mAssert(v3.is_valid() && static_cast<std::size_t>(v3.idx()) < m_meshData->n_vertices());
-	FaceHandle hdl = m_meshData->add_face(v0, v1, v2, v3);
-	mAssert(hdl.is_valid());
+	mAssert(static_cast<std::size_t>(v0) < this->get_vertex_count());
+	mAssert(static_cast<std::size_t>(v1) < this->get_vertex_count());
+	mAssert(static_cast<std::size_t>(v2) < this->get_vertex_count());
+	mAssert(static_cast<std::size_t>(v3) < this->get_vertex_count());
+	const auto hdl = static_cast<FaceHandle>(this->get_face_count());
 	// Expand the index buffer
 	this->reserve_index_buffer<Device::CPU>(3u * m_triangles + 4u * (m_quads + 1u));
-	auto indexBuffer = m_indexBuffer.get<IndexBuffer<Device::CPU>>().indices;
+	auto indexBuffer = m_indexBuffer.get<IndexBuffer<Device::CPU>>().indices.get();
 	std::size_t currIndexCount = 3u * m_triangles + 4u * m_quads;
-	indexBuffer[currIndexCount + 0u] = static_cast<u32>(v0.idx());
-	indexBuffer[currIndexCount + 1u] = static_cast<u32>(v1.idx());
-	indexBuffer[currIndexCount + 2u] = static_cast<u32>(v2.idx());
-	indexBuffer[currIndexCount + 3u] = static_cast<u32>(v3.idx());
+	indexBuffer[currIndexCount + 0u] = v0;
+	indexBuffer[currIndexCount + 1u] = v1;
+	indexBuffer[currIndexCount + 2u] = v2;
+	indexBuffer[currIndexCount + 3u] = v3;
 	// TODO: slow, hence replace with reserve
 	m_faceAttributes.resize(m_faceAttributes.get_attribute_elem_count() + 1u);
 	++m_quads;
@@ -269,7 +217,7 @@ Polygons::QuadHandle Polygons::add(const VertexHandle& v0, const VertexHandle& v
 								   const VertexHandle& v2, const VertexHandle& v3,
 								   MaterialIndex idx) {
 	QuadHandle hdl = this->add(v0, v1, v2, v3);
-	m_faceAttributes.template acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl.idx()] = idx;
+	m_faceAttributes.template acquire<Device::CPU, MaterialIndex>(m_matIndicesHdl)[hdl] = idx;
 	m_faceAttributes.mark_changed(Device::CPU);
 	return hdl;
 }
@@ -284,48 +232,34 @@ Polygons::QuadHandle Polygons::add(const Quad& quad, MaterialIndex idx) {
 					 VertexHandle(quad[2u]), VertexHandle(quad[3u]), idx);
 }
 
-Polygons::QuadHandle Polygons::add(const std::array<VertexHandle, 4u>& vertices) {
-	return this->add(vertices[0u], vertices[1u], vertices[2u], vertices[3u]);
-}
-
-Polygons::QuadHandle Polygons::add(const std::array<VertexHandle, 4u>& vertices,
-								   MaterialIndex idx) {
-	return this->add(vertices[0u], vertices[1u], vertices[2u],
-					 vertices[3u], idx);
-}
-
 Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteReader& pointStream,
 											  util::IByteReader& normalStream, util::IByteReader& uvStream) {
-	mAssert(m_meshData->n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
-	std::size_t start = m_meshData->n_vertices();
-	VertexHandle hdl(static_cast<int>(start));
+	const auto start = this->get_vertex_count();
+	mAssert(start < static_cast<std::size_t>(std::numeric_limits<int>::max()));
+	const auto hdl = static_cast<VertexHandle>(start);
 
 	// Resize the attributes prior
-	this->reserve(start + count, m_meshData->n_edges(), m_triangles, m_quads);
+	this->reserve(start + count, m_triangles, m_quads);
 
 	// Read the attributes
 	std::size_t readPoints = m_vertexAttributes.restore(m_pointsHdl, pointStream, start, count);
 	std::size_t readNormals = m_vertexAttributes.restore(m_normalsHdl, normalStream, start, count);
 	std::size_t readUvs = m_vertexAttributes.restore(m_uvsHdl, uvStream, start, count);
 	// Expand the bounding box
-	const OpenMesh::Vec3f* points = m_vertexAttributes.template acquire_const<Device::CPU, OpenMesh::Vec3f>(m_pointsHdl);
-	for(std::size_t i = start; i < start + readPoints; ++i) {
-		m_boundingBox.max = ei::max(util::pun<ei::Vec3>(points[i]), m_boundingBox.max);
-		m_boundingBox.min = ei::min(util::pun<ei::Vec3>(points[i]), m_boundingBox.min);
-	}
-
+	const auto* points = m_vertexAttributes.template acquire_const<Device::CPU, ei::Vec3>(m_pointsHdl);
+	m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ points, static_cast<u32>(readPoints) } };
 	return { hdl, readPoints, readNormals, readUvs };
 }
 
 Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteReader& pointStream,
 											  util::IByteReader& normalStream, util::IByteReader& uvStream,
 											  const ei::Box& boundingBox) {
-	mAssert(m_meshData->n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
-	std::size_t start = m_meshData->n_vertices();
-	VertexHandle hdl(static_cast<int>(start));
+	const auto start = this->get_vertex_count();
+	mAssert(start < static_cast<std::size_t>(std::numeric_limits<int>::max()));
+	const auto hdl = static_cast<VertexHandle>(start);
 
 	// Resize the attributes prior
-	this->reserve(start + count, m_meshData->n_edges(), m_triangles, m_quads);
+	this->reserve(start + count, m_triangles, m_quads);
 
 	// Read the attributes
 	std::size_t readPoints = m_vertexAttributes.restore(m_pointsHdl, pointStream, start, count);
@@ -340,12 +274,12 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 
 Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteReader& pointStream,
 											  util::IByteReader& uvStream) {
-	mAssert(m_meshData->n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
-	std::size_t start = m_meshData->n_vertices();
-	VertexHandle hdl(static_cast<int>(start));
+	const auto start = this->get_vertex_count();
+	mAssert(start < static_cast<std::size_t>(std::numeric_limits<int>::max()));
+	const auto hdl = static_cast<VertexHandle>(start);
 
 	// Resize the attributes prior
-	this->reserve(start + count, m_meshData->n_edges(), m_triangles, m_quads);
+	this->reserve(start + count, m_triangles, m_quads);
 
 	// Read the attributes
 	std::size_t readPoints = m_vertexAttributes.restore(m_pointsHdl, pointStream, start, count);
@@ -362,12 +296,12 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 
 Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteReader& pointStream,
 											  util::IByteReader& uvStream, const ei::Box& boundingBox) {
-	mAssert(m_meshData->n_vertices() < static_cast<std::size_t>(std::numeric_limits<int>::max()));
-	std::size_t start = m_meshData->n_vertices();
-	VertexHandle hdl(static_cast<int>(start));
+	const auto start = this->get_vertex_count();
+	mAssert(start < static_cast<std::size_t>(std::numeric_limits<int>::max()));
+	const auto hdl = static_cast<VertexHandle>(start);
 
 	// Resize the attributes prior
-	this->reserve(start + count, m_meshData->n_edges(), m_triangles, m_quads);
+	this->reserve(start + count, m_triangles, m_quads);
 
 	// Read the attributes
 	std::size_t readPoints = m_vertexAttributes.restore(m_pointsHdl, pointStream, start, count);
@@ -379,10 +313,310 @@ Polygons::VertexBulkReturn Polygons::add_bulk(std::size_t count, util::IByteRead
 	return { hdl, readPoints, 0u, readUvs };
 }
 
+
+void Polygons::create_halfedge_structure(PolygonMeshType& mesh) {
+	this->template synchronize<Device::CPU>();
+	const auto vertexCount = this->get_vertex_count();
+	const auto faceCount = this->get_face_count();
+	// Estimate the number of edges we need with Euler characteristic for stellated dodecahedron
+	mesh.reserve(vertexCount, vertexCount + faceCount + 6, faceCount);
+	// Add all vertices
+	const auto* points = this->template acquire_const<Device::CPU, ei::Vec3>(this->get_points_hdl());
+	const auto* normals = this->template acquire_const<Device::CPU, ei::Vec3>(this->get_normals_hdl());
+	const auto* uvs = this->template acquire_const<Device::CPU, ei::Vec2>(this->get_uvs_hdl());
+	for(std::size_t vertex = 0u; vertex < vertexCount; ++vertex) {
+		const auto hdl = mesh.add_vertex(util::pun<OpenMesh::Vec3f>(points[vertex]));
+		mesh.set_normal(hdl, util::pun<OpenMesh::Vec3f>(normals[vertex]));
+		mesh.set_texcoord2D(hdl, util::pun<OpenMesh::Vec2f>(uvs[vertex]));
+	}
+	// Add all faces
+	const auto* indices = this->get_index_buffer<Device::CPU>();
+	for(std::size_t tri = 0u; tri < m_triangles; ++tri) {
+		const auto faceHdl = mesh.add_face(
+			OpenMesh::VertexHandle{ static_cast<int>(indices[3u * tri + 0u]) },
+			OpenMesh::VertexHandle{ static_cast<int>(indices[3u * tri + 1u]) },
+			OpenMesh::VertexHandle{ static_cast<int>(indices[3u * tri + 2u]) }
+		);
+	}
+	for(std::size_t quad = 0u; quad < m_quads; ++quad) {
+		const auto faceHdl = mesh.add_face(
+			OpenMesh::VertexHandle{ static_cast<int>(indices[3u * m_triangles + 4u * quad + 0u]) },
+			OpenMesh::VertexHandle{ static_cast<int>(indices[3u * m_triangles + 4u * quad + 1u]) },
+			OpenMesh::VertexHandle{ static_cast<int>(indices[3u * m_triangles + 4u * quad + 2u]) },
+			OpenMesh::VertexHandle{ static_cast<int>(indices[3u * m_triangles + 4u * quad + 3u]) }
+		);
+	}
+}
+
+PolygonMeshType Polygons::create_halfedge_structure() {
+	PolygonMeshType mesh;
+	this->create_halfedge_structure(mesh);
+	return mesh;
+}
+
+void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::vector<u32>* newVertexPosition,
+											 std::vector<ei::Vec3>* normals) {
+	// We have to keep track of moved vertices. It would be beneficial memory-wise
+	// to use a map for moved ones, but faster to just use a linear array
+	std::vector<u32> buffer;
+	if(newVertexPosition == nullptr)
+		newVertexPosition = &buffer;
+	newVertexPosition->resize(mesh.n_vertices());
+	std::fill(newVertexPosition->begin(), newVertexPosition->end(), std::numeric_limits<u32>::max());
+
+	// Invalidate bounding box
+	m_boundingBox.min = {
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max()
+	};
+	m_boundingBox.max = {
+		-std::numeric_limits<float>::max(),
+		-std::numeric_limits<float>::max(),
+		-std::numeric_limits<float>::max()
+	};
+
+	auto currPos = 0u;
+	auto currEnd = mesh.n_vertices() - 1u;
+	const auto* points = this->template acquire_const<Device::CPU, ei::Vec3>(this->get_points_hdl());
+	// Find the next vertex from the back to move to a potential hole
+	while(currEnd > currPos && mesh.status(mesh.vertex_handle(static_cast<unsigned>(currEnd))).deleted())
+		currEnd -= 1u;
+	for(auto iter = mesh.vertices_begin(); iter != mesh.vertices_end(); ++iter) {
+		if(currPos >= currEnd)
+			break;
+
+		const auto vertex = *iter;
+		if(mesh.status(vertex).deleted()) {
+			// Fill the gap and set where to find the vertex
+			m_vertexAttributes.copy<Device::CPU>(currEnd, currPos);
+			(*newVertexPosition)[currEnd] = static_cast<u32>(currPos);
+
+			// Find the next vertex from the back to move to a potential hole
+			do {
+				currEnd -= 1u;
+			} while(currEnd > currPos && mesh.status(mesh.vertex_handle(static_cast<unsigned>(currEnd))).deleted());
+		}
+
+		// Expand bounding box
+		m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ points[currPos] } };
+		currPos += 1u;
+	}
+	m_vertexAttributes.resize(currPos);
+	m_vertexAttributes.shrink_to_fit();
+
+	// Reconstruct the index buffer - count triangles and quads first for correct offsets
+	m_triangles = 0u;
+	m_quads = 0u;
+	for(const auto face : mesh.faces()) {
+		const auto vBegin = mesh.cfv_ccwbegin(face);
+		const auto vEnd = mesh.cfv_ccwend(face);
+		const auto vertexCount = std::distance(vBegin, vEnd);
+		if(vertexCount == 0)
+			continue;
+		if(vertexCount == 3u)
+			++m_triangles;
+		else if(vertexCount == 4u)
+			++m_quads;
+		else
+			throw std::runtime_error("Found a non-quad/tri face (" + std::to_string(vertexCount) + " vertices)");
+	}
+	this->unload_index_buffer<Device::CPU>();
+	this->reserve_index_buffer<Device::CPU>(3u * m_triangles + 4u * m_quads);
+	auto* indexBuffer = m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices.get();
+
+	// To recalculate the normals we would either have to garbage collect the mesh,
+	// use skipping iterators (severe overhead in heavily decimated meshes), or use
+	// a buffer to keep track of cumulative normals
+	std::vector<ei::Vec3> normalBuffer;
+	if(normals == nullptr)
+		normals = &normalBuffer;
+
+	FaceAttributePoolType faceAttribs{ m_faceAttributes };
+	std::size_t currTri = 0u;
+	std::size_t currQuad = 0u;
+	for(const auto face : mesh.faces()) {
+		const auto startVertex = mesh.cfv_ccwbegin(face);
+		const auto endVertex = mesh.cfv_ccwend(face);
+		const auto vertexCount = std::distance(startVertex, endVertex);
+
+		u32* currIndices = indexBuffer;
+		std::size_t faceIndex;
+		if(vertexCount == 3u) {
+			faceIndex = currTri;
+			currIndices += 3u * currTri++;
+		} else {
+			faceIndex = m_triangles + currQuad;
+			currIndices += 3u * m_triangles + 4u * currQuad++;
+		}
+		// Compute the sector normals
+		{
+			// TODO
+		}
+
+		// Copy the attributes (we can make the assumption of face.idx() == index in face attributes
+		// because the mesh was created by first inserting triangles, then quads, and no faces were
+		// garbage collected yet)
+		faceAttribs.template copy<Device::CPU>(m_faceAttributes, static_cast<std::size_t>(face.idx()), faceIndex);
+		// Set the index buffer
+		for(auto vertexIter = startVertex; vertexIter != endVertex; ++vertexIter) {
+			const auto vertexIdx = static_cast<u32>(vertexIter->idx());
+			auto index = (*newVertexPosition)[vertexIdx];
+			if(index == std::numeric_limits<u32>::max())
+				index = vertexIdx;
+			mAssert(index < m_vertexAttributes.get_attribute_elem_count());
+			*(currIndices++) = index;
+		}
+	}
+
+	// TODO: set the normals
+
+	m_faceAttributes = std::move(faceAttribs);
+	this->mark_changed(Device::CPU);
+}
+
+void Polygons::after_tessellation(const PolygonMeshType& mesh, const OpenMesh::FaceHandle tempHandle,
+								  const OpenMesh::FPropHandleT<OpenMesh::FaceHandle>& oldFaceProp) {
+	// We have to update the attributes. Two parts:
+	// - For vertices, only new ones, none get deleted, standard props (UV, normal etc.) are already computed in mesh:
+	//   we only update those, other attributes are left as default (have to be computed manually if desired).
+	// - Faces not only get added, but the replaced faces get deleted. For those we copy over all attributes.
+	//   After that we have to compact the attributes and recompute the index buffer.
+	// Don't forget to remove the temporary face vertices from the total count
+	m_vertexAttributes.resize(mesh.n_vertices() - 3u);
+
+	// First we have to allocate extra faces to have swap space
+	const auto faceCount = mesh.n_faces() - 1u;
+	m_faceAttributes.resize(faceCount);
+	for(std::size_t i = this->get_face_count(); i < mesh.n_faces(); ++i) {
+		if(i == static_cast<std::size_t>(tempHandle.idx()))
+			continue;
+		// We don't need to check previously existing faces
+		const auto face = mesh.face_handle(static_cast<unsigned>(i));
+		if(const auto oldFace = mesh.property(oldFaceProp, face); oldFace.is_valid()) {
+			// Make sure we ignore the temporary face
+			const auto newFaceIdx = (i < static_cast<std::size_t>(tempHandle.idx())) ? i : (i - 1u);
+			m_faceAttributes.copy<Device::CPU>(static_cast<std::size_t>(oldFace.idx()),
+											   newFaceIdx);
+		}
+	}
+	const auto* matIndices = this->template acquire_const<Device::CPU, MaterialIndex>(m_matIndicesHdl);
+	// Remove old faces. There must be more new faces than removed ones by design
+	for(std::size_t i = 0u; i < this->get_face_count(); ++i) {
+		const auto face = mesh.face_handle(static_cast<unsigned>(i));
+		if(mesh.status(face).deleted()) {
+			const auto currSize = m_faceAttributes.get_attribute_elem_count();
+			m_faceAttributes.copy<Device::CPU>(currSize - 1u, i);
+			m_faceAttributes.resize(currSize - 1u);
+		}
+	}
+	// Copy over the default vertex attributes; don't forget to ignore the temporary vertices
+	auto* points = this->template acquire<Device::CPU, ei::Vec3>(this->get_points_hdl());
+	auto* normals = this->template acquire<Device::CPU, ei::Vec3>(this->get_normals_hdl());
+	auto* uvs = this->template acquire<Device::CPU, ei::Vec2>(this->get_uvs_hdl());
+	std::size_t vertexIndex = 0u;
+	for(const auto vertex : mesh.vertices()) {
+		points[vertexIndex] = util::pun<ei::Vec3>(mesh.point(vertex));
+		normals[vertexIndex] = util::pun<ei::Vec3>(mesh.normal(vertex));
+		uvs[vertexIndex] = util::pun<ei::Vec2>(mesh.texcoord2D(vertex));
+		vertexIndex += 1u;
+	}
+
+	m_faceAttributes.shrink_to_fit();
+	// Recompute the index buffer
+	this->rebuild_index_buffer(mesh, tempHandle);
+}
+
+void Polygons::rebuild_index_buffer(const PolygonMeshType& mesh, const OpenMesh::FaceHandle tempHandle) {
+	// Recompute the index buffer. For this we have to ignore deleted faces
+	this->mark_changed(Device::CPU);
+	// Count 
+	m_triangles = 0u;
+	m_quads = 0u;
+	for(const auto face : mesh.faces()) {
+		const auto vBegin = mesh.cfv_ccwbegin(face);
+		const auto vEnd = mesh.cfv_ccwend(face);
+		const auto vertexCount = std::distance(vBegin, vEnd);
+		if(vertexCount == 0)
+			continue;
+		if(vertexCount == 3u)
+			++m_triangles;
+		else if(vertexCount == 4u)
+			++m_quads;
+		else
+			throw std::runtime_error("Tessellation added a non-quad/tri face (" + std::to_string(vertexCount) + " vertices)");
+	}
+
+	// Invalidate bounding box
+	m_boundingBox.min = {
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max(),
+		std::numeric_limits<float>::max()
+	};
+	m_boundingBox.max = {
+		-std::numeric_limits<float>::max(),
+		-std::numeric_limits<float>::max(),
+		-std::numeric_limits<float>::max()
+	};
+
+	// Fetch the vertex handles of the temporary face, since those have to be deleted as well
+	auto vTempIter = mesh.cfv_ccwbegin(tempHandle);
+	const auto tempV0 = *vTempIter;
+	const auto tempV1 = *(++vTempIter);
+	const auto tempV2 = *(++vTempIter);
+
+	// Rebuild the index buffer
+	this->reserve_index_buffer<Device::CPU>(3u * m_triangles + 4u * m_quads);
+	std::size_t currTri = 0u;
+	std::size_t currQuad = 0u;
+	auto* indexBuffer = m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices.get();
+
+	// Keep track of the last after-delete face inserted
+	// We do this because the prior step of rebuilding index buffer was to fill in the
+	// holes of deleted faces in the attributes
+	auto currEnd = mesh.n_faces() - 1u;
+	for(auto iter = mesh.faces_begin(); iter != mesh.faces_end(); ++iter) {
+		auto face = *iter;
+		if(face == tempHandle)
+			continue;
+		if(static_cast<std::size_t>(face.idx()) > currEnd)
+			break;
+		if(mesh.status(face).deleted()) {
+			face = mesh.face_handle(static_cast<unsigned>(currEnd));
+			currEnd -= 1u;
+		}
+
+		const auto startVertex = mesh.cfv_ccwbegin(face);
+		const auto endVertex = mesh.cfv_ccwend(face);
+		const auto vertexCount = std::distance(startVertex, endVertex);
+
+		u32* currIndices = indexBuffer;
+		if(vertexCount == 3u) {
+			currIndices += 3u * currTri++;
+		} else {
+			currIndices += 3u * m_triangles + 4u * currQuad++;
+		}
+		for(auto vertexIter = startVertex; vertexIter != endVertex; ++vertexIter) {
+			const auto vertexIdx = static_cast<u32>(vertexIter->idx());
+			auto index = vertexIdx;
+			if(vertexIdx > static_cast<u32>(tempV0.idx()))
+				index -= 1u;
+			if(vertexIdx > static_cast<u32>(tempV1.idx()))
+				index -= 1u;
+			if(vertexIdx > static_cast<u32>(tempV2.idx()))
+				index -= 1u;
+			mAssert(index < m_vertexAttributes.get_attribute_elem_count());
+			*(currIndices++) = index;
+			const auto pt = util::pun<ei::Vec3>(mesh.point(*vertexIter));
+			m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ pt } };
+		}
+	}
+}
+
 void Polygons::tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
 						  const bool usePhong) {
 	auto profileTimer = Profiler::core().start<CpuProfileState>("Polygons::tessellate");
-	this->synchronize<Device::CPU>();
+	auto mesh = this->create_halfedge_structure();
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
 
@@ -391,14 +625,19 @@ void Polygons::tessellate(tessellation::TessLevelOracle& oracle, const Scenario*
 	tessellater.set_phong_tessellation(usePhong);
 
 	if(scenario != nullptr) {
+		// Add the material indices as mesh property
 		OpenMesh::FPropHandleT<MaterialIndex> matIdxProp;
-		m_meshData->get_property_handle(matIdxProp, MAT_INDICES_NAME);
+		mesh.add_property(matIdxProp);
+		const auto* matIndices = this->template acquire_const<Device::CPU, MaterialIndex>(this->get_material_indices_hdl());
+		copy(mesh.property(matIdxProp).data_vector().data(), matIndices, sizeof(MaterialIndex) * this->get_face_count());
 		oracle.set_mat_properties(*scenario, matIdxProp);
 	}
 
-	tessellater.tessellate(*m_meshData);
-	this->mark_changed(Device::CPU);
-	this->rebuild_index_buffer();
+	mesh.request_face_status();
+	mesh.request_vertex_status();
+	const auto tempFace = tessellater.tessellate(mesh);
+	const auto oldFaceProp = tessellater.get_old_face_property();
+	this->after_tessellation(mesh, tempFace, oldFaceProp);
 	m_wasDisplaced = true;
 	logInfo("Tessellated polygon mesh (", prevTri, "/", prevQuad,
 			" -> ", m_triangles, "/", m_quads, ")");
@@ -406,41 +645,46 @@ void Polygons::tessellate(tessellation::TessLevelOracle& oracle, const Scenario*
 
 void Polygons::displace(tessellation::TessLevelOracle& oracle, const Scenario& scenario) {
 	auto profileTimer = Profiler::core().start<CpuProfileState>("Polygons::displace");
-	this->synchronize<Device::CPU>();
-	// Then perform tessellation
+	auto mesh = this->create_halfedge_structure();
 	const std::size_t prevTri = m_triangles;
 	const std::size_t prevQuad = m_quads;
+
 	// This is necessary since we'd otherwise need to pass an accessor into the tessellater
-	OpenMesh::FPropHandleT<MaterialIndex> matIdxProp{ static_cast<int>(m_matIndicesHdl.index) };
+	// Add the material indices as mesh property
+	OpenMesh::FPropHandleT<MaterialIndex> matIdxProp;
+	mesh.add_property(matIdxProp);
+	const auto* matIndices = this->template acquire_const<Device::CPU, MaterialIndex>(this->get_material_indices_hdl());
+	copy(mesh.property(matIdxProp).data_vector().data(), matIndices, sizeof(MaterialIndex) * this->get_face_count());
 	oracle.set_mat_properties(scenario, matIdxProp);
 	tessellation::DisplacementMapper tessellater(oracle);
 	tessellater.set_scenario(scenario);
 	tessellater.set_material_idx_hdl(matIdxProp);
-
 	tessellater.set_phong_tessellation(true);
-	tessellater.tessellate(*m_meshData);
 
-	this->mark_changed(Device::CPU);
-	this->rebuild_index_buffer();
+	mesh.request_face_status();
+	mesh.request_vertex_status();
+	const auto tempFace = tessellater.tessellate(mesh);
+	const auto oldFaceProp = tessellater.get_old_face_property();
+	this->after_tessellation(mesh, tempFace, oldFaceProp);
 	m_wasDisplaced = true;
-	logInfo("Uniformly tessellated polygon mesh (", prevTri, "/", prevQuad,
+	logInfo("Displaced polygon mesh (", prevTri, "/", prevQuad,
 			" -> ", m_triangles, "/", m_quads, ")");
 }
 
 bool Polygons::apply_animation(u32 frame, const Bone* bones) {
 	if(!m_animationWeightHdl.has_value())
 		return false;
-	auto weights = acquire_const<Device::CPU, ei::UVec4>(*m_animationWeightHdl);
-	auto normals = acquire<Device::CPU, ei::Vec3>(get_normals_hdl());
-	auto positions = acquire<Device::CPU, ei::Vec3>(get_points_hdl());
+	auto* weights = acquire_const<Device::CPU, ei::UVec4>(*m_animationWeightHdl);
+	auto* normals = acquire<Device::CPU, ei::Vec3>(get_normals_hdl());
+	auto* positions = acquire<Device::CPU, ei::Vec3>(get_points_hdl());
 
 	// We also have to recalculate the bounding box
 	m_boundingBox.min = ei::Vec3{ std::numeric_limits<float>::max() };
 	m_boundingBox.max = ei::Vec3{ -std::numeric_limits<float>::max() };
 
-	for(auto vertex : m_meshData->vertices()) {
+	for(std::size_t vertex = 0u; vertex < this->get_vertex_count(); ++vertex) {
 		// Decode weight and bone index and sum all the dual quaternions
-		ei::UVec4 codedWeights = weights[vertex.idx()];
+		ei::UVec4 codedWeights = weights[vertex];
 		// We must NOT start at 0,0,0,1 for the real part
 		ei::DualQuaternion q{ 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 		bool transformed = false;
@@ -456,200 +700,13 @@ bool Polygons::apply_animation(u32 frame, const Bone* bones) {
 			q = ei::normalize(q);
 		else
 			q = ei::qqidentity();
-		const auto newPos = ei::transform(positions[vertex.idx()], q);
-		positions[vertex.idx()] = newPos;
-		normals[vertex.idx()] = ei::transformDir(normals[vertex.idx()], q);
+		const auto newPos = ei::transform(positions[vertex], q);
+		positions[vertex] = newPos;
+		normals[vertex] = ei::transformDir(normals[vertex], q);
 		m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ newPos } };
 	}
 	this->mark_changed(Device::CPU);
 	return true;
-}
-
-template < class T >
-void Polygons::compute_error_quadrics(OpenMesh::VPropHandleT<OpenMesh::Geometry::QuadricT<T>> quadricProps) {
-	using OpenMesh::Geometry::QuadricT;
-	for(const auto vertex : m_meshData->vertices())
-		m_meshData->property(quadricProps, vertex).clear();
-	for(const auto face : m_meshData->faces()) {
-		// Assume triangle
-		auto vIter = m_meshData->cfv_ccwbegin(face);
-		const auto vh0 = *vIter;
-		const auto vh1 = *(++vIter);
-		const auto vh2 = *(++vIter);
-
-		const auto p0 = util::pun<ei::Vec3>(m_meshData->point(vh0));
-		const auto p1 = util::pun<ei::Vec3>(m_meshData->point(vh1));
-		const auto p2 = util::pun<ei::Vec3>(m_meshData->point(vh2));
-		auto normal = ei::cross(p1 - p0, p2 - p0);
-		auto area = ei::len(normal);
-		if(area > std::numeric_limits<decltype(area)>::min()) {
-			normal /= area;
-			area *= 0.5f;
-		}
-
-		const auto d = -ei::dot(p0, normal);
-		QuadricT<T> q{ normal.x, normal.y, normal.z, d };
-		q *= area;
-		m_meshData->property(quadricProps, vh0) += q;
-		m_meshData->property(quadricProps, vh1) += q;
-		m_meshData->property(quadricProps, vh2) += q;
-	}
-}
-
-// Creates a decimater 
-OpenMesh::Decimater::DecimaterT<PolygonMeshType> Polygons::create_decimater() {
-	return OpenMesh::Decimater::DecimaterT<PolygonMeshType>(*m_meshData);
-}
-
-std::size_t Polygons::cluster(const renderer::decimaters::FloatOctree& octree,
-							  const std::size_t maxCount, const float maxDensity,
-							  const bool garbageCollect) {
-	using OpenMesh::Geometry::Quadricf;
-
-	this->synchronize<Device::CPU>();
-
-	const auto previousVertices = m_meshData->n_vertices();
-	m_meshData->request_vertex_status();
-	m_meshData->request_edge_status();
-	m_meshData->request_face_status();
-
-	clustering::OctreeVertexClusterer<renderer::decimaters::FloatOctree> clusterer{ octree, maxCount, maxDensity };
-	const auto clusterCount = clusterer.cluster(*m_meshData, m_boundingBox);
-
-	if(garbageCollect)
-		this->garbage_collect();
-	else
-		this->rebuild_index_buffer();
-	compute_vertex_normals(*m_meshData, m_meshData->vertices_sbegin(), m_meshData->vertices_end());
-	// Do not garbage-collect the mesh yet - only rebuild the index buffer
-
-	// Adjust vertex and face attribute sizes
-	m_vertexAttributes.resize(m_meshData->n_vertices());
-	m_faceAttributes.resize(m_meshData->n_faces());
-	m_vertexAttributes.mark_changed(Device::CPU);
-	m_faceAttributes.mark_changed(Device::CPU);
-
-	logInfo("Octree-clustered polygon mesh (", m_meshData->n_vertices(), " vertices, ", clusterCount, " cluster centres)");
-	return previousVertices - m_meshData->n_vertices();
-}
-
-std::size_t Polygons::cluster_decimate(const renderer::decimaters::FloatOctree& octree,
-									   OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-									   const std::size_t targetVertices, const float maxDensity,
-									   std::vector<bool>* octreeNodeMask,
-									   std::vector<renderer::decimaters::FloatOctree::NodeIndex>* currLevel,
-									   std::vector<renderer::decimaters::FloatOctree::NodeIndex>* nextLevel) {
-	if(targetVertices >= decimater.mesh().n_vertices())
-		return 0u;
-	this->synchronize<Device::CPU>();
-	decimater.initialize();
-
-	const auto previousVertices = m_meshData->n_vertices();
-	m_meshData->request_vertex_status();
-	m_meshData->request_edge_status();
-	m_meshData->request_face_status();
-
-	clustering::OctreeVertexClusterer<renderer::decimaters::FloatOctree> clusterer{ octree, targetVertices, maxDensity };
-	const auto clusterCount = clusterer.cluster(*m_meshData, m_boundingBox, true, octreeNodeMask, currLevel, nextLevel);
-
-	const std::size_t targetDecimations = decimater.mesh().n_vertices() - std::min(decimater.mesh().n_vertices(), targetVertices);
-	const std::size_t actualDecimations = decimater.decimate_to(targetVertices);
-	this->garbage_collect();
-	m_meshData->release_vertex_status();
-	m_meshData->release_edge_status();
-	m_meshData->release_face_status();
-	compute_vertex_normals(*m_meshData, m_meshData->vertices_sbegin(), m_meshData->vertices_end());
-
-	// Adjust vertex and face attribute sizes
-	m_vertexAttributes.resize(m_meshData->n_vertices());
-	m_faceAttributes.resize(m_meshData->n_faces());
-	m_vertexAttributes.mark_changed(Device::CPU);
-	m_faceAttributes.mark_changed(Device::CPU);
-
-	logPedantic("Octree-cluster-decimated polygon mesh (", actualDecimations, "/",
-				targetDecimations, " decimations performed; ", m_meshData->n_vertices(),
-				" vertices remaining, ", clusterCount, " cluster centres)");
-	if(m_meshData->n_vertices() > targetVertices)
-		logWarning("Not enough vertices removed: ", m_meshData->n_vertices(), " > ", targetVertices);
-	return previousVertices - m_meshData->n_vertices();
-}
-
-std::size_t Polygons::cluster(const std::size_t gridRes, bool garbageCollect) {
-	using OpenMesh::Geometry::Quadricf;
-
-	this->synchronize<Device::CPU>();
-
-	const auto previousVertices = m_meshData->n_vertices();
-
-	clustering::UniformVertexClusterer clusterer{ ei::UVec3(gridRes) };
-	const auto clusterCount = clusterer.cluster(*m_meshData, m_boundingBox);
-
-	if(garbageCollect)
-		this->garbage_collect();
-	else
-		this->rebuild_index_buffer();
-	compute_vertex_normals(*m_meshData, m_meshData->vertices_sbegin(), m_meshData->vertices_end());
-	// Do not garbage-collect the mesh yet - only rebuild the index buffer
-
-	// Adjust vertex and face attribute sizes
-	m_vertexAttributes.resize(m_meshData->n_vertices());
-	m_faceAttributes.resize(m_meshData->n_faces());
-	m_vertexAttributes.mark_changed(Device::CPU);
-	m_faceAttributes.mark_changed(Device::CPU);
-
-	const auto remainingVertices = std::distance(m_meshData->vertices_sbegin(), m_meshData->vertices_end());
-	logPedantic("Uniformly clustered polygon mesh (", remainingVertices, " vertices, ", clusterCount, " cluster centres)");
-	return previousVertices - m_meshData->n_vertices();
-}
-
-std::size_t Polygons::decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-							   const std::size_t targetVertices, bool garbageCollect) {
-	if(targetVertices >= decimater.mesh().n_vertices())
-		return 0u;
-	this->synchronize<Device::CPU>();
-	decimater.initialize();
-	const std::size_t oldVertexCount = decimater.mesh().n_vertices();
-	const std::size_t targetDecimations = decimater.mesh().n_vertices() - targetVertices;
-	const std::size_t actualDecimations = decimater.decimate_to(targetVertices);
-
-	if(garbageCollect)
-		this->garbage_collect();
-	else
-		this->rebuild_index_buffer();
-	// Do not garbage-collect the mesh yet - only rebuild the index buffer
-
-	// Adjust vertex and face attribute sizes
-	m_vertexAttributes.resize(m_meshData->n_vertices());
-	m_faceAttributes.resize(m_meshData->n_faces());
-
-	m_vertexAttributes.mark_changed(Device::CPU);
-	m_faceAttributes.mark_changed(Device::CPU);
-	if(targetVertices == 0) {
-		logPedantic("Decimated polygon mesh (", actualDecimations, " decimations performed; ",
-					decimater.mesh().n_vertices() - actualDecimations, " vertices remaining)");
-	} else {
-		logPedantic("Decimated polygon mesh (", actualDecimations, "/", targetDecimations,
-					" decimations performed; ", garbageCollect ? (decimater.mesh().n_vertices()) : (oldVertexCount - actualDecimations),
-					" vertices remaining)");
-	}
-	// TODO: this leaks mesh outside
-
-	return actualDecimations;
-}
-
-void Polygons::garbage_collect(std::function<void(VertexHandle, VertexHandle)> vCallback) {
-	if(vCallback) {
-		// "Manual" call
-		std::vector<PolygonMeshType::VertexHandle*> emptyVh;
-		std::vector<PolygonMeshType::HalfedgeHandle*> emptyHh;
-		std::vector<PolygonMeshType::FaceHandle*> emptyFh;
-		m_meshData->garbage_collection(emptyVh, emptyHh, emptyFh, true, true, true, vCallback);
-	} else {
-		m_meshData->garbage_collection();
-	}
-	this->rebuild_index_buffer();
-	m_vertexAttributes.shrink_to_fit();
-	m_faceAttributes.shrink_to_fit();
 }
 
 void Polygons::transform(const ei::Mat3x4& transMat) {
@@ -684,22 +741,37 @@ void Polygons::transform(const ei::Mat3x4& transMat) {
 	m_vertexAttributes.mark_changed(Device::CPU);
 }
 
-float Polygons::compute_surface_area() const noexcept {
+float Polygons::compute_surface_area() {
+	this->template synchronize<Device::CPU>();
 	float area = 0.f;
-	for(const auto face : m_meshData->faces()) {
-		auto vIter = m_meshData->cfv_ccwbegin(face);
-		const auto a = *vIter; ++vIter;
-		const auto b = *vIter; ++vIter;
-		const auto c = *vIter; ++vIter;
-		const auto pA = util::pun<ei::Vec3>(m_meshData->point(a));
-		const auto pB = util::pun<ei::Vec3>(m_meshData->point(b));
-		const auto pC = util::pun<ei::Vec3>(m_meshData->point(c));
+	const auto* indexBuffer = this->template get_index_buffer<Device::CPU>();
+	const auto* points = this->template acquire_const<Device::CPU, ei::Vec3>(this->get_points_hdl());
+	// Faces are split into triangles and quads
+	for(std::size_t tri = 0u; tri < m_triangles; ++tri) {
+		const ei::UVec3 indices{
+			indexBuffer[3u * tri + 0u],
+			indexBuffer[3u * tri + 1u],
+			indexBuffer[3u * tri + 2u]
+		};
+		const auto pA = points[indices.x];
+		const auto pB = points[indices.y];
+		const auto pC = points[indices.z];
 		area += ei::len(ei::cross(pB - pA, pC - pA));
-		if(vIter.is_valid()) {
-			const auto d = *vIter;
-			const auto pD = util::pun<ei::Vec3>(m_meshData->point(d));
-			area += ei::len(ei::cross(pC - pA, pD - pA));
-		}
+	}
+	for(std::size_t quad = 0u; quad < m_quads; ++quad) {
+		const ei::UVec4 indices{
+			indexBuffer[3u * m_triangles + 4u * quad + 0u],
+			indexBuffer[3u * m_triangles + 4u * quad + 1u],
+			indexBuffer[3u * m_triangles + 4u * quad + 2u],
+			indexBuffer[3u * m_triangles + 4u * quad + 3u]
+		};
+		const auto pA = points[indices.x];
+		const auto pB = points[indices.y];
+		const auto pC = points[indices.z];
+		const auto pD = points[indices.w];
+		// Assume that the quad is planar
+		area += ei::len(ei::cross(pB - pA, pC - pA));
+		area += ei::len(ei::cross(pC - pA, pD - pA));
 	}
 	return 0.5f * area;
 }
@@ -711,32 +783,29 @@ void Polygons::remove_curvature() {
 		newValue = std::max(1u, oldValue) - 1u;
 	} while(m_curvRefCount.compare_exchange_weak(oldValue, newValue, std::memory_order_acq_rel));
 	if(newValue == 0u && m_curvatureHdl.has_value()) {
-		m_vertexAttributes.remove_attribute(m_curvatureHdl.value());
+		m_vertexAttributes.remove(m_curvatureHdl.value());
 		m_curvatureHdl.reset();
 	}
 }
 
 void Polygons::compute_curvature() {
+#if 0
 	// Check if the curvature has been computed before
 	if(m_curvRefCount.fetch_add(1u) == 0 && !m_curvatureHdl.has_value())
 		m_curvatureHdl = this->template add_vertex_attribute<float>("mean_curvature");
 
-	float* curv = m_vertexAttributes.template acquire<Device::CPU, float>(m_curvatureHdl.value());
+	// TODO: we need neighborhood information
 
-	if(!m_meshData->has_vertex_normals()) {
-		// Without interpolated normals, the mesh is assumed to have only flat
-		// faces -> no curvature.
-		for(u32 i = 0; i < m_meshData->n_vertices(); ++i)
-			curv[i] = 0.0f;
-		return;
-	}
+	auto* curv = m_vertexAttributes.template acquire<Device::CPU, float>(m_curvatureHdl.value());
+	const auto* points = this->template acquire_const<Device::CPU, ei::Vec3>(this->get_points_hdl());
+	const auto* normals = this->template acquire_const<Device::CPU, ei::Vec3>(this->get_normals_hdl());
 
-	for(auto& v : m_meshData->vertices()) {
+	for(std::size_t vertex = 0u; vertex < this->get_vertex_count(); ++vertex) {
 		// Fetch data at reference vertex and create an orthogonal space
-		Point vPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(v));
-		Direction vNrm = ei::details::hard_cast<ei::Vec3>(m_meshData->normal(v));
-		Direction dirU = normalize(perpendicular(vNrm));
-		Direction dirV = cross(vNrm, dirU);
+		const auto vPos = points[vertex];
+		const auto vNrm = normals[vertex];
+		const auto dirU = normalize(perpendicular(vNrm));
+		const auto dirV = cross(vNrm, dirU);
 		// Construct an equation system which fits a paraboloid to the 1-ring.
 		// We need Aᵀ A x = Aᵀ b for the least squares system.
 		// Interestingly, it suffices to solve for two of the variables instead of
@@ -770,6 +839,7 @@ void Polygons::compute_curvature() {
 		mAssert(!std::isnan(meanc));
 		curv[v.idx()] = meanc;
 	}
+#endif // 0
 }
 
 
@@ -779,12 +849,12 @@ void Polygons::synchronize() {
 	m_faceAttributes.synchronize<dev>();
 	// Synchronize the index buffer
 
-	if(m_indexBuffer.template get<IndexBuffer<dev>>().indices == nullptr) {
+	if(m_indexBuffer.template get<IndexBuffer<dev>>().indices.get() != nullptr) {
 		// Try to find a valid device
 		bool synced = false;
 		m_indexBuffer.for_each([&](auto& buffer) {
 			using ChangedBuffer = std::decay_t<decltype(buffer)>;
-			if(!synced && buffer.indices != nullptr) {
+			if(!synced && buffer.indices.get() != nullptr) {
 				this->synchronize_index_buffer<ChangedBuffer::DEVICE, dev>();
 				synced = true;
 			}
@@ -832,27 +902,15 @@ void Polygons::update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
 	// Free the previous attribute array if no attributes are wanted
 	auto& buffer = m_attribBuffer.template get<AttribBuffer<dev>>();
 
-	if(vertexAttribs.size() == 0) {
-		if(buffer.vertSize != 0)
-			buffer.vertex = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(buffer.vertex, buffer.vertSize);
-		// else keep current nullptr
-	} else {
-		if(buffer.vertSize == 0)
-			buffer.vertex = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(vertexAttribs.size());
-		else
-			buffer.vertex = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(buffer.vertex, buffer.vertSize,
-																						  vertexAttribs.size());
-	}
-	if(faceAttribs.size() == 0) {
-		if(buffer.faceSize != 0)
-			buffer.face = Allocator<dev>::template free<ArrayDevHandle_t<dev, void>>(buffer.face, buffer.faceSize);
-		// else keep current nullptr
-	} else {
-		if(buffer.faceSize == 0)
-			buffer.face = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(faceAttribs.size());
-		else
-			buffer.face = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(buffer.face, buffer.faceSize, faceAttribs.size());
-	}
+	if(vertexAttribs.size() == 0)
+		buffer.vertex.reset();
+	else // else keep current nullptr
+		buffer.vertex = make_udevptr_array<dev, ArrayDevHandle_t<dev, void>, false>(vertexAttribs.size());
+	
+	if(faceAttribs.size() == 0)
+		buffer.face.reset();
+	else // else keep current nullptr
+		buffer.face = make_udevptr_array<dev, ArrayDevHandle_t<dev, void>, false>(faceAttribs.size());
 
 	std::vector<ArrayDevHandle_t<dev, void>> cpuVertexAttribs;
 	std::vector<ArrayDevHandle_t<dev, void>> cpuFaceAttribs;
@@ -862,13 +920,13 @@ void Polygons::update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
 		cpuVertexAttribs.push_back(this->template acquire_vertex<dev, void>(ident));
 	for(const auto& ident : faceAttribs)
 		cpuFaceAttribs.push_back(this->template acquire_face<dev, void>(ident));
-	copy(buffer.vertex, cpuVertexAttribs.data(), sizeof(cpuVertexAttribs.front()) * vertexAttribs.size());
-	copy(buffer.face, cpuFaceAttribs.data(), sizeof(cpuFaceAttribs.front()) * faceAttribs.size());
+	copy(buffer.vertex.get(), cpuVertexAttribs.data(), sizeof(cpuVertexAttribs.front()) * vertexAttribs.size());
+	copy(buffer.face.get(), cpuFaceAttribs.data(), sizeof(cpuFaceAttribs.front()) * faceAttribs.size());
 
 	descriptor.numVertexAttributes = static_cast<u32>(vertexAttribs.size());
 	descriptor.numFaceAttributes = static_cast<u32>(faceAttribs.size());
-	descriptor.vertexAttributes = buffer.vertex;
-	descriptor.faceAttributes = buffer.face;
+	descriptor.vertexAttributes = buffer.vertex.get();
+	descriptor.faceAttributes = buffer.face.get();
 }
 
 // Reserves more space for the index buffer
@@ -876,83 +934,18 @@ template < Device dev, bool markChanged >
 void Polygons::reserve_index_buffer(std::size_t capacity) {
 	auto& buffer = m_indexBuffer.get<IndexBuffer<dev>>();
 	if(capacity > buffer.reserved) {
-		if(buffer.reserved == 0u)
-			buffer.indices = Allocator<dev>::template alloc_array<u32>(capacity);
-		else
-			buffer.indices = Allocator<dev>::template realloc<u32>(buffer.indices, buffer.reserved,
-																   capacity);
+		buffer.indices = make_udevptr_array<dev, u32, false>(capacity);
 		buffer.reserved = capacity;
 		if constexpr(markChanged) {
 			m_indexBuffer.for_each([](auto& data) {
 				using ChangedBuffer = std::decay_t<decltype(data)>;
 				if(ChangedBuffer::DEVICE != dev && data.indices != nullptr) {
-					Allocator<ChangedBuffer::DEVICE>::template free<u32>(data.indices, data.reserved);
+					data.indices.reset();
 					data.reserved = 0u;
 				}
 			});
 		}
 	}
-}
-
-void Polygons::rebuild_index_buffer() {
-	// Update the statistics we keep
-	// TODO: is there a better way?
-	m_triangles = 0u;
-	m_quads = 0u;
-	for(const auto& face : this->faces()) {
-		const std::size_t vertices = std::distance(face.begin(), face.end());
-		if(vertices == 0)
-			continue;
-		if(vertices == 3u)
-			++m_triangles;
-		else if(vertices == 4u)
-			++m_quads;
-		else
-			throw std::runtime_error("Tessellation added a non-quad/tri face (" + std::to_string(vertices) + " vertices)");
-	}
-
-	// Invalidate bounding box
-	m_boundingBox.min = {
-		std::numeric_limits<float>::max(),
-		std::numeric_limits<float>::max(),
-		std::numeric_limits<float>::max()
-	};
-	m_boundingBox.max = {
-		-std::numeric_limits<float>::max(),
-		-std::numeric_limits<float>::max(),
-		-std::numeric_limits<float>::max()
-	};
-
-	// Rebuild the index buffer
-	this->reserve_index_buffer<Device::CPU>(3u * m_triangles + 4u * m_quads);
-	std::size_t currTri = 0u;
-	std::size_t currQuad = 0u;
-	u32* indexBuffer = m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices;
-
-	for(auto face : m_meshData->faces()) {
-		const auto startVertex = m_meshData->cfv_ccwbegin(face);
-		const auto endVertex = m_meshData->cfv_ccwend(face);
-		const auto vertexCount = std::distance(startVertex, endVertex);
-
-		u32* currIndices = indexBuffer;
-		if(vertexCount == 3u) {
-			currIndices += 3u * currTri++;
-		} else {
-			currIndices += 3u * m_triangles + 4u * currQuad++;
-		}
-		for(auto vertexIter = startVertex; vertexIter != endVertex; ++vertexIter) {
-			*(currIndices++) = static_cast<u32>(vertexIter->idx());
-			ei::Vec3 pt = util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]);
-			m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ util::pun<ei::Vec3>(m_meshData->points()[vertexIter->idx()]) } };
-		}
-	}
-
-	// Let our attribute pools know that we changed sizes
-	m_vertexAttributes.resize(m_meshData->n_vertices());
-	m_faceAttributes.resize(m_meshData->n_faces());
-
-	// Flag the entire polygon as dirty
-	m_vertexAttributes.mark_changed(Device::CPU);
 }
 
 // Synchronizes two device index buffers
@@ -967,15 +960,14 @@ void Polygons::synchronize_index_buffer() {
 			this->reserve_index_buffer<sync, false>(3u * m_triangles + 4u * m_quads);
 
 		if(changedBuffer.reserved != 0u)
-			copy(syncBuffer.indices, changedBuffer.indices, sizeof(u32) * (3u * m_triangles + 4u * m_quads));
+			copy(syncBuffer.indices.get(), changedBuffer.indices.get(), sizeof(u32) * (3u * m_triangles + 4u * m_quads));
 	}
 }
 
 template < Device dev >
 void Polygons::unload_index_buffer() {
 	auto& idxBuffer = m_indexBuffer.template get<IndexBuffer<dev>>();
-	if(idxBuffer.indices != nullptr)
-		idxBuffer.indices = Allocator<dev>::free(idxBuffer.indices, idxBuffer.reserved);
+	idxBuffer.indices.reset();
 	idxBuffer.reserved = 0u;
 }
 
@@ -984,17 +976,11 @@ void Polygons::resizeAttribBuffer(std::size_t v, std::size_t f) {
 	AttribBuffer<dev>& attribBuffer = m_attribBuffer.get<AttribBuffer<dev>>();
 	// Resize the attribute array if necessary
 	if(attribBuffer.faceSize < f) {
-		if(attribBuffer.faceSize == 0)
-			attribBuffer.face = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(f);
-		else
-			attribBuffer.face = Allocator<dev>::template realloc<ArrayDevHandle_t<dev, void>>(attribBuffer.face, attribBuffer.faceSize, f);
+		attribBuffer.face = make_udevptr_array<dev, ArrayDevHandle_t<dev, void>, false>(f);
 		attribBuffer.faceSize = f;
 	}
 	if(attribBuffer.vertSize < v) {
-		if(attribBuffer.vertSize == 0)
-			attribBuffer.vertex = Allocator<dev>::template alloc_array<ArrayDevHandle_t<dev, void>>(v);
-		else
-			attribBuffer.vertex = Allocator<dev>::template realloc< ArrayDevHandle_t<dev, void>>(attribBuffer.vertex, attribBuffer.vertSize, v);
+		attribBuffer.vertex = make_udevptr_array<dev, ArrayDevHandle_t<dev, void>, false>(v);
 		attribBuffer.vertSize = v;
 	}
 }
@@ -1033,7 +1019,6 @@ template void Polygons::update_attribute_descriptor<Device::CUDA>(PolygonsDescri
 template void Polygons::update_attribute_descriptor<Device::OPENGL>(PolygonsDescriptor<Device::OPENGL>& descriptor,
 																	const std::vector<AttributeIdentifier>& vertexAttribs,
 																	const std::vector<AttributeIdentifier>& faceAttribs);
-template void Polygons::compute_error_quadrics<float>(OpenMesh::VPropHandleT<OpenMesh::Geometry::QuadricT<float>>);
 
 
 } // namespace mufflon::scene::geometry

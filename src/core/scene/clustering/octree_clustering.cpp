@@ -208,8 +208,6 @@ std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, c
 
 	// We have to track a few things per cluster
 	// TODO: better bound!
-	printf("Max cluster index: %lu\n", maxIndex);
-	fflush(stdout);
 	std::vector<OctreeVertexCluster> clusters(maxIndex + 1u);
 
 	const auto aabbMin = aabb.min;
@@ -244,6 +242,10 @@ std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, c
 	std::vector<geometry::PolygonMeshType::VertexHandle> representative(clusters.size());
 	// then we set the position of every vertex to that of its
 	// cluster representative
+	if(m_collapsedTo.is_valid()) {
+		for(const auto vertex : mesh.vertices())
+			mesh.property(m_collapsedTo, vertex) = OpenMesh::VertexHandle{};
+	}
 	for(const auto vertex : mesh.vertices()) {
 		const auto pos = util::pun<ei::Vec3>(mesh.point(vertex));
 		const auto clusterIndex = get_cluster_index(pos);
@@ -263,7 +265,10 @@ std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, c
 		if(clusterIndex.has_value()) {
 			if(vertex == representative[clusterIndex->index])
 				continue;
-#
+
+			// Preserve collapse history
+			if(m_collapsedTo.is_valid())
+				mesh.property(m_collapsedTo, vertex) = representative[clusterIndex->index];
 			// Tell all incoming half-edges from outside the cluster that they now point to the cluster vertex instead
 			for(auto iter = mesh.vih_ccwbegin(vertex); iter.is_valid(); ++iter) {
 				const auto from = mesh.from_vertex_handle(*iter);
@@ -273,11 +278,15 @@ std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, c
 			}
 		}
 	}
-	if(garbageCollect) {
+	const bool removeVertexStatus = !mesh.has_vertex_status();
+	const bool removeFaceStatus = !mesh.has_face_status();
+	const bool removeEdgeStatus = !mesh.has_edge_status();
+	if(removeVertexStatus)
 		mesh.request_vertex_status();
-		mesh.request_edge_status();
+	if(removeFaceStatus)
 		mesh.request_face_status();
-	}
+	if(removeEdgeStatus)
+		mesh.request_edge_status();
 
 	// We do up to 10 takes to remove as many as possible
 	for(std::size_t tries = 0u; tries < 10u && !removableHalfedges.empty(); ++tries) {
@@ -291,14 +300,14 @@ std::size_t OctreeVertexClusterer<O>::cluster(geometry::PolygonMeshType& mesh, c
 		}
 		removableHalfedges.resize(free);
 	}
-	if(garbageCollect) {
+	if(garbageCollect)
 		mesh.garbage_collection();
+	if(removeVertexStatus)
 		mesh.release_vertex_status();
-		mesh.release_edge_status();
+	if(removeFaceStatus)
 		mesh.release_face_status();
-	}
-
-
+	if(removeEdgeStatus)
+		mesh.release_edge_status();
 	return clusterCount;
 }
 

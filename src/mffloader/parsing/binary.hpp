@@ -40,7 +40,8 @@ public:
 				   const bool noDefaultInstances);
 
 	mufflon::u32 read_unique_object_material_indices(const fs::path& file, const mufflon::u32 objId, mufflon::u16* indices);
-	void load_lod(const fs::path& file, ObjectHdl obj, mufflon::u32 objId, mufflon::u32 lod);
+	void load_lod(const fs::path& file, ObjectHdl obj, mufflon::u32 objId,
+				  mufflon::u32 lod, const bool asReduced);
 
 	const std::vector<std::string>& get_material_names() const noexcept {
 		return m_materialNames;
@@ -209,7 +210,7 @@ private:
 						const bool noDefaultInstances);
 	void deinstance();
 	void read_object();
-	mufflon::u32 read_lod(const ObjectState& object, mufflon::u32 lod);
+	mufflon::u32 read_lod(const ObjectState& object, mufflon::u32 lod, bool asReduced = false);
 	void read_bone_animation_data();
 
 	MufflonInstanceHdl m_mffInstHdl;

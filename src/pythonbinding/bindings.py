@@ -254,7 +254,7 @@ class DllHolder:
         self.core.world_create_object.argtypes = [c_void_p, c_char_p, c_int]
         self.core.object_add_lod.restype = c_void_p
         self.core.object_add_lod.argtypes = [c_void_p, c_uint]
-        self.core.polygon_reserve.argtypes = [c_void_p, c_size_t, c_size_t, c_size_t, c_size_t]
+        self.core.polygon_reserve.argtypes = [c_void_p, c_size_t, c_size_t, c_size_t]
         self.core.polygon_add_vertex.restype = c_int
         self.core.polygon_add_vertex.argtypes = [c_void_p, Vec3, Vec3, Vec2]
         self.core.polygon_add_triangle_material.restype = c_int

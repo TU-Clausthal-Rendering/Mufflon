@@ -18,13 +18,18 @@ public:
 						  std::optional<float> maxDensity = std::nullopt) :
 		m_octree{ octree },
 		m_maxCount{ maxCount },
-		m_maxDensity{ maxDensity }
+		m_maxDensity{ maxDensity },
+		m_collapsedTo{}
 	{}
+
+	void enable_collapse_history(OpenMesh::VPropHandleT<OpenMesh::VertexHandle> handle) {
+		m_collapsedTo = handle;
+	}
 
 	// Performs the clustering. Note that, if garbageCollect == false, you 
 	// MUST request status for vertices, edges, and faces prior
 	std::size_t cluster(geometry::PolygonMeshType& mesh, const ei::Box& aabb,
-						const bool garbageCollect = true, std::vector<bool>* octreeNodeMask = nullptr,
+						const bool garbageCollect = false, std::vector<bool>* octreeNodeMask = nullptr,
 						std::vector<typename O::NodeIndex>* currLevel = nullptr,
 						std::vector<typename O::NodeIndex>* nextLevel = nullptr);
 
@@ -32,6 +37,7 @@ private:
 	const OctreeType& m_octree;
 	const std::size_t m_maxCount;
 	const std::optional<float> m_maxDensity;
+	OpenMesh::VPropHandleT<OpenMesh::VertexHandle> m_collapsedTo;
 };
 
 } // namespace mufflon::scene::clustering
