@@ -447,7 +447,7 @@ using mat_type = typename mat_info<M>::type;
 
 // Get the full descriptor size of a material
 template < Device dev, Materials M >
-constexpr std::size_t get_material_descriptor_size() {
+constexpr std::size_t get_material_descriptor_size() noexcept {
 	return round_to_align<8u>(sizeof(MaterialDescriptorBase)
 		+ int(mat_type<M>::Textures::TEX_COUNT) * sizeof(textures::ConstTextureDevHandle_t<dev>)
 		+ (std::is_empty<typename mat_type<M>::NonTexParams>::value ? 0 : sizeof(typename mat_type<M>::NonTexParams)));

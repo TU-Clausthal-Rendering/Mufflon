@@ -220,6 +220,10 @@ public:
 		m_memory.resize(m_dataCapacity * sizeof(std::pair<K,V>) + m_mapSize * sizeof(u32));
 	}
 
+	std::size_t size() const noexcept {
+		return m_memory.size();
+	}
+
 	template < Device dstDev >
 	void synchronize() {
 		m_memory.synchronize<dstDev>();

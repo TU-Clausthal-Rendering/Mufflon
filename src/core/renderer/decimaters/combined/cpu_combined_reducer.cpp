@@ -383,6 +383,7 @@ void CpuCombinedReducer::initialize_decimaters() {
 	}
 
 	// First we load in the LoDs (possibly reduced version)
+	std::atomic_uint32_t progress = 0u;
 	// TODO: sort them to keep memory budget?
 #pragma PARALLEL_FOR_COND_DYNAMIC(true)
 	for(std::int64_t o = 0; o < static_cast<std::int64_t>(objects.size()); ++o) {
@@ -390,8 +391,8 @@ void CpuCombinedReducer::initialize_decimaters() {
 		for(i32 j = 0; j < o; ++j)
 			++objIter;
 		auto& obj = *objIter;
-		if(o % 100 == 0)
-			logInfo("Progess: ", o, " of ", objects.size());
+		if(const auto prev = progress.fetch_add(1u); (prev + 1u) % 100 == 0u)
+			logInfo("Progess: ", prev, " of ", objects.size());
 		// TODO: proper LoD levels!
 		// Load and pre-reduce the LoDs if applicable
 		const u32 lodIndex = 0u;
@@ -420,8 +421,8 @@ void CpuCombinedReducer::initialize_decimaters() {
 					// Possibly repeat until we reached the desired count
 					const auto performedCollapses = decimater.decimate_to(targetVertexCount);
 					polygons.reconstruct_from_reduced_mesh(mesh);
-					logInfo("Loaded reduced LoD '", obj.first->get_name(), "' (",
-							origPolys.get_vertex_count(), " -> ", polygons.get_vertex_count(), ")");
+					logPedantic("Loaded reduced LoD '", obj.first->get_name(), "' (",
+								origPolys.get_vertex_count(), " -> ", polygons.get_vertex_count(), ")");
 					lod.clear_accel_structure();
 					obj.first->remove_original_lod(lodIndex);
 				}

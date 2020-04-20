@@ -216,6 +216,12 @@ public:
 	// Gets the descriptor with only default attributes (position etc)
 	template < Device dev >
 	PolygonsDescriptor<dev> get_descriptor();
+	// Gets the size of the final descriptor
+	std::size_t desciptor_size() const noexcept {
+		return this->get_vertex_count() * (2u * sizeof(ei::Vec3) +  sizeof(ei::Vec2))
+			+ this->get_triangle_count() * (3u * sizeof(u32) + sizeof(MaterialIndex))
+			+ this->get_quad_count() * (4u * sizeof(u32) + sizeof(MaterialIndex));
+	}
 	// Updates the descriptor with the given set of attributes
 	template < Device dev >
 	void update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,

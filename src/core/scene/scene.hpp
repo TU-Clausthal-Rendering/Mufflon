@@ -29,6 +29,17 @@ class WorldContainer;
  */
 class Scene {
 public:
+	struct SceneSizes {
+		std::size_t geometrySize = 0u;
+		std::size_t instanceSize = 0u;
+		std::size_t lodAccelSize = 0u;
+		std::size_t instanceAccelSize = 0u;
+		std::size_t materialSize = 0u;
+		std::size_t textureSize = 0u;
+		std::size_t lightSize = 0u;
+		std::size_t descriptorOverhead = 0u;
+	};
+
 	// Holds offset into instance list as well as number of instances
 	// for one object
 	struct InstanceRef {
@@ -149,6 +160,8 @@ public:
 											   const std::vector<AttributeIdentifier>& faceAttribs,
 											   const std::vector<AttributeIdentifier>& sphereAttribs,
 											   const std::optional<std::function<bool(WorldContainer&, Object&, u32)>> lodLoader = std::nullopt);
+	template < Device dev >
+	SceneSizes get_estimated_descriptor_size() const noexcept;
 
 	// Get access to the existing objects in the scene (subset from the world)
 	const util::FixedHashMap<ObjectHandle, InstanceRef>& get_objects() const noexcept {

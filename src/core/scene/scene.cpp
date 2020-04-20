@@ -87,7 +87,7 @@ void Scene::load_materials() {
 	// Temporary storage to only copy once
 	auto cpuTexHdlBuffer = std::make_unique<textures::ConstTextureDevHandle_t<dev>[]>(MAT_SLOTS);
 
-	auto mem = m_materials.acquire<dev>(false);
+	auto mem = m_materials.template acquire<dev>(false);
 	copy(mem, as<char>(offsets.data()), sizeof(int) * m_scenario.get_num_material_slots());
 	// 2. Pass get all the material descriptors
 	char buffer[materials::MAX_MATERIAL_DESCRIPTOR_SIZE()];
@@ -103,7 +103,7 @@ void Scene::load_materials() {
 	}
 
 	// Coyp the alpha texture handles
-	copy((ArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>>)(m_alphaTextures.acquire<dev>()),
+	copy((ArrayDevHandle_t<dev, textures::ConstTextureDevHandle_t<dev>>)(m_alphaTextures.template acquire<dev>()),
 		 cpuTexHdlBuffer.get(), sizeof(textures::ConstTextureDevHandle_t<dev>) * MAT_SLOTS);
 }
 
@@ -417,6 +417,17 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 					"ms");
 		}
 		sceneDescriptor.accelStruct = m_accelStruct.template acquire_const<dev>();
+
+		const auto descSize = this->template get_estimated_descriptor_size<dev>();
+		logInfo("Descriptor size (geom(data/accel)/inst(data/accel)/mat/tex/light/desc): ",
+				descSize.geometrySize / 1'000'000, "/",
+				descSize.lodAccelSize / 1'000'000, "/",
+				descSize.instanceSize / 1'000'000, "/",
+				descSize.instanceAccelSize / 1'000'000, "/",
+				descSize.materialSize / 1'000'000, "/",
+				descSize.textureSize / 1'000'000, "/",
+				descSize.lightSize / 1'000'000, "/",
+				descSize.descriptorOverhead / 1'000'000, " MB");
     }
 	
 	// Camera doesn't get a media-changed flag because it's relatively cheap to determine?
@@ -431,6 +442,73 @@ const SceneDescriptor<dev>& Scene::get_descriptor(const std::vector<AttributeIde
 	}
 	
 	return sceneDescriptor;
+}
+
+template < Device dev >
+Scene::SceneSizes Scene::get_estimated_descriptor_size() const noexcept {
+	SceneSizes sizes{};
+
+	std::vector<u32> usedLods;
+	const int objCount = static_cast<int>(m_objects.size());
+	std::atomic_uint32_t lodIndex = 0u;
+	std::atomic_uint32_t actualInstanceCount = 0u;
+	for(int o = 0; o < objCount; ++o) {
+		auto& obj = *(m_objects.begin() + o);
+		mAssert(obj.first != nullptr);
+
+		// First gather which LoDs of this objects are used and
+		// collect the instance transformations
+		const auto lodSlots = static_cast<u32>(obj.first->get_lod_slot_count());
+		usedLods.clear();
+		usedLods.resize(lodSlots);
+		std::fill(usedLods.begin(), usedLods.end(), std::numeric_limits<u32>::max());
+		const auto endIndex = obj.second.offset + obj.second.count;
+		u32 lodCounter = 0u;
+		for(std::size_t i = obj.second.offset; i < endIndex; ++i) {
+			const auto inst = m_instances[i];
+			mAssert(inst != nullptr);
+			const u32 instanceLod = m_scenario.get_effective_lod(inst);
+			mAssert(instanceLod < lodSlots);
+			if(usedLods[instanceLod] == std::numeric_limits<u32>::max())
+				usedLods[instanceLod] = lodCounter++;
+		}
+
+		// Reserve the proper amount of LoD descriptors
+		for(u32 i = 0u; i < lodSlots; i++) {
+			if(usedLods[i] == std::numeric_limits<u32>::max())
+				continue;
+			// LoD size and AABB
+			sizes.geometrySize += obj.first->get_lod(i).desciptor_size();
+			sizes.lodAccelSize += obj.first->get_lod(i).accel_descriptor_size() + sizeof(ei::Box);
+			sizes.descriptorOverhead += sizeof(LodDescriptor<dev>);
+		}
+		actualInstanceCount += obj.second.count;
+	}
+
+	// Instance transformations and LoD indices
+	sizes.instanceSize += sizeof(ei::Mat3x4) * m_worldToInstanceTransformation.size();
+	// OpenGL descriptor has two transformation sets instead of LoD indices
+	if constexpr(dev == Device::OPENGL)
+		sizes.instanceSize += sizeof(ei::Mat3x4) * m_worldToInstanceTransformation.size();
+	else
+		sizes.instanceSize += sizeof(u32) * m_worldToInstanceTransformation.size();
+	sizes.instanceAccelSize += m_accelStruct.desciptor_size();
+	sizes.descriptorOverhead += sizeof(SceneDescriptor<dev>);
+
+	// Camera descriptor is already integrated, but the lighttree has more data
+	sizes.lightSize += m_lightTree.descriptor_size();
+	// Media and material descriptors
+	sizes.materialSize += m_media.size() + m_materials.size();
+	// Textures
+	sizes.descriptorOverhead += m_alphaTextures.size();
+	for(MaterialIndex i = 0u; i < static_cast<MaterialIndex>(m_scenario.get_num_material_slots()); ++i) {
+		const auto& mat = m_scenario.get_assigned_material(i);
+		if(const auto* alphaTex = mat->get_alpha_texture(); alphaTex != nullptr)
+			sizes.textureSize += alphaTex->get_size();
+		sizes.textureSize += mat->get_material_texture_size();
+	}
+
+	return sizes;
 }
 
 void Scene::set_lights(std::vector<lights::PositionalLights>&& posLights,
@@ -631,5 +709,8 @@ template const SceneDescriptor<Device::OPENGL>& Scene::get_descriptor<Device::OP
 																					  const std::vector<AttributeIdentifier>&,
 																					  const std::vector<AttributeIdentifier>&,
 																					  const std::optional<std::function<bool(WorldContainer&, Object&, u32)>>);
+template Scene::SceneSizes Scene::get_estimated_descriptor_size<Device::CPU>() const noexcept;
+template Scene::SceneSizes Scene::get_estimated_descriptor_size<Device::CUDA>() const noexcept;
+template Scene::SceneSizes Scene::get_estimated_descriptor_size<Device::OPENGL>() const noexcept;
 
 }} // namespace mufflon::scene

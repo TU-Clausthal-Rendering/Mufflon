@@ -225,6 +225,8 @@ public:
 		else return *m_treeCuda;
 	}
 
+	std::size_t descriptor_size() const noexcept;
+
 	template < Device dev >
 	void synchronize(const ei::Box& sceneBounds);
 

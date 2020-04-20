@@ -74,6 +74,14 @@ public:
 									 const std::vector<AttributeIdentifier>& vertexAttribs,
 									 const std::vector<AttributeIdentifier>& faceAttribs,
 									 const std::vector<AttributeIdentifier>& sphereAttribs);
+	// Gets the size of the final descriptor (without attributes)
+	std::size_t desciptor_size() const noexcept {
+		return m_geometry.template get<geometry::Polygons>().desciptor_size()
+			+ m_geometry.template get<geometry::Spheres>().desciptor_size();
+	}
+	std::size_t accel_descriptor_size() const noexcept {
+		return m_accelStruct.desciptor_size();
+	}
 
 	// Clears the BVH of this object.
 	void clear_accel_structure();

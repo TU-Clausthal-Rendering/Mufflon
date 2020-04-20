@@ -450,6 +450,11 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 //__device__ GuideFunction cudaGuideFluxPos = guide_flux_pos;
 //__device__ float pi_gpu = 0;
 
+std::size_t LightTreeBuilder::descriptor_size() const noexcept {
+	return m_treeMemory.size() + m_primToNodePath.size()
+		+ (m_envLight != nullptr ? m_envLight->descriptor_size() : 0u);
+}
+
 template < Device dev >
 void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 	// Background is no longer outdated
