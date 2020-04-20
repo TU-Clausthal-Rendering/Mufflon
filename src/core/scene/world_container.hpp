@@ -32,13 +32,22 @@ namespace scene {
  */
 class WorldContainer {
 public:
+	struct LodMetadata {
+		u32 vertices;
+		u32 triangles;
+		u32 quads;
+		u32 edges;
+		u32 spheres;
+	};
+
 	using PointLightHandle = std::map<std::string, lights::PointLight, std::less<>>::iterator;
 	using SpotLightHandle = std::map<std::string, lights::SpotLight, std::less<>>::iterator;
 	using DirLightHandle = std::map<std::string, lights::DirectionalLight, std::less<>>::iterator;
 	using EnvLightHandle = std::map<std::string, TextureHandle, std::less<>>::iterator;
 
 	using LodLoadFuncPtr = std::uint32_t(CDECL*)(void* userParams, ObjectHandle obj, u32 lod, u32);
-	using ObjMatIndicesFuncPtr = std::uint32_t(CDECL*)(void* userParams, uint32_t objId, uint16_t* matIndices, uint32_t* count);
+	using ObjMatIndicesFuncPtr = std::uint32_t(CDECL*)(void* userParams, uint32_t objId, uint16_t * matIndices, uint32_t * count);
+	using LodMetaDataFuncPtr = std::uint32_t(CDECL*)(void* userParams, uint32_t objId, uint32_t lodLevel, LodMetadata* data);
 
 
 	enum class Sanity {
@@ -83,8 +92,9 @@ public:
 	// Ejects a specific LoD
 	bool unload_lod(Object& obj, const u32 lodIndex);
 	// Loads the material indices of an object
-	std::vector<MaterialIndex> load_object_material_indices(const u32 objectId);
-	std::size_t load_object_material_indices(const u32 objectId, MaterialIndex* buffer);
+	std::vector<MaterialIndex> load_object_material_indices(const u32 objectId) const;
+	std::size_t load_object_material_indices(const u32 objectId, MaterialIndex* buffer) const;
+	LodMetadata load_lod_metadata(const u32 objectId, const u32 lodLevel) const;
 	// Discards any already applied tessellation/displacement for the current scene
 	// and re-tessellates/-displaces with the current max. tessellation level
 	void retessellate();
@@ -186,7 +196,7 @@ public:
 	// Set the new animation frame. Caution: this invalidates the currently loaded scene
 	// which must thus be set for any active renderer!
 	bool set_frame_current(const u32 frameCurrent);
-	void set_lod_loader_function(LodLoadFuncPtr func, ObjMatIndicesFuncPtr matFunc, void* userParams);
+	void set_lod_loader_function(LodLoadFuncPtr func, ObjMatIndicesFuncPtr matFunc, LodMetaDataFuncPtr metaFunc, void* userParams);
 	void set_tessellation_level(const float tessLevel) { m_tessLevel = tessLevel; }
 
 
@@ -209,6 +219,7 @@ private:
 	// Function pointer for loading a LoD from a scene
 	LodLoadFuncPtr m_loadLod = nullptr;
 	ObjMatIndicesFuncPtr m_objMatLoad = nullptr;
+	LodMetaDataFuncPtr m_lodMetaLoad = nullptr;
 	void* m_loadLodUserParams = nullptr;
 
 	// A pool for all object/instance names (keeps references valid until world clear)

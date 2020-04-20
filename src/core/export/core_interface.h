@@ -74,6 +74,14 @@ typedef struct {
 	uint64_t microseconds;
 } ProcessTime;
 
+typedef struct {
+	uint32_t vertices;
+	uint32_t triangles;
+	uint32_t quads;
+	uint32_t edges;
+	uint32_t spheres;
+} LodMetadata;
+
 typedef enum {
 	CAM_PINHOLE,
 	CAM_FOCUS,
@@ -345,7 +353,8 @@ CORE_API Boolean CDECL mufflon_initialize_opengl(MufflonInstanceHdl instHdl);
 CORE_API int32_t CDECL mufflon_get_cuda_device_index();
 CORE_API Boolean CDECL mufflon_is_cuda_available();
 CORE_API Boolean CDECL mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t, Boolean),
-											  Boolean(*objFunc)(void*, uint32_t, uint16_t*, uint32_t*), void* userParams);
+											  Boolean(*objFunc)(void*, uint32_t, uint16_t*, uint32_t*),
+											  Boolean(*metaFunc)(void*, uint32_t, uint32_t, LodMetadata* data), void* userParams);
 
 // Render image functions
 CORE_API Boolean CDECL mufflon_get_target_image(MufflonInstanceHdl instHdl, const char* name, Boolean variance, const float** ptr);

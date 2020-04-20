@@ -25,6 +25,7 @@ LOADER_API LoaderStatus CDECL loader_save_scene(MufflonLoaderInstanceHdl, const 
 LOADER_API Boolean CDECL loader_load_lod(MufflonLoaderInstanceHdl, void* obj, uint32_t lod, Boolean asReduced);
 LOADER_API Boolean CDECL loader_load_object_material_indices(MufflonLoaderInstanceHdl, const uint32_t objId,
 															 uint16_t* indexBuffer, uint32_t* readIndices);
+LOADER_API Boolean CDECL loader_lod_lod_metadata(MufflonLoaderInstanceHdl hdl, uint32_t objId, uint32_t lodLevel, LodMetadata* data);
 LOADER_API Boolean CDECL loader_abort(MufflonLoaderInstanceHdl);
 LOADER_API const char* CDECL loader_get_loading_status(MufflonLoaderInstanceHdl);
 LOADER_API void CDECL loader_profiling_enable();

@@ -45,6 +45,7 @@ void CpuCombinedReducer::post_reset() {
 
 		// The descriptor already accounts for all instances (over all frames);
 		// unfortunately we do not know which ones are no-animated (ie. over all frames)
+		// TODO: cache the currently unneeded sums to disk
 		if(m_instanceImportanceSums == nullptr)
 			m_instanceImportanceSums = std::make_unique<std::atomic<double>[]>(m_sceneDesc.activeInstances * m_world.get_frame_count());
 	}
@@ -382,6 +383,16 @@ void CpuCombinedReducer::initialize_decimaters() {
 		mesh.request_edge_status();
 	}
 
+	// Fetch all LoD sizes so we can keep the process beneath a given memory threshold
+	std::vector<std::pair<u32, scene::WorldContainer::LodMetadata>> lodSizes(objects.size());
+#pragma PARALLEL_FOR_COND_DYNAMIC(true)
+	for(std::int64_t o = 0; o < static_cast<std::int64_t>(objects.size()); ++o) {
+		// TODO: proper LoD level
+		lodSizes[o] = std::make_pair(static_cast<u32>(o), m_world.load_lod_metadata(static_cast<u32>(o), 0u));
+	}
+	// TODO!
+
+
 	// First we load in the LoDs (possibly reduced version)
 	std::atomic_uint32_t progress = 0u;
 	// TODO: sort them to keep memory budget?
@@ -391,44 +402,39 @@ void CpuCombinedReducer::initialize_decimaters() {
 		for(i32 j = 0; j < o; ++j)
 			++objIter;
 		auto& obj = *objIter;
-		if(const auto prev = progress.fetch_add(1u); (prev + 1u) % 100 == 0u)
+		if(const auto prev = progress.fetch_add(1u, std::memory_order_acq_rel) + 1u; prev % 100 == 0u)
 			logInfo("Progess: ", prev, " of ", objects.size());
 		// TODO: proper LoD levels!
 		// Load and pre-reduce the LoDs if applicable
 		const u32 lodIndex = 0u;
-		if(!m_world.load_lod(*obj.first, lodIndex))
+		if(!m_world.load_lod(*obj.first, lodIndex, m_params.initialReduction > 0.f))
 			throw std::runtime_error("Failed to load object LoD!");
 		m_originalVertices[o] = obj.first->get_lod(lodIndex).template get_geometry<scene::geometry::Polygons>().get_vertex_count();
 
 		if(m_params.initialReduction > 0.f) {
-			if(!obj.first->has_reduced_lod_available(lodIndex)) {
-				const auto& origLod = obj.first->get_original_lod(lodIndex);
-				const auto& origPolys = origLod.template get_geometry<scene::geometry::Polygons>();
-				if(origPolys.get_vertex_count() >= m_params.threshold) {
-					auto& lod = obj.first->add_reduced_lod(lodIndex);
-					auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-					// Pre-reduce
-					const auto targetVertexCount = static_cast<std::size_t>((1.f - m_params.initialReduction)
-																			* static_cast<float>(origPolys.get_vertex_count()));
-					const auto gridRes = static_cast<std::size_t>(std::ceil(std::cbrt(2.f * static_cast<float>(targetVertexCount))));
-					auto& mesh = meshes[get_current_thread_idx()];
-					mesh.clean_keep_reservation();
-					polygons.create_halfedge_structure(mesh);
-					OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
-					OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
-					decimater.add(modQuadricHandle);
-					decimater.initialize();
-					// Possibly repeat until we reached the desired count
-					const auto performedCollapses = decimater.decimate_to(targetVertexCount);
-					polygons.reconstruct_from_reduced_mesh(mesh);
-					logPedantic("Loaded reduced LoD '", obj.first->get_name(), "' (",
-								origPolys.get_vertex_count(), " -> ", polygons.get_vertex_count(), ")");
-					lod.clear_accel_structure();
-					obj.first->remove_original_lod(lodIndex);
-				}
-			} else {
-				obj.first->remove_original_lod(lodIndex);
+			auto& lod = obj.first->add_reduced_lod(lodIndex);
+			auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+			if(const auto origVertCount = polygons.get_vertex_count(); origVertCount >= m_params.threshold) {
+				// Pre-reduce
+				const auto targetVertexCount = static_cast<std::size_t>((1.f - m_params.initialReduction)
+																		* static_cast<float>(origVertCount));
+				const auto gridRes = static_cast<std::size_t>(std::ceil(std::cbrt(2.f * static_cast<float>(targetVertexCount))));
+				auto& mesh = meshes[get_current_thread_idx()];
+				mesh.clean_keep_reservation();
+				polygons.create_halfedge_structure(mesh);
+				// TODO: persistent decimater? persistent error quadrics?
+				OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
+				OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
+				decimater.add(modQuadricHandle);
+				decimater.initialize();
+				// Possibly repeat until we reached the desired count
+				const auto performedCollapses = decimater.decimate_to(targetVertexCount);
+				polygons.reconstruct_from_reduced_mesh(mesh);
+				logPedantic("Loaded reduced LoD '", obj.first->get_name(), "' (",
+							origVertCount, " -> ", polygons.get_vertex_count(), ")");
+				lod.clear_accel_structure();
 			}
+			obj.first->remove_original_lod(lodIndex);
 		}
 	}
 

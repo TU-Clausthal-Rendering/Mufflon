@@ -699,7 +699,7 @@ bool WorldContainer::unload_lod(Object& obj, const u32 lodIndex) {
 	return true;
 }
 
-std::vector<MaterialIndex> WorldContainer::load_object_material_indices(const u32 objectId) {
+std::vector<MaterialIndex> WorldContainer::load_object_material_indices(const u32 objectId) const {
 	std::vector<MaterialIndex> indices;
 	indices.resize(m_scenario->get_num_material_slots());
 	const auto count = this->load_object_material_indices(objectId, indices.data());
@@ -707,12 +707,21 @@ std::vector<MaterialIndex> WorldContainer::load_object_material_indices(const u3
 	return indices;
 }
 
-std::size_t WorldContainer::load_object_material_indices(const u32 objectId, MaterialIndex* buffer) {
+std::size_t WorldContainer::load_object_material_indices(const u32 objectId, MaterialIndex* buffer) const {
 	u32 numIndices = 0u;
 	if(m_objMatLoad(m_loadLodUserParams, objectId, buffer, &numIndices) == 0)
 		throw std::runtime_error("Failed to load unique material indices for object '"
 								 + std::string((m_objects.cbegin() + objectId)->first) + "'");
 	return numIndices;
+}
+
+WorldContainer::LodMetadata WorldContainer::load_lod_metadata(const u32 objectId, const u32 lodLevel) const {
+	LodMetadata data;
+	if(!m_lodMetaLoad(m_loadLodUserParams, objectId, lodLevel, &data))
+		throw std::runtime_error("Failed to load metadata for object '"
+								 + std::string((m_objects.cbegin() + objectId)->first)
+								 + "', LoD level " + std::to_string(lodLevel));
+	return data;
 }
 
 SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* renderer) {
@@ -1008,9 +1017,11 @@ bool WorldContainer::load_scene_lights() {
 	return reloaded;
 }
 
-void WorldContainer::set_lod_loader_function(LodLoadFuncPtr func, ObjMatIndicesFuncPtr matFunc, void* userParams) {
+void WorldContainer::set_lod_loader_function(LodLoadFuncPtr func, ObjMatIndicesFuncPtr matFunc,
+											 LodMetaDataFuncPtr metaFunc, void* userParams) {
 	m_loadLod = func;
 	m_objMatLoad = matFunc;
+	m_lodMetaLoad = metaFunc;
 	m_loadLodUserParams = userParams;
 }
 

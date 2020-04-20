@@ -226,13 +226,14 @@ Boolean core_set_log_level(LogLevel level) {
 }
 
 Boolean mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t, Boolean),
-							   Boolean(*objFunc)(void*, uint32_t, uint16_t*, uint32_t*), void* userParams) {
+							   Boolean(*objFunc)(void*, uint32_t, uint16_t*, uint32_t*),
+							   Boolean(*metaFunc)(void*, uint32_t, uint32_t, LodMetadata*), void* userParams) {
 	TRY
 	CHECK_NULLPTR(instHdl, "mufflon instance", false);
 	MufflonInstance& instance = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(func, "LoD loader function", false);
-	instance.world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(void*, ObjectHandle, u32, u32)>(func),
-										   objFunc, userParams);
+	instance.world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(void*, ObjectHandle, u32, u32)>(func), objFunc,
+										   reinterpret_cast<std::uint32_t(*)(void*, u32, u32, WorldContainer::LodMetadata*)>(metaFunc), userParams);
 	return true;
 	CATCH_ALL(false)
 }

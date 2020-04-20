@@ -189,6 +189,17 @@ namespace gui.Dll
             IntPtr name;
         };
 
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct LodMetadata
+        {
+            UInt32 vertices;
+            UInt32 triangles;
+            UInt32 quads;
+            UInt32 edges;
+            UInt32 spheres;
+        };
+
         public enum CameraType
         {
             Pinhole,
@@ -305,6 +316,7 @@ namespace gui.Dll
         public delegate void LogCallback(string message, Severity severity);
         public delegate void LodLoaderFunc(IntPtr userParams, IntPtr objHdl, UInt32 UInt32);
         public delegate void ObjMatIndicesFunc(IntPtr userParams, UInt32 objId, IntPtr indices, out UInt32 count);
+        public delegate void LodMetaDataFuncPtr(IntPtr userParams, UInt32 objId, UInt32 lodLevel, out LodMetadata data);
         public delegate Vec4 TextureCallback(UInt32 x, UInt32 y, UInt32 layer, TextureFormat format, Vec4 value, IntPtr userParams);
 
 
@@ -332,8 +344,8 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "mufflon_is_cuda_available")]
         internal static extern Boolean mufflon_is_cuda_available();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "mufflon_set_lod_loader")]
-        private static extern Boolean mufflon_set_lod_loader_(IntPtr instHdl, LodLoaderFunc loader, ObjMatIndicesFunc objFunc, IntPtr userParams);
-        internal static Boolean mufflon_set_lod_loader(LodLoaderFunc loader, ObjMatIndicesFunc objFunc, IntPtr userParams) { return mufflon_set_lod_loader_(muffInstHdl, loader, objFunc, userParams); }
+        private static extern Boolean mufflon_set_lod_loader_(IntPtr instHdl, LodLoaderFunc loader, ObjMatIndicesFunc objFunc, LodMetaDataFuncPtr metaFunc, IntPtr userParams);
+        internal static Boolean mufflon_set_lod_loader(LodLoaderFunc loader, ObjMatIndicesFunc objFunc, LodMetaDataFuncPtr metaFunc, IntPtr userParams) { return mufflon_set_lod_loader_(muffInstHdl, loader, objFunc, metaFunc, userParams); }
 
         // Render image functions
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "mufflon_get_target_image")]

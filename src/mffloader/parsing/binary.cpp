@@ -1044,6 +1044,83 @@ u32 BinaryLoader::read_unique_object_material_indices(const fs::path& file, cons
 	return 0u;
 }
 
+LodMetadata BinaryLoader::read_lod_metadata(const fs::path& file, const mufflon::u32 objId, const mufflon::u32 lodLevel) {
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_unique_object_material_indices");
+	m_filePath = file;
+
+	for(u32 i = 0u; i < 3u; ++i)
+		m_fileDescs[i] = FileDescriptor{ m_filePath };
+
+	if(!fs::exists(m_filePath))
+		throw std::runtime_error("Binary file '" + m_filePath.u8string() + "' doesn't exist");
+
+	try {
+		// Open the binary file and enable exception management
+		m_fileStream = std::ifstream(m_filePath, std::ios_base::binary);
+		if(m_fileStream.bad() || m_fileStream.fail())
+			throw std::runtime_error("Failed to open binary file '" + m_filePath.u8string() + "\'");
+		m_fileStream.exceptions(std::ifstream::failbit);
+		m_fileStart = m_fileStream.tellg();
+
+		// Skip over the materials header
+		if(read<u32>() != MATERIALS_HEADER_MAGIC)
+			throw std::runtime_error("Invalid materials header magic constant");
+		const u64 objectStart = read<u64>();
+		m_fileStream.seekg(objectStart, std::ifstream::beg);
+
+		// Skip over animations header (if existing)
+		u32 headerMagic = read<u32>();
+		if(headerMagic == BONE_ANIMATION_MAGIC) {
+			const u64 objectStart = read<u64>();
+			m_fileStream.seekg(objectStart, std::ifstream::beg);
+			headerMagic = read<u32>();
+		}
+
+		// Parse the object header
+		if(headerMagic != OBJECTS_HEADER_MAGIC)
+			throw std::runtime_error("Invalid objects header magic constant");
+		(void)read<u64>(); // Instance start
+		GlobalFlag compressionFlags = GlobalFlag{ { read<u32>() } };
+
+		// Jump to the desired object
+		const u32 jumpCount = read<u32>();
+		if(objId >= jumpCount)
+			throw std::runtime_error("Object index out of bounds (" + std::to_string(objId)
+									 + " >= " + std::to_string(jumpCount) + ")");
+		m_fileStream.seekg(sizeof(u64) * objId, std::ifstream::cur);
+
+		const auto offset = read<u64>();
+		// Jump to the object
+		m_fileStream.seekg(offset + sizeof(u32), std::ifstream::beg);
+		// Skip the object name and properties
+		m_fileStream.seekg(read<u32>() + sizeof(u32) * 9u, std::ifstream::cur);
+		// Go to the proper LoD
+		const auto lodCount = read<u32>();
+		if(lodLevel >= lodCount)
+			throw std::runtime_error("LoD level out of bounds (" + std::to_string(lodLevel)
+									 + " >= " + std::to_string(lodCount) + ") for object "
+									 + std::to_string(objId));
+		m_fileStream.seekg(sizeof(u64) * lodLevel, std::ifstream::cur);
+		m_fileStream.seekg(read<u64>(), std::ifstream::beg);
+		if(read<u32>() != LOD_MAGIC)
+			throw std::runtime_error("Invalid LoD magic constant (object " + std::to_string(objId) + ", LoD "
+									 + std::to_string(lodLevel) + ")");
+
+		// Read the LoD information
+		LodMetadata data{};
+		data.triangles = read<u32>();
+		data.quads = read<u32>();
+		data.spheres = read<u32>();
+		data.vertices = read<u32>();
+		data.edges = read<u32>();
+		return data;
+	} catch(const std::exception&) {
+		// Clean up before leaving throwing
+		this->clear_state();
+		throw;
+	}
+}
+
 bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 							 const util::FixedHashMap<StringView, mufflon::u32>& objectLods,
 							 util::FixedHashMap<StringView, InstanceMapping>& instanceLods,
