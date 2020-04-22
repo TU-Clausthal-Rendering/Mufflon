@@ -121,7 +121,7 @@ LoaderStatus loader_load_json(MufflonLoaderInstanceHdl hdl, const char* path) {
 		// Clear the world
 		world_clear_all(mffLoaderInst.mffInst);
 		json::JsonLoader loader{ mffLoaderInst.mffInst, filePath };
-		mufflon_set_lod_loader(mffLoaderInst.mffInst, loader_load_lod, loader_load_object_material_indices, loader_lod_lod_metadata, hdl);
+		mufflon_set_lod_loader(mffLoaderInst.mffInst, loader_load_lod, loader_load_object_material_indices, loader_load_lod_metadatas, hdl);
 		mffLoaderInst.jsonLoader.store(&loader);
 		if(!loader.load_file(mffLoaderInst.binPath, &mffLoaderInst.fileVersion))
 			return LoaderStatus::LOADER_ABORT;
@@ -206,16 +206,19 @@ Boolean loader_load_object_material_indices(MufflonLoaderInstanceHdl hdl, const 
 	CATCH_ALL(false)
 }
 
-Boolean loader_lod_lod_metadata(MufflonLoaderInstanceHdl hdl, uint32_t objId, uint32_t lodLevel, LodMetadata* data) {
+Boolean loader_load_lod_metadatas(MufflonLoaderInstanceHdl hdl, LodMetadata* data, size_t* read) {
 	TRY
 	CHECK_NULLPTR(hdl, "loader instance handle", false);
+	CHECK_NULLPTR(data, "LoD metadata buffer", false);
 	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
 	if(data == nullptr)
 		return true;
 
 	std::string status;
 	binary::BinaryLoader loader{ mffLoaderInst.mffInst, status };
-	*data = loader.read_lod_metadata(mffLoaderInst.binPath, objId, lodLevel);
+	const auto count = loader.read_lods_metadata(mffLoaderInst.binPath, data);
+	if(read != nullptr)
+		*read = count;
 	return true;
 	CATCH_ALL(false)
 }

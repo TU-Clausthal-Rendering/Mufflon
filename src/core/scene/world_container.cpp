@@ -715,12 +715,16 @@ std::size_t WorldContainer::load_object_material_indices(const u32 objectId, Mat
 	return numIndices;
 }
 
-WorldContainer::LodMetadata WorldContainer::load_lod_metadata(const u32 objectId, const u32 lodLevel) const {
-	LodMetadata data;
-	if(!m_lodMetaLoad(m_loadLodUserParams, objectId, lodLevel, &data))
-		throw std::runtime_error("Failed to load metadata for object '"
-								 + std::string((m_objects.cbegin() + objectId)->first)
-								 + "', LoD level " + std::to_string(lodLevel));
+std::vector<WorldContainer::LodMetadata> WorldContainer::load_lods_metadata() const {
+	// First count how many LoDs there are
+	std::size_t lodCount = 0u;
+	for(const auto& obj : m_objects)
+		lodCount += obj.second.get_lod_slot_count();
+	std::vector<LodMetadata> data(lodCount);
+
+	if(!m_lodMetaLoad(m_loadLodUserParams, data.data(), &lodCount))
+		throw std::runtime_error("Failed to load metadata for LoDs");
+	data.resize(lodCount);
 	return data;
 }
 

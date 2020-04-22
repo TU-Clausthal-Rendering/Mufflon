@@ -2,6 +2,7 @@
 
 #include "combined_common.hpp"
 #include "combined_params.hpp"
+#include "util/swapped_vector.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include "core/renderer/decimaters/util/octree.hpp"
@@ -53,7 +54,7 @@ private:
 
 	std::vector<OctreeManager<FloatOctree>> m_viewOctrees;
 	std::vector<OctreeManager<SampleOctree>> m_irradianceOctrees;
-	std::unique_ptr<std::atomic<double>[]> m_instanceImportanceSums;
+	std::unique_ptr<util::SwappedVector<std::atomic<double>>> m_instanceImportanceSums;
 	// Shadow screenspace info
 	unique_device_ptr<Device::CPU, combined::ShadowStatus[]> m_shadowStatus;
 	std::size_t m_lightCount = 0u;

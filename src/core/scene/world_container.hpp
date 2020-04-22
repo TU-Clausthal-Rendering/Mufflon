@@ -47,7 +47,7 @@ public:
 
 	using LodLoadFuncPtr = std::uint32_t(CDECL*)(void* userParams, ObjectHandle obj, u32 lod, u32);
 	using ObjMatIndicesFuncPtr = std::uint32_t(CDECL*)(void* userParams, uint32_t objId, uint16_t * matIndices, uint32_t * count);
-	using LodMetaDataFuncPtr = std::uint32_t(CDECL*)(void* userParams, uint32_t objId, uint32_t lodLevel, LodMetadata* data);
+	using LodMetaDataFuncPtr = std::uint32_t(CDECL*)(void* userParams, LodMetadata* data, std::size_t* read);
 
 
 	enum class Sanity {
@@ -94,7 +94,7 @@ public:
 	// Loads the material indices of an object
 	std::vector<MaterialIndex> load_object_material_indices(const u32 objectId) const;
 	std::size_t load_object_material_indices(const u32 objectId, MaterialIndex* buffer) const;
-	LodMetadata load_lod_metadata(const u32 objectId, const u32 lodLevel) const;
+	std::vector<WorldContainer::LodMetadata> load_lods_metadata() const;
 	// Discards any already applied tessellation/displacement for the current scene
 	// and re-tessellates/-displaces with the current max. tessellation level
 	void retessellate();

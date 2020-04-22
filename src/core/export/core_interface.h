@@ -354,7 +354,7 @@ CORE_API int32_t CDECL mufflon_get_cuda_device_index();
 CORE_API Boolean CDECL mufflon_is_cuda_available();
 CORE_API Boolean CDECL mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t, Boolean),
 											  Boolean(*objFunc)(void*, uint32_t, uint16_t*, uint32_t*),
-											  Boolean(*metaFunc)(void*, uint32_t, uint32_t, LodMetadata* data), void* userParams);
+											  Boolean(*metaFunc)(void*, LodMetadata*, size_t*), void* userParams);
 
 // Render image functions
 CORE_API Boolean CDECL mufflon_get_target_image(MufflonInstanceHdl instHdl, const char* name, Boolean variance, const float** ptr);

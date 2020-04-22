@@ -316,7 +316,7 @@ namespace gui.Dll
         public delegate void LogCallback(string message, Severity severity);
         public delegate void LodLoaderFunc(IntPtr userParams, IntPtr objHdl, UInt32 UInt32);
         public delegate void ObjMatIndicesFunc(IntPtr userParams, UInt32 objId, IntPtr indices, out UInt32 count);
-        public delegate void LodMetaDataFuncPtr(IntPtr userParams, UInt32 objId, UInt32 lodLevel, out LodMetadata data);
+        public delegate void LodMetaDataFuncPtr(IntPtr userParams, out LodMetadata data, out UInt64 read);
         public delegate Vec4 TextureCallback(UInt32 x, UInt32 y, UInt32 layer, TextureFormat format, Vec4 value, IntPtr userParams);
 
 

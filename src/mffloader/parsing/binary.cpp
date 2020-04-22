@@ -1044,7 +1044,7 @@ u32 BinaryLoader::read_unique_object_material_indices(const fs::path& file, cons
 	return 0u;
 }
 
-LodMetadata BinaryLoader::read_lod_metadata(const fs::path& file, const mufflon::u32 objId, const mufflon::u32 lodLevel) {
+std::size_t BinaryLoader::read_lods_metadata(const fs::path& file, LodMetadata* buffer) {
 	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_unique_object_material_indices");
 	m_filePath = file;
 
@@ -1083,37 +1083,39 @@ LodMetadata BinaryLoader::read_lod_metadata(const fs::path& file, const mufflon:
 		GlobalFlag compressionFlags = GlobalFlag{ { read<u32>() } };
 
 		// Jump to the desired object
-		const u32 jumpCount = read<u32>();
-		if(objId >= jumpCount)
-			throw std::runtime_error("Object index out of bounds (" + std::to_string(objId)
-									 + " >= " + std::to_string(jumpCount) + ")");
-		m_fileStream.seekg(sizeof(u64) * objId, std::ifstream::cur);
+		std::vector<u64> objJumpTable(read<u32>());
+		for(std::size_t i = 0u; i < objJumpTable.size(); ++i)
+			objJumpTable[i] = read<u64>();
 
-		const auto offset = read<u64>();
-		// Jump to the object
-		m_fileStream.seekg(offset + sizeof(u32), std::ifstream::beg);
-		// Skip the object name and properties
-		m_fileStream.seekg(read<u32>() + sizeof(u32) * 9u, std::ifstream::cur);
-		// Go to the proper LoD
-		const auto lodCount = read<u32>();
-		if(lodLevel >= lodCount)
-			throw std::runtime_error("LoD level out of bounds (" + std::to_string(lodLevel)
-									 + " >= " + std::to_string(lodCount) + ") for object "
-									 + std::to_string(objId));
-		m_fileStream.seekg(sizeof(u64) * lodLevel, std::ifstream::cur);
-		m_fileStream.seekg(read<u64>(), std::ifstream::beg);
-		if(read<u32>() != LOD_MAGIC)
-			throw std::runtime_error("Invalid LoD magic constant (object " + std::to_string(objId) + ", LoD "
-									 + std::to_string(lodLevel) + ")");
+		// For every object and every LoD, we read the metadata
+		std::vector<u64> lodJumpTable;
+		std::size_t currIndex = 0u;
+		for(const auto objOffset : objJumpTable) {
+			m_fileStream.seekg(objOffset, std::ifstream::beg);
+			if(read<u32>() != OBJECT_MAGIC)
+				throw std::runtime_error("Invalid object magic constant");
+			// Skip the object name and properties
+			m_fileStream.seekg(read<u32>() + sizeof(u32) * 9u, std::ifstream::cur);
+			// Read the LoD jump table
+			lodJumpTable.resize(read<u32>());
+			for(std::size_t i = 0u; i < lodJumpTable.size(); ++i)
+				lodJumpTable[i] = read<u64>();
 
-		// Read the LoD information
-		LodMetadata data{};
-		data.triangles = read<u32>();
-		data.quads = read<u32>();
-		data.spheres = read<u32>();
-		data.vertices = read<u32>();
-		data.edges = read<u32>();
-		return data;
+			// Iterate every LoD
+			for(const auto lodOffset : lodJumpTable) {
+				m_fileStream.seekg(lodOffset, std::ifstream::beg);
+				if(read<u32>() != LOD_MAGIC)
+					throw std::runtime_error("Invalid LoD magic constant");
+				// Read the LoD information
+				LodMetadata& data = buffer[currIndex++];
+				data.triangles = read<u32>();
+				data.quads = read<u32>();
+				data.spheres = read<u32>();
+				data.vertices = read<u32>();
+				data.edges = read<u32>();
+			}
+		}
+		return currIndex;
 	} catch(const std::exception&) {
 		// Clean up before leaving throwing
 		this->clear_state();

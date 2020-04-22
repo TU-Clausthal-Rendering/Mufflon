@@ -39,7 +39,7 @@ public:
 				   const bool deinstance, const bool loadWorldToInstTrans,
 				   const bool noDefaultInstances);
 
-	LodMetadata read_lod_metadata(const fs::path& file, const mufflon::u32 objId, const mufflon::u32 lodLevel);
+	std::size_t read_lods_metadata(const fs::path& file, LodMetadata* buffer);
 	mufflon::u32 read_unique_object_material_indices(const fs::path& file, const mufflon::u32 objId, mufflon::u16* indices);
 	void load_lod(const fs::path& file, ObjectHdl obj, mufflon::u32 objId,
 				  mufflon::u32 lod, const bool asReduced);
