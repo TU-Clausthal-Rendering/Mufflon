@@ -406,6 +406,8 @@ void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::v
 	m_vertexAttributes.shrink_to_fit();
 
 	// Reconstruct the index buffer - count triangles and quads first for correct offsets
+	if(m_triangles == 0u && m_quads == 0u)
+		throw std::runtime_error("Something went wrong: no faces!");
 	m_triangles = 0u;
 	m_quads = 0u;
 	for(const auto face : mesh.faces()) {
@@ -421,6 +423,8 @@ void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::v
 		else
 			throw std::runtime_error("Found a non-quad/tri face (" + std::to_string(vertexCount) + " vertices)");
 	}
+	if(m_triangles == 0u && m_quads == 0u)
+		throw std::runtime_error("Something went wrong: no faces!");
 	this->unload_index_buffer<Device::CPU>();
 	this->reserve_index_buffer<Device::CPU>(3u * m_triangles + 4u * m_quads);
 	auto* indexBuffer = m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices.get();

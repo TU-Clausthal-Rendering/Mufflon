@@ -1,6 +1,7 @@
 #include "cpu_combined_reducer.hpp"
 #include "combined_gathering.hpp"
 #include "core/scene/geometry/util.hpp"
+#include "core/scene/clustering/uniform_clustering.hpp"
 #include "core/renderer/decimaters/combined/modules/importance_quadrics.hpp"
 #include "profiler/cpu_profiler.hpp"
 #include <random>
@@ -388,7 +389,7 @@ void CpuCombinedReducer::initialize_decimaters() {
 
 	std::vector<scene::geometry::PolygonMeshType> meshes(threadCount);
 	std::vector<std::pair<u32, scene::WorldContainer::LodMetadata>> lodSizeMap(objects.size());
-	std::vector<std::pair<u32, u32>> threadLodStarts;
+	std::unique_ptr<std::pair<std::atomic_uint32_t, u32>[]> threadLodStarts;
 	// We only need extra coordination if we reduce initially
 	if(m_params.initialReduction > 0.f) {
 		for(auto& mesh : meshes) {
@@ -397,14 +398,21 @@ void CpuCombinedReducer::initialize_decimaters() {
 			mesh.request_edge_status();
 		}
 
-		constexpr float loadWeight = 1.f;
-		constexpr float collapseWeight = 8.f;
-		constexpr float constantWeight = 50.f;
-
 		// Fetch all LoD sizes so we can keep the process beneath a given memory threshold
 		const auto lodSizes = m_world.load_lods_metadata();
-		double totalCollapseCount = 0.0;
-		// TODO: load all at once!
+		double totalCost = 0.0;
+		const auto estimateCost = [this](const scene::WorldContainer::LodMetadata& meta) {
+			constexpr float loadWeight = 1.f;
+			constexpr float collapseWeight = 10.f;
+			constexpr float constantWeight = 0.f;
+			const auto bytes = meta.vertices * (2u * sizeof(ei::Vec3) + sizeof(ei::Vec2))
+				+ meta.triangles * 3u * sizeof(u32)
+				+ meta.quads * 4u * sizeof(u32);
+			auto cost = loadWeight * bytes + constantWeight;
+			if(meta.vertices >= static_cast<std::size_t>(m_params.threshold))
+				cost += collapseWeight * static_cast<float>(meta.vertices)* m_params.initialReduction;
+			return cost;
+		};
 		{
 			auto currObject = objects.cbegin();
 			for(u32 o = 0; o < static_cast<u32>(objects.size()); ++o) {
@@ -414,12 +422,7 @@ void CpuCombinedReducer::initialize_decimaters() {
 				if(currObject->first->get_lod_slot_count() > 1u)
 					throw std::runtime_error("We currently cannot support multiple LoDs in file for this");
 				lodSizeMap[o] = std::make_pair(o, lodSizes[objId]);
-				const auto bytes = lodSizes[objId].vertices * (2u * sizeof(ei::Vec3) + sizeof(ei::Vec2))
-					+ lodSizes[objId].triangles * 3u * sizeof(u32)
-					+ lodSizes[objId].quads * 4u * sizeof(u32);
-				totalCollapseCount += loadWeight * bytes + constantWeight;
-				if(lodSizeMap[o].second.vertices >= static_cast<std::size_t>(m_params.threshold))
-					totalCollapseCount += collapseWeight * static_cast<float>(lodSizeMap[o].second.vertices) * m_params.initialReduction;
+				totalCost += estimateCost(lodSizes[objId]);
 				++currObject;
 			}
 		}
@@ -432,76 +435,152 @@ void CpuCombinedReducer::initialize_decimaters() {
 		// should roughly perform an equal amount of collapses.
 		// TODO: we somehow have to take into account memory limits
 		{
-			threadLodStarts.reserve(threadCount);
+			threadLodStarts = std::make_unique<std::pair<std::atomic_uint32_t, u32>[]>(threadCount);
+			std::size_t partitionCount = 0u;
 			u32 currStart = 0u;
 			double currTotal = 0u;
 			for(u32 i = 0u; i < static_cast<u32>(lodSizeMap.size()); ++i) {
-				const auto bytes = lodSizeMap[i].second.vertices * (2u * sizeof(ei::Vec3) + sizeof(ei::Vec2))
-					+ lodSizeMap[i].second.triangles * 3u * sizeof(u32)
-					+ lodSizeMap[i].second.quads * 4u * sizeof(u32);
-				currTotal += loadWeight * bytes + constantWeight;
-				if(lodSizeMap[i].second.vertices >= static_cast<u32>(m_params.threshold))
-					currTotal += collapseWeight * static_cast<float>(lodSizeMap[i].second.vertices) * m_params.initialReduction;
-				if(currTotal >= totalCollapseCount / threadCount) {
-					threadLodStarts.emplace_back(currStart, i + 1u);
+				currTotal += estimateCost(lodSizeMap[i].second);
+				if(currTotal >= totalCost / threadCount) {
+					threadLodStarts[partitionCount++] = std::make_pair(currStart, i + 1u);
 					currTotal = 0u;
 					currStart = i + 1u;
 				}
 			}
 			// Last thread picks up the slack
 			if(currStart < lodSizeMap.size()) {
-				if(threadLodStarts.size() == threadCount)
-					threadLodStarts.back().second = static_cast<u32>(lodSizeMap.size());
+				if(partitionCount == threadCount)
+					threadLodStarts[threadCount - 1u].second = static_cast<u32>(lodSizeMap.size());
 				else
-					threadLodStarts.emplace_back(currStart, static_cast<u32>(lodSizeMap.size()));
+					threadLodStarts[partitionCount++] = std::make_pair(currStart, static_cast<u32>(lodSizeMap.size()));
 			}
+
+			if(partitionCount > 1u) {
+				// Now we have to ensure that we do not go over our budget
+				// For this we progressively shift LoDs up and compensate the lower threads to re-balance
+				const auto estimateSize = [&lodSizeMap](const std::size_t index) {
+					const auto verts = lodSizeMap[index].second.vertices;
+					const auto faces = lodSizeMap[index].second.triangles + lodSizeMap[index].second.quads;
+					const auto edges = lodSizeMap[index].second.edges;
+					const auto lodSize = verts * (2u * sizeof(ei::Vec3) + sizeof(ei::Vec2))
+						+ lodSizeMap[index].second.triangles * 3u * sizeof(u32)
+						+ lodSizeMap[index].second.quads * 4u * sizeof(u32);
+					// Estimate the amount of storage OpenMesh needs for the mesh
+					const auto meshSize = verts * (sizeof(OpenMesh::ArrayItems::Vertex) + 2u * sizeof(OpenMesh::Vec3f) + sizeof(OpenMesh::Vec2f) + 1u)
+						+ faces * (sizeof(OpenMesh::ArrayItems::Face) + sizeof(scene::MaterialIndex) + 1u)
+						+ edges * (sizeof(OpenMesh::ArrayItems::Edge) + 3u);
+					// Size needed for error quadrics/decimater etc.
+					const auto decimaterSize = verts * (sizeof(OpenMesh::Geometry::Quadricd)			// Quadric error module
+														+ sizeof(OpenMesh::HalfedgeHandle)				// Collapse target
+														+ sizeof(float)									// Collapse priority
+														+ sizeof(int)									// Heap position
+														+ sizeof(OpenMesh::VertexHandle));				// Heap reference
+					return lodSize + meshSize + decimaterSize;
+				};
+				const auto estimateCumSize = [&estimateSize, &lodSizeMap, &threadLodStarts, &partitionCount]() {
+					std::size_t size = 0u;
+					for(std::size_t t = 0u; t < partitionCount; ++t)
+						size += estimateSize(threadLodStarts[t].first.load(std::memory_order_acquire));
+					return size;
+				};
+				const auto estimateCumCost = [&estimateCost, &threadLodStarts, &lodSizeMap](const std::size_t threadId) {
+					float cumCost = 0.f;
+					for(u32 i = threadLodStarts[threadId].first.load(std::memory_order_acquire); i < threadLodStarts[threadId].second; ++i)
+						cumCost += estimateCost(lodSizeMap[i].second);
+					return cumCost;
+				};
+				const auto budgetSize = std::max<std::size_t>(8'000'000'000llu, estimateSize(threadLodStarts[0u].first.load(std::memory_order_acquire)));
+				std::size_t cumSize;
+				while((cumSize = estimateCumSize()) > budgetSize) {
+					// TODO: we could also reallocate on the fly and add extra threads once the heavy meshes are done,
+					// but that would be HELLA complicated...
+					// Shift and reevaluate cost
+					threadLodStarts[0u].second += 1u;
+					printf("Cum size: %zu of %zu; thread limit: %u\n", cumSize, budgetSize, threadLodStarts[0u].second);
+					fflush(stdout);
+					const auto newThreadCost = estimateCumCost(0u);
+					// Now shift the other threads to match the cost
+					for(std::size_t t = 1u; t < partitionCount; ++t) {
+						// Adjust the thread start according to the last thread end
+						threadLodStarts[t].first.store(threadLodStarts[t - 1u].second, std::memory_order_release);
+						threadLodStarts[t].second = std::max(threadLodStarts[t].second, threadLodStarts[t - 1u].second);
+						float currCost = estimateCumCost(t);
+						// Add new LoDs to the thread while we don't exceed the new cost (and have LoDs left)
+						while(currCost < newThreadCost && threadLodStarts[t].second < static_cast<u32>(lodSizeMap.size())) {
+							const auto additionalCost = estimateCost(lodSizeMap[threadLodStarts[t].second].second);
+							threadLodStarts[t].second += 1u;
+							currCost += additionalCost;
+						}
+					}
+				}
+				// Screen for empty threads
+				for(std::size_t t = 1u; t < partitionCount; ++t) {
+					if(threadLodStarts[t].first.load(std::memory_order_acquire) >= threadLodStarts[t].second) {
+						partitionCount = t + 1u;
+						break;
+					}
+				}
+			}
+
 			// Make sure that every thread has a valid lookup (even if it means they won't do work)
-			threadCount = threadLodStarts.size();
+			threadCount = partitionCount;
 		}
 	}
 
 	// First we load in the LoDs (possibly reduced version)
 	std::atomic_uint32_t progress = 0u;
 	auto loader = [&](const std::size_t threadId) {
-		// Work all assigned LoDs
-		for(std::size_t l = threadLodStarts[threadId].first; l < threadLodStarts[threadId].second; ++l) {
-			if(const auto prev = progress.fetch_add(1u, std::memory_order_acq_rel) + 1u; prev % 100 == 0u)
-				logInfo("Progess: ", prev, " of ", objects.size());
-			const auto index = lodSizeMap[l].first;
-			auto objIter = objects.begin() + index;
-			auto& obj = *objIter;
+		// Work all assigned LoDs, and once we're done with our work try to steal work from lower-memory threads
+		// For this reason we over-prioritize lower-mem thread work queues
+		bool first = true;
+		for(std::size_t t = threadId; t < threadCount; ++t) {
+			u32 currMapIndex;
+			while((currMapIndex = threadLodStarts[t].first.fetch_add(1, std::memory_order_acq_rel)) < threadLodStarts[t].second) {
+				if(const auto prev = progress.fetch_add(1u, std::memory_order_acq_rel) + 1u; prev % 100 == 0u)
+					logInfo("Progess: ", prev, " of ", objects.size());
+				const auto index = lodSizeMap[currMapIndex].first;
+				auto objIter = objects.begin() + index;
+				auto& obj = *objIter;
 
-			// TODO: proper LoD levels!
-			// Load and pre-reduce the LoDs if applicable
-			const u32 lodIndex = 0u;
-			if(!m_world.load_lod(*obj.first, lodIndex, m_params.initialReduction > 0.f))
-				throw std::runtime_error("Failed to load object LoD!");
-			m_originalVertices[index] = obj.first->get_lod(lodIndex).template get_geometry<scene::geometry::Polygons>().get_vertex_count();
+				// TODO: proper LoD levels!
+				// Load and pre-reduce the LoDs if applicable
+				const u32 lodIndex = 0u;
+				if(!m_world.load_lod(*obj.first, lodIndex, m_params.initialReduction > 0.f))
+					throw std::runtime_error("Failed to load object LoD!");
+				m_originalVertices[index] = obj.first->get_lod(lodIndex).template get_geometry<scene::geometry::Polygons>().get_vertex_count();
 
-			if(m_params.initialReduction > 0.f) {
-				auto& lod = obj.first->get_reduced_lod(lodIndex);
-				auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-				if(const auto origVertCount = polygons.get_vertex_count(); origVertCount >= m_params.threshold) {
-					// Pre-reduce
-					const auto targetVertexCount = static_cast<std::size_t>((1.f - m_params.initialReduction)
-																			* static_cast<float>(origVertCount));
-					const auto gridRes = static_cast<std::size_t>(std::ceil(std::cbrt(2.f * static_cast<float>(targetVertexCount))));
-					auto& mesh = meshes[threadId];
-					mesh.clean_keep_reservation();
-					polygons.create_halfedge_structure(mesh);
-					// TODO: persistent decimater? persistent error quadrics?
-					OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
-					OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
-					decimater.add(modQuadricHandle);
-					decimater.initialize();
-					// Possibly repeat until we reached the desired count
-					const auto performedCollapses = decimater.decimate_to(targetVertexCount);
-					polygons.reconstruct_from_reduced_mesh(mesh);
-					logPedantic("Loaded reduced LoD '", obj.first->get_name(), "' (",
-								origVertCount, " -> ", polygons.get_vertex_count(), ")");
-					lod.clear_accel_structure();
+				if(m_params.initialReduction > 0.f) {
+					auto& lod = obj.first->get_reduced_lod(lodIndex);
+					auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+					if(const auto origVertCount = polygons.get_vertex_count(); origVertCount >= m_params.threshold) {
+						// Pre-reduce
+						const auto targetVertexCount = static_cast<std::size_t>((1.f - m_params.initialReduction)
+																				* static_cast<float>(origVertCount));
+						const auto gridRes = static_cast<std::size_t>(std::ceil(std::cbrt(2.f * static_cast<float>(targetVertexCount))));
+						auto& mesh = meshes[threadId];
+						mesh.clean_keep_reservation();
+						polygons.create_halfedge_structure(mesh);
+						if(first) {
+							logInfo("Thread ", threadId, " mesh size: ", mesh.n_vertices(), "/", mesh.n_faces(), "/", mesh.n_edges());
+							first = false;
+						}
+						scene::clustering::UniformVertexClusterer clusterer{ ei::UVec3{ gridRes }};
+						clusterer.cluster(mesh, polygons.get_bounding_box(), false);
+
+						// TODO: persistent decimater? persistent error quadrics?
+						//OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
+						//OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
+						//decimater.add(modQuadricHandle);
+						//decimater.initialize();
+						// Possibly repeat until we reached the desired count
+						//const auto performedCollapses = decimater.decimate_to(targetVertexCount);
+						polygons.reconstruct_from_reduced_mesh(mesh);
+						logPedantic("Loaded reduced LoD '", obj.first->get_name(), "' (",
+									origVertCount, " -> ", polygons.get_vertex_count(), ")");
+						lod.clear_accel_structure();
+					}
+					obj.first->remove_original_lod(lodIndex);
 				}
-				obj.first->remove_original_lod(lodIndex);
 			}
 		}
 	};
