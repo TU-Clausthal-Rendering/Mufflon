@@ -209,7 +209,6 @@ void launch_with_best_grid_block_size_dyn_smem(const GpuStream& stream, const Fu
 	}
 
 	func<<<gridSize, blockSize, smemPerThread* blockSize.x* blockSize.y, stream.native()>>>(std::forward<Args>(args)...);
-	//cuda::check_error(::cudaDeviceSynchronize());
 }
 
 struct EdgeDeviation {
@@ -838,8 +837,7 @@ cluster_uniformly_cuda(unique_device_ptr<Device::CPU, char[]> vertexAttributes,
 	GpuEvent afterCopies{ false };
 	GpuEvent afterVertCountBackcopy{ false };
 	GpuEvent afterFaceCountBackcopy{ false };
-
-
+	
 	const auto maxDims = get_max_block_dim_sizes();
 	// Allocate the counters, which we can host-pin (TODO: RAII)
 	HostPinnedMemory<VertFaceCounters> vertFaceCounters{};

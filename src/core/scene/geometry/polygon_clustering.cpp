@@ -401,6 +401,8 @@ void remove_or_transform_marked_quads(u32* indices, Polygons::FaceAttributePoolT
 }
 
 void Polygons::cluster_uniformly(const ei::UVec3& gridRes) {
+	using namespace std::chrono;
+	const auto t0 = high_resolution_clock::now();
 	this->template unload_index_buffer<Device::CUDA>();
 	this->template unload_index_buffer<Device::OPENGL>();
 	auto indices = std::move(m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices);
@@ -430,6 +432,9 @@ void Polygons::cluster_uniformly(const ei::UVec3& gridRes) {
 	m_faceAttributes.replace_pool_memory<Device::CPU>(std::move(newFaceAttribs), remTris + remQuads);
 	m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices = std::move(newIndices);
 	m_indexBuffer.template get<IndexBuffer<Device::CPU>>().reserved = 3u * remTris + 4u * remQuads;
+
+	const auto t1 = high_resolution_clock::now();
+	logWarning(duration_cast<milliseconds>(t1 - t0).count(), "ms");
 }
 
 #if 0

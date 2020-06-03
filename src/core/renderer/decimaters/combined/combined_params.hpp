@@ -38,6 +38,13 @@ struct PInitialReduction {
 	}
 };
 
+struct PInitialGridRes {
+	int initialGridRes = 32;
+	static constexpr ParamDesc get_desc() noexcept {
+		return { "Initial grid res", ParameterTypes::INT };
+	}
+};
+
 struct PVertexThreshold {
 	int threshold{ 100 };
 	static constexpr ParamDesc get_desc() noexcept {
@@ -125,7 +132,7 @@ struct PSlidingWindow {
 
 using CombinedParameters = ParameterHandler <
 	PImportanceIterations, PTargetReduction,
-	PInitialReduction, PVertexThreshold,
+	PInitialReduction, PInitialGridRes, PVertexThreshold,
 	PSelectiveImportance, PImpSumStrat,
 	PClusterMaxDensity, PInstanceMaxDensity, PImpStructCapacity,
 	PVertexDistMethod, PImpWeightMethod,

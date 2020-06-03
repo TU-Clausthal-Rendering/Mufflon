@@ -1,5 +1,6 @@
 #include "cpu_combined_reducer.hpp"
 #include "combined_gathering.hpp"
+#include "reduction_queue.hpp"
 #include "core/scene/geometry/util.hpp"
 #include "core/scene/clustering/uniform_clustering.hpp"
 #include "core/renderer/decimaters/combined/modules/importance_quadrics.hpp"
@@ -527,6 +528,8 @@ void CpuCombinedReducer::initialize_decimaters() {
 		}
 	}
 
+	combined::GpuReductionQueue gpuQueue{ ei::UVec3{ static_cast<u32>(m_params.initialGridRes) } };
+
 	// First we load in the LoDs (possibly reduced version)
 	std::atomic_uint32_t progress = 0u;
 	auto loader = [&](const std::size_t threadId) {
@@ -557,24 +560,24 @@ void CpuCombinedReducer::initialize_decimaters() {
 						const auto targetVertexCount = static_cast<std::size_t>((1.f - m_params.initialReduction)
 																				* static_cast<float>(origVertCount));
 						const auto gridRes = static_cast<std::size_t>(std::ceil(std::cbrt(2.f * static_cast<float>(targetVertexCount))));
-						auto& mesh = meshes[threadId];
-						mesh.clean_keep_reservation();
-						polygons.create_halfedge_structure(mesh);
-						if(first) {
-							logInfo("Thread ", threadId, " mesh size: ", mesh.n_vertices(), "/", mesh.n_faces(), "/", mesh.n_edges());
-							first = false;
+						if(polygons.get_vertex_count() > 50000u) {
+							auto res = gpuQueue.queue(&polygons);
+							res.wait();
 						}
-						scene::clustering::UniformVertexClusterer clusterer{ ei::UVec3{ 20u }};
-						clusterer.cluster(mesh, polygons.get_bounding_box(), false);
+						//scene::clustering::UniformVertexClusterer clusterer{ ei::UVec3{ 20u }};
+						//clusterer.cluster(mesh, polygons.get_bounding_box(), false);
 						// TODO: we can cluster directly on the index buffer
 
 
 						// TODO: persistent decimater? persistent error quadrics?
-						/*OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
+						auto& mesh = meshes[threadId];
+						mesh.clean_keep_reservation();
+						polygons.create_halfedge_structure(mesh);
+						OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
 						OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
 						decimater.add(modQuadricHandle);
 						decimater.initialize();
-						const auto performedCollapses = decimater.decimate_to(targetVertexCount);*/
+						const auto performedCollapses = decimater.decimate_to(targetVertexCount);
 						polygons.reconstruct_from_reduced_mesh(mesh);
 						logPedantic("Loaded reduced LoD '", obj.first->get_name(), "' (",
 									origVertCount, " -> ", polygons.get_vertex_count(), ")");
@@ -593,6 +596,7 @@ void CpuCombinedReducer::initialize_decimaters() {
 		if(thread.joinable())
 			thread.join();
 	}
+	gpuQueue.join();
 
 
 	for(std::size_t i = 0u; i < m_world.get_frame_count(); ++i) {
