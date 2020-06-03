@@ -564,16 +564,17 @@ void CpuCombinedReducer::initialize_decimaters() {
 							logInfo("Thread ", threadId, " mesh size: ", mesh.n_vertices(), "/", mesh.n_faces(), "/", mesh.n_edges());
 							first = false;
 						}
-						scene::clustering::UniformVertexClusterer clusterer{ ei::UVec3{ gridRes }};
+						scene::clustering::UniformVertexClusterer clusterer{ ei::UVec3{ 20u }};
 						clusterer.cluster(mesh, polygons.get_bounding_box(), false);
+						// TODO: we can cluster directly on the index buffer
+
 
 						// TODO: persistent decimater? persistent error quadrics?
-						//OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
-						//OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
-						//decimater.add(modQuadricHandle);
-						//decimater.initialize();
-						// Possibly repeat until we reached the desired count
-						//const auto performedCollapses = decimater.decimate_to(targetVertexCount);
+						/*OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
+						OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
+						decimater.add(modQuadricHandle);
+						decimater.initialize();
+						const auto performedCollapses = decimater.decimate_to(targetVertexCount);*/
 						polygons.reconstruct_from_reduced_mesh(mesh);
 						logPedantic("Loaded reduced LoD '", obj.first->get_name(), "' (",
 									origVertCount, " -> ", polygons.get_vertex_count(), ")");

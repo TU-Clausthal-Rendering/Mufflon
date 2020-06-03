@@ -69,6 +69,16 @@ AttributePool::~AttributePool() {
 	for(auto& attrib : m_attributes)
 		util::UniqueStringPool::instance().remove(attrib.name);
 }
+
+AttributePool AttributePool::create_with_attributes(const std::size_t size) const noexcept {
+	AttributePool newPool{};
+	// Copy over attributes (pool offsets will be correctly set in the resize)
+	newPool.m_attributes.reserve(m_attributes.size());
+	std::copy(m_attributes.cbegin(), m_attributes.cend(), std::back_inserter(newPool.m_attributes));
+	newPool.resize(size);
+	return newPool;
+}
+
 AttributeHandle AttributePool::add_attribute(const AttributeIdentifier& ident) {
 	this->unload<Device::CUDA>();
 	this->unload<Device::OPENGL>();
@@ -185,45 +195,35 @@ void AttributePool::shrink_to_fit() {
 	}
 }
 
-template < Device dev >
 void AttributePool::copy(std::size_t from, std::size_t to) {
 	mAssert(from < m_attribElemCount);
 	mAssert(to < m_attribElemCount);
-	this->template synchronize<dev>();
-	if constexpr(dev != Device::CPU)
-		this->unload<Device::CPU>();
-	if constexpr(dev != Device::CUDA)
-		this->unload<Device::CUDA>();
-	if constexpr(dev != Device::OPENGL)
-		this->unload<Device::OPENGL>();
+	this->template synchronize<Device::CPU>();
+	this->unload<Device::CUDA>();
+	this->unload<Device::OPENGL>();
 
-	ArrayDevHandle_t<dev, char> pool = m_pools.template get<PoolHandle<dev>>().handle.get();
+	ArrayDevHandle_t<Device::CPU, char> pool = m_pools.template get<PoolHandle<Device::CPU>>().handle.get();
 	for(const auto& attr : m_attributes) {
 		if(attr.erased)
 			continue;
 
-		mufflon::copy(pool + (attr.poolOffset + to * attr.elemSize),
-					  pool + (attr.poolOffset + from * attr.elemSize),
-					  attr.elemSize);
+		std::memcpy(pool + (attr.poolOffset + to * attr.elemSize),
+					pool + (attr.poolOffset + from * attr.elemSize),
+					attr.elemSize);
 	}
 }
 
-template < Device dev >
 void AttributePool::copy(AttributePool& fromPool, const std::size_t from, const std::size_t to) {
 	mAssert(fromPool.m_attributes.size() == m_attributes.size());
 	mAssert(from < fromPool.m_attribElemCount);
 	mAssert(to < m_attribElemCount);
-	this->template synchronize<dev>();
-	fromPool.template synchronize<dev>();
-	if constexpr(dev != Device::CPU)
-		this->unload<Device::CPU>();
-	if constexpr(dev != Device::CUDA)
-		this->unload<Device::CUDA>();
-	if constexpr(dev != Device::OPENGL)
-		this->unload<Device::OPENGL>();
+	this->template synchronize<Device::CPU>();
+	fromPool.template synchronize<Device::CPU>();
+	this->unload<Device::CUDA>();
+	this->unload<Device::OPENGL>();
 
-	ArrayDevHandle_t<dev, char> pool = m_pools.template get<PoolHandle<dev>>().handle.get();
-	ArrayDevHandle_t<dev, char> otherPool = fromPool.m_pools.template get<PoolHandle<dev>>().handle.get();
+	ArrayDevHandle_t<Device::CPU, char> pool = m_pools.template get<PoolHandle<Device::CPU>>().handle.get();
+	ArrayDevHandle_t<Device::CPU, char> otherPool = fromPool.m_pools.template get<PoolHandle<Device::CPU>>().handle.get();
 	for(std::size_t i = 0u; i < m_attributes.size(); ++i) {
 		const auto& attr = m_attributes[i];
 		const auto& fromAttr = fromPool.m_attributes[i];
@@ -231,10 +231,9 @@ void AttributePool::copy(AttributePool& fromPool, const std::size_t from, const 
 		mAssert(attr.erased == fromAttr.erased);
 		if(attr.erased)
 			continue;
-
-		mufflon::copy(pool + (attr.poolOffset + to * attr.elemSize),
-					  otherPool + (fromAttr.poolOffset + from * attr.elemSize),
-					  attr.elemSize);
+		std::memcpy(pool + (attr.poolOffset + to * attr.elemSize),
+					otherPool + (fromAttr.poolOffset + from * attr.elemSize),
+					attr.elemSize);
 	}
 }
 
@@ -344,11 +343,4 @@ template void AttributePool::synchronize<Device::OPENGL>();
 template void AttributePool::unload<Device::CPU>();
 template void AttributePool::unload<Device::CUDA>();
 template void AttributePool::unload<Device::OPENGL>();
-template void AttributePool::copy<Device::CPU>(std::size_t, std::size_t);
-template void AttributePool::copy<Device::CUDA>(std::size_t, std::size_t);
-template void AttributePool::copy<Device::OPENGL>(std::size_t, std::size_t);
-template void AttributePool::copy<Device::CPU>(AttributePool&, std::size_t, std::size_t);
-template void AttributePool::copy<Device::CUDA>(AttributePool&, std::size_t, std::size_t);
-template void AttributePool::copy<Device::OPENGL>(AttributePool&, std::size_t, std::size_t);
-
 }} // namespace mufflon::scene

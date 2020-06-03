@@ -343,7 +343,7 @@ inline CUDA_FUNCTION void sample_importance_octree(CombinedTargets::RenderBuffer
 		math::RndSet2_1 rnd{ rng.next(), rng.next() };
 		VertexSample sample;
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
-		if(walk(scene, vertices[pathLen], rnd, rndRoulette, false, throughput, vertices[pathLen + 1], sample) != WalkResult::HIT)
+		if(walk(scene, vertices[pathLen], rnd, rndRoulette, false, throughput, vertices[pathLen + 1], sample, nullptr) != WalkResult::HIT)
 			break;
 
 		// Update old vertex with accumulated throughput
@@ -505,7 +505,7 @@ inline CUDA_FUNCTION void sample_vis_importance_octree(CombinedTargets::RenderBu
 	scene::Point lastPosition = vertex.get_position();
 	math::RndSet2_1 rnd{ rng.next(), rng.next() };
 	float rndRoulette = math::sample_uniform(u32(rng.next()));
-	if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) == WalkResult::HIT) {
+	if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, nullptr, guideWeight) == WalkResult::HIT) {
 		const auto& hitpoint = vertex.get_position();
 		const auto& hitId = vertex.get_primitive_id();
 		const auto lodIdx = scene.lodIndices[hitId.instanceId];
@@ -558,7 +558,7 @@ inline CUDA_FUNCTION void sample_vis_importance(CombinedTargets::RenderBufferTyp
 	scene::Point lastPosition = vertex.get_position();
 	math::RndSet2_1 rnd{ rng.next(), rng.next() };
 	float rndRoulette = math::sample_uniform(u32(rng.next()));
-	if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) == WalkResult::HIT) {
+	if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, nullptr, guideWeight) == WalkResult::HIT) {
 		const auto& hitpoint = vertex.get_position();
 		const auto& hitId = vertex.get_primitive_id();
 		const auto lodIdx = scene.lodIndices[hitId.instanceId];

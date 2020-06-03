@@ -21,7 +21,7 @@ struct HitIdTarget {
 
 using PtTargets = TargetList<
 	RadianceTarget, PositionTarget, DepthTarget,
-	NormalTarget, AlbedoTarget, LightnessTarget,
+	NormalTarget, UvTarget, AlbedoTarget, LightnessTarget,
 	HitIdTarget
 >;
 

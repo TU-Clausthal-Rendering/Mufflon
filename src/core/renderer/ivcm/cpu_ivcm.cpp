@@ -420,7 +420,7 @@ void CpuIvcm::trace_photon(int idx, int numPhotons, u64 /*seed*/, float /*curren
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
-		if(walk(m_sceneDesc, *previous, rnd, rndRoulette, true, throughput, vertex, sample, m_sceneDesc, numPhotons) != WalkResult::HIT)
+		if(walk(m_sceneDesc, *previous, rnd, rndRoulette, true, throughput, vertex, sample, nullptr, m_sceneDesc, numPhotons) != WalkResult::HIT)
 			break;
 		++pathLen;
 
@@ -472,7 +472,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
 		const WalkResult walkRes = walk(m_sceneDesc, *currentVertex, rnd, rndRoulette, false, throughput,
-										*(currentVertex + 1), sample, m_sceneDesc, numPhotons);
+										*(currentVertex + 1), sample, nullptr, m_sceneDesc, numPhotons);
 		if(walkRes == WalkResult::CANCEL)
 			break;
 		++viewPathLen;

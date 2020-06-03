@@ -3,6 +3,7 @@
 #include "attribute_sizes.hpp"
 #include "attribute_handles.hpp"
 #include "util/tagged_tuple.hpp"
+#include "core/memory/dyntype_memory.hpp"
 #include "core/memory/residency.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
 
@@ -46,6 +47,9 @@ public:
 	AttributePool& operator=(AttributePool&&) noexcept;
 	~AttributePool();
 
+	// Create an attribute pool with new size, but the same attributes
+	AttributePool create_with_attributes(const std::size_t size) const noexcept;
+
 	// Adds a new attribute
 	AttributeHandle add_attribute(const AttributeIdentifier& ident);
 	std::optional<AttributeHandle> find_attribute(const AttributeIdentifier& ident) const;
@@ -63,10 +67,8 @@ public:
 	// Does not unload any device memory
 	void shrink_to_fit();
 
-	// Copies over all attributes of one element slot to another on the specified device
-	template < Device dev >
+	// Copies over all attributes of one element slot to another on the CPU
 	void copy(const std::size_t from, const std::size_t to);
-	template < Device dev >
 	void copy(AttributePool& fromPool, const std::size_t from, const std::size_t to);
 
 	template < Device dev, class T >
@@ -85,6 +87,28 @@ public:
 		this->template synchronize<dev>();
 		return as<ArrayDevHandle_t<dev, T>, ArrayDevHandle_t<dev, char>>(
 			m_pools.template get<PoolHandle<dev>>().handle.get() + m_attributes[hdl.index].poolOffset);
+	}
+
+	template < Device dev >
+	unique_device_ptr<dev, char[]> release_pool_memory() noexcept {
+		this->template synchronize<dev>();
+		return std::move(m_pools.template get<PoolHandle<dev>>().handle);
+	}
+	template < Device dev >
+	void replace_pool_memory(unique_device_ptr<dev, char[]> mem, const std::size_t count) noexcept {
+		mark_changed(dev);
+		m_pools.template get<PoolHandle<dev>>().handle = std::move(mem);
+
+		std::size_t currOffset = 0u;
+		for(auto& attr : m_attributes) {
+			if(!attr.erased) {
+				attr.poolOffset = currOffset;
+				currOffset += count * attr.elemSize;
+			}
+		}
+		m_poolSize = currOffset;
+		m_attribElemCapacity = count;
+		m_attribElemCount = count;
 	}
 
 	template < Device dev >
@@ -112,6 +136,20 @@ public:
 	std::size_t get_attribute_elem_capacity() const noexcept {
 		return m_attribElemCapacity;
 	}
+
+	std::size_t get_pool_size() const noexcept {
+		return m_poolSize;
+	}
+
+	std::vector<unsigned> get_attribute_element_sizes() const noexcept {
+		std::vector<unsigned> sizes;
+		sizes.reserve(m_attributes.size());
+		for(const auto& attrib : m_attributes)
+			if(!attrib.erased)
+				sizes.push_back(static_cast<unsigned>(attrib.elemSize));
+		return sizes;
+	}
+
 private:
 	// Bookkeeping for attributes
 	struct AttribInfo {

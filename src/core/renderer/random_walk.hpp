@@ -36,14 +36,15 @@ enum class WalkResult {
  */
 template < typename VertexType, typename... Args >
 inline CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& scene,
-							  const VertexType& vertex,
-							  const math::RndSet2_1& rndSet, float u0,
-							  bool adjoint,
-							  Spectrum& throughput,
-							  VertexType& outVertex,
-							  VertexSample& outSample,
-							  Args&&... args
-) {
+									 const VertexType& vertex,
+									 const math::RndSet2_1& rndSet, float u0,
+									 bool adjoint,
+									 Spectrum& throughput,
+									 VertexType& outVertex,
+									 VertexSample& outSample,
+									 ei::Vec2* uv,
+									 Args&&... args)
+{
 	// Sample the vertex's outgoing direction
 	outSample = vertex.sample(scene.aabb, scene.media, rndSet, adjoint);
 	if(outSample.type == math::PathEventType::INVALID) {
@@ -105,6 +106,8 @@ inline CUDA_FUNCTION WalkResult walk(const scene::SceneDescriptor<CURRENT_DEV>& 
 				position, tangentSpace, outSample.excident);
 	outVertex.ext().update(vertex, outVertex, outSample.pdf, connection, throughput,
 		continuationProbability, transmission, args...);
+	if(uv != nullptr)
+		*uv = nextHit.uv;
 	return WalkResult::HIT;
 }
 

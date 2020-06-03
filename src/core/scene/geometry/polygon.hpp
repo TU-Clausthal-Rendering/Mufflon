@@ -3,6 +3,7 @@
 #include "polygon_mesh.hpp"
 #include "util/range.hpp"
 #include "util/string_view.hpp"
+#include "core/memory/unique_device_ptr.hpp"
 #include "core/renderer/decimaters/util/octree.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/attributes/attribute.hpp"
@@ -284,6 +285,8 @@ public:
 	void reconstruct_from_reduced_mesh(const PolygonMeshType& mesh,
 									   std::vector<u32>* newVertexPosition = nullptr,
 									   std::vector<ei::Vec3>* normals = nullptr);
+
+	void cluster_uniformly(const ei::UVec3& gridRes);
 
 	// Implements tessellation for the mesh
 	void tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,

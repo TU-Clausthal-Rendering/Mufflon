@@ -126,7 +126,8 @@ inline CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT
 		scene::Point lastPosition = vertex.get_position();
 		math::RndSet2_1 rnd { rng.next(), rng.next() };
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
-		if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, guideWeight) == WalkResult::CANCEL)
+		ei::Vec2 uv{ 0.f };
+		if(walk(scene, vertex, rnd, rndRoulette, false, throughput, vertex, sample, &uv, guideWeight) == WalkResult::CANCEL)
 			break;
 
 		if(pathLen == 0)
@@ -146,6 +147,7 @@ inline CUDA_FUNCTION void pt_sample(PtTargets::template RenderBufferType<CURRENT
 			outputBuffer.template contribute<PositionTarget>(coord, guideWeight * vertex.get_position());
 			outputBuffer.template contribute<DepthTarget>(coord, guideWeight * vertex.get_incident_dist());
 			outputBuffer.template contribute<NormalTarget>(coord, guideWeight * vertex.get_normal());
+			outputBuffer.template contribute<UvTarget>(coord, guideWeight * uv);
 			outputBuffer.template contribute<AlbedoTarget>(coord, guideWeight * vertex.get_albedo());
 			outputBuffer.template contribute<LightnessTarget>(coord, guideWeight * ei::avg(emission.value));
 		}

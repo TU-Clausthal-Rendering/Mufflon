@@ -8,6 +8,7 @@
 #include "core/scene/descriptors.hpp"
 #include "core/scene/scenario.hpp"
 #include "core/scene/materials/material.hpp"
+#include "core/scene/clustering/util.hpp"
 #include "core/math/curvature.hpp"
 #include "core/scene/tessellation/tessellater.hpp"
 #include "core/scene/tessellation/displacement_mapper.hpp"
@@ -389,7 +390,7 @@ void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::v
 		const auto vertex = *iter;
 		if(mesh.status(vertex).deleted()) {
 			// Fill the gap and set where to find the vertex
-			m_vertexAttributes.copy<Device::CPU>(currEnd, currPos);
+			m_vertexAttributes.copy(currEnd, currPos);
 			(*newVertexPosition)[currEnd] = static_cast<u32>(currPos);
 
 			// Find the next vertex from the back to move to a potential hole
@@ -461,7 +462,7 @@ void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::v
 		// Copy the attributes (we can make the assumption of face.idx() == index in face attributes
 		// because the mesh was created by first inserting triangles, then quads, and no faces were
 		// garbage collected yet)
-		faceAttribs.template copy<Device::CPU>(m_faceAttributes, static_cast<std::size_t>(face.idx()), faceIndex);
+		faceAttribs.copy(m_faceAttributes, static_cast<std::size_t>(face.idx()), faceIndex);
 		// Set the index buffer
 		for(auto vertexIter = startVertex; vertexIter != endVertex; ++vertexIter) {
 			const auto vertexIdx = static_cast<u32>(vertexIter->idx());
@@ -478,6 +479,353 @@ void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::v
 	m_faceAttributes = std::move(faceAttribs);
 	this->mark_changed(Device::CPU);
 }
+
+
+#if 0
+void Polygons::cluster_uniformly(const ei::UVec3& gridRes) {
+	// Idea taken from here: https://www.comp.nus.edu.sg/~tants/Paper/simplify.pdf
+
+	this->template synchronize<Device::CPU>();
+	const auto* points = this->template acquire_const<Device::CPU, ei::Vec3>(this->get_points_hdl());
+	// Gather all edges and compute the error quadrics per vertex
+	// We'll have lots of duplicates, but that's (imo) fine and worth the reduced
+	// runtime overhead
+	const auto compute_quadric = [points](const ei::UVec3& indices) {
+		// Quadric
+		const auto p0 = points[indices.x];
+		auto normal = ei::cross(points[indices.y] - p0, points[indices.z] - p0);
+		auto area = ei::len(normal);
+		if(area > std::numeric_limits<decltype(area)>::min()) {
+			normal /= area;
+			area *= 0.5f;
+		}
+		const auto d = -ei::dot(p0, normal);
+		OpenMesh::Geometry::Quadricf q{ normal.x, normal.y, normal.z, d };
+		q *= area;
+		return q;
+	};
+
+	std::vector<std::pair<u32, u32>> edges;
+	std::vector<OpenMesh::Geometry::Quadricf> quadrics(this->get_vertex_count());
+	edges.reserve(m_triangles * 6u + m_quads * 8u);
+	for(const auto tri : this->triangles()) {
+		edges.emplace_back(tri.x, tri.y);
+		edges.emplace_back(tri.y, tri.z);
+		edges.emplace_back(tri.z, tri.x);
+		edges.emplace_back(tri.x, tri.z);
+		edges.emplace_back(tri.z, tri.y);
+		edges.emplace_back(tri.y, tri.x);
+
+		const auto q = compute_quadric(tri);
+		quadrics[tri.x] += q;
+		quadrics[tri.y] += q;
+		quadrics[tri.z] += q;
+	}
+	for(const auto quad : this->quads()) {
+		edges.emplace_back(quad.x, quad.y);
+		edges.emplace_back(quad.y, quad.z);
+		edges.emplace_back(quad.z, quad.w);
+		edges.emplace_back(quad.w, quad.x);
+		edges.emplace_back(quad.x, quad.w);
+		edges.emplace_back(quad.w, quad.z);
+		edges.emplace_back(quad.z, quad.y);
+		edges.emplace_back(quad.y, quad.x);
+
+		const ei::UVec3 tri0{ quad.x, quad.y, quad.z };
+		const ei::UVec3 tri1{ quad.x, quad.z, quad.w };
+		const auto q0 = compute_quadric(tri0);
+		const auto q1 = compute_quadric(tri1);
+		quadrics[tri0.x] += q0;
+		quadrics[tri0.y] += q0;
+		quadrics[tri0.z] += q0;
+		quadrics[tri1.x] += q1;
+		quadrics[tri1.y] += q1;
+		quadrics[tri1.z] += q1;
+	}
+	// Sort them by vertex
+	std::sort(edges.begin(), edges.end(), [](const auto& left, const auto& right) { return left.first < right.first; });
+	// Now we can compute the "grading" of each vertex
+	std::vector<std::pair<u32, float>> vertexGrade(this->get_vertex_count());
+	for(std::size_t i = 0u; i < edges.size(); ++i) {
+		auto currVertex = edges[i].first;
+		float minCos = 1.f;
+
+		// Find the end-index of edges
+		std::size_t lastEdge;
+		for(lastEdge = i; lastEdge < edges.size() && edges[lastEdge].first == currVertex; ++lastEdge) {}
+		// Find the pairwise max. angle (== min. cosine) between the edges
+		const auto v0 = points[currVertex];
+		for(std::size_t e1 = i; (e1 + 1u) < lastEdge; ++e1) {
+			const auto v1 = points[edges[e1].second];
+			const auto v0v1 = ei::normalize(v1 - v0);
+			for(std::size_t e2 = e1 + 1u; e2 < lastEdge; ++e2) {
+				const auto v2 = points[edges[e2].second];
+				const auto v0v2 = ei::normalize(v2 - v0);
+				const auto cosTheta = ei::dot(v0v1, v0v2);
+				minCos = std::min(minCos, cosTheta);
+			}
+		}
+
+		// Compute and store the grade
+		vertexGrade[currVertex] = std::make_pair(currVertex, std::cos(std::acos(minCos) / 2.f));
+	}
+	// Sort the vertices by grade (descending)
+	std::sort(vertexGrade.begin(), vertexGrade.end(), [](const auto& lhs, const auto& rhs) { return lhs.second > rhs.second; });
+
+	// Clustering step: first create the grid
+	// For this we discretize the bounding box in equal parts
+	struct Cluster {
+		ei::Vec3 centre;
+		u32 count;
+		OpenMesh::Geometry::Quadricf q;
+	};
+	struct Grid {
+		std::optional<Cluster> cluster;
+	};
+	std::vector<u32> vertexGridIndices(this->get_vertex_count());
+	std::vector<Grid> grids(ei::prod(gridRes));
+	const auto aabbDiag = m_boundingBox.max - m_boundingBox.min;
+	const auto get_grid_index = [gridRes](const ei::UVec3& gridPos) {
+		return gridPos.x + gridPos.y * gridRes.x + gridPos.z * gridRes.y * gridRes.x;
+	};
+	for(const auto& vertex : vertexGrade) {
+		const auto pos = points[vertex.first];
+		// Check if the vertex is part of a cell already
+		// For this, first find out the grid it belongs to and its neighbors
+		std::optional<u32> chosenGridIndex = std::nullopt;
+		float minDist = std::numeric_limits<float>::max();
+
+		// Get the normalized position [0, 1]^3
+		const auto normPos = (pos - m_boundingBox.min) / aabbDiag;
+		// Get the discretized grid position with twice the grid resolution
+		const auto gridPos = ei::min(ei::UVec3{ normPos * ei::Vec3{ 2u * gridRes } }, 2u * gridRes - 1u);
+		const auto centreGridIdx = get_grid_index(gridPos / 2u);
+		if(grids[centreGridIdx].cluster.has_value()) {
+			chosenGridIndex = centreGridIdx;
+			minDist = ei::len(pos - grids[centreGridIdx].cluster->centre);
+		}
+
+		// The other grid indices we get by adding/subtracting one if the double grid position is odd/even
+		const auto compareGrid = [&grids, &minDist, &chosenGridIndex, centreGridIdx, pos](const i32 indexOffset) {
+			const auto currGridIndex = centreGridIdx + indexOffset;
+			// Check if the grid cell even has a cluster associated with it
+			if(grids[currGridIndex].cluster.has_value()) {
+				// We compare the distance between vertex and cluster instead of using cluster weight
+				const auto distance = ei::len(pos - grids[currGridIndex].cluster->centre);
+				if(distance < minDist) {
+					minDist = distance;
+					chosenGridIndex = currGridIndex;
+				}
+			}
+		};
+
+		// Iterate all neighbor cells
+		constexpr ei::UVec3 offsets[] = {
+			ei::UVec3{ 1u, 0u, 0u }, ei::UVec3{ 0u, 1u, 0u }, ei::UVec3{ 0u, 0u, 1u },
+			ei::UVec3{ 1u, 1u, 0u }, ei::UVec3{ 1u, 0u, 1u }, ei::UVec3{ 0u, 1u, 1u },
+			ei::UVec3{ 1u, 1u, 1u }
+		};
+		for(std::size_t i = 0u; i < sizeof(offsets) / sizeof(*offsets); ++i) {
+			unsigned offset = 1u;
+			for(std::size_t j = 0u; j < 3u; ++j) {
+				if(offsets[j] != 0u) {
+					if(gridPos[j] & 1u == 0u) {
+						if(gridPos[j] > 0u)
+							compareGrid(-static_cast<i32>(offset));
+					} else if(gridPos[j] < gridRes[j] * 2u - 1u) {
+						compareGrid(static_cast<i32>(offset));
+					}
+				}
+				offset *= gridRes[j];
+			}
+		}
+
+		// If vertex doesn't fit into any cell, create the cell with the vertex as centre
+		if(!chosenGridIndex.has_value()) {
+			grids[centreGridIdx].cluster = Cluster{ pos, 0u, {} };
+			chosenGridIndex = centreGridIdx;
+		}
+		grids[chosenGridIndex.value()].cluster->count += 1u;
+		grids[chosenGridIndex.value()].cluster->q += quadrics[vertex.first];
+		vertexGridIndices[vertex.first] = chosenGridIndex.value();
+	}
+
+	// Compute the cluster centres with error quadrics
+	for(auto& grid : grids) {
+		if(grid.cluster.has_value()) {
+			// Attempt to compute the optimal contraction point by inverting the quadric matrix
+			const auto q = grid.cluster->q;
+			const ei::Mat4x4 w{
+				q.a(), q.b(), q.c(), q.d(),
+				q.b(), q.e(), q.f(), q.g(),
+				q.c(), q.f(), q.h(), q.i(),
+				0,	   0,	  0,	 1
+			};
+			const auto inverse = invert_opt(w);
+			if(inverse.has_value())
+				grid.cluster->centre = ei::Vec3{ inverse.value() * ei::Vec4{ 0.f, 0.f, 0.f, 1.f } };
+			else
+				grid.cluster->centre /= static_cast<float>(grid.cluster->count);
+		}
+	}
+
+	// Now we have to delete triangles which have degenerated into points/lines
+	// Quads can also be transformed into triangles
+	auto* indices = m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices.get();
+	auto* triIndices = indices;
+	auto* quadIndices = indices + 3u * this->get_triangle_count();
+	std::size_t triCount = this->get_triangle_count();
+	std::size_t quadCount = this->get_quad_count();
+	for(std::size_t i = 0u; i < this->get_triangle_count(); ++i) {
+		u32* tri = triIndices + 3u * i;
+		// Check if all three vertices are in different cells, otherwise mark the triangle as invalid
+		if(vertexGridIndices[tri[0u]] != vertexGridIndices[tri[1u]]
+		   && vertexGridIndices[tri[0u]] != vertexGridIndices[tri[2u]]) {
+			tri[0u] = std::numeric_limits<u32>::max();
+			triCount -= 1u;
+		}
+	}
+	std::size_t quadTurnedTris = 0u;
+	for(std::size_t i = 0u; i < this->get_quad_count(); ++i) {
+		u32* quad = quadIndices + 4u * i;
+		ei::UVec4 quadVertIndices{
+			vertexGridIndices[quad[0u]], vertexGridIndices[quad[1u]],
+			vertexGridIndices[quad[2u]], vertexGridIndices[quad[3u]]
+		};
+		// Check for tri
+		// For triangles, we mark the outlying vertex, for edges/vertices we mark first and second
+		if(quadVertIndices.x == quadVertIndices.y) {
+			// At least edge
+			if(quadVertIndices.x == quadVertIndices.z) {
+				// At least triangle
+				if(quadVertIndices.x != quadVertIndices.w) {
+					// Mark as triangle
+					quad[3u] = std::numeric_limits<u32>::max();
+					quadCount -= 1u;
+					quadTurnedTris += 1u;
+				}
+			} else {
+				// Pre-mark as triangle
+				quadCount -= 1u;
+				// Check if it is actually triangle, mark as removal otherwise
+				if(quadVertIndices.x != quadVertIndices.w) {
+					quad[0u] = std::numeric_limits<u32>::max();
+					quad[1u] = std::numeric_limits<u32>::max();
+				} else {
+					quad[2u] = std::numeric_limits<u32>::max();
+					quadTurnedTris += 1u;
+				}
+			}
+		} else {
+			// No longer quad, but maybe triangle
+			quadCount -= 1u;
+
+			if(quadVertIndices.x == quadVertIndices.z) {
+				quad[1u] = std::numeric_limits<u32>::max();
+				if(quadVertIndices.x != quadVertIndices.w)
+					quad[0u] = std::numeric_limits<u32>::max();
+				else
+					quadTurnedTris += 1u;
+			} else if(quadVertIndices.y == quadVertIndices.z) {
+				quad[0u] = std::numeric_limits<u32>::max();
+				if(quadVertIndices.y != quadVertIndices.w)
+					quad[1u] = std::numeric_limits<u32>::max();
+				else
+					quadTurnedTris += 1u;
+			} else {
+				quad[0u] = std::numeric_limits<u32>::max();
+				quad[1u] = std::numeric_limits<u32>::max();
+			}
+		}
+	}
+	// Now we have to iterate the index buffer to swap/remove all remaining faces
+	auto endTri = m_triangles;
+	// Find the first valid triangle (from the back)
+	while(endTri > 0u) {
+		if()
+	}
+	// TODO: find last valid tri/quad
+	for(std::size_t i = 0u; i < triCount; ++i) {
+		if(triIndices[3u * i] == std::numeric_limits<u32>::max()) {
+			// Swap last triangle
+			endTri -= 1u;
+			m_faceAttributes.copy(endTri, i);
+			std::memcpy(triIndices + 3u * i, triIndices + 3u * endTri, 3u * sizeof(u32));
+		}
+	}
+
+	auto endQuad = m_quads;
+	// For quads we do two things - first we copy out all the quad->triangle ones, and then swap around
+	const auto fillQuadHole = [&](const auto index) {
+		if(quadIndices[4u * index] == std::numeric_limits<u32>::max()) {
+			if(quadIndices[4u * index + 1u] == std::numeric_limits<u32>::max()) {
+				// Swap last quad
+				endQuad -= 1u;
+				m_faceAttributes.copy(endQuad, m_triangles + index);
+				std::memcpy(quadIndices + 4u * index, quadIndices + endQuad * 4u, 4u * sizeof(u32));
+			} else {
+				// Degenerated to triangle
+				m_faceAttributes.copy(m_triangles + index, triCount);
+				std::memcpy(triIndices + 3u * triCount, quadIndices + 4u * index + 1u, 3u * sizeof(u32));
+				triCount += 1u;
+			}
+		} else {
+			// Check the other vertices for triangle degeneration
+			for(std::size_t j = 1u; j < 4u; ++j) {
+				if(quadIndices[4u * index + j] == std::numeric_limits<u32>::max()) {
+					m_faceAttributes.copy(m_triangles + index, triCount);
+					// Copy over the indices (ignore the index marked invalid)
+					auto* copyIndexTarget = triIndices + 3u * triCount;
+					for(std::size_t c = 0u; c < 4u; ++c) {
+						if(c != j)
+							*(copyIndexTarget++) = quadIndices[4u * index + c];
+					}
+					triCount += 1u;
+					break;
+				}
+			}
+		}
+	};
+
+	for(std::size_t i = 0u; i < quadCount + quadTurnedTris; ++i) {
+		if(quadIndices[4u * i] == std::numeric_limits<u32>::max()) {
+			if(quadIndices[4u * i + 1u] == std::numeric_limits<u32>::max()) {
+				// Swap last quad
+				endQuad -= 1u;
+				m_faceAttributes.copy(endQuad, m_triangles + i);
+				std::memcpy(quadIndices + 4u * i, quadIndices + endQuad * 4u, 4u * sizeof(u32));
+			} else {
+				// Degenerated to triangle
+				m_faceAttributes.copy(m_triangles + i, triCount);
+				std::memcpy(triIndices + 3u * triCount, quadIndices + 4u * i + 1u, 3u * sizeof(u32));
+				triCount += 1u;
+			}
+		} else {
+			// Check the other vertices for triangle degeneration
+			for(std::size_t j = 1u; j < 4u; ++j) {
+				if(quadIndices[4u * i + j] == std::numeric_limits<u32>::max()) {
+					m_faceAttributes.copy(m_triangles + i, triCount);
+					// Copy over the indices (ignore the index marked invalid)
+					auto* copyIndexTarget = triIndices + 3u * triCount;
+					for(std::size_t c = 0u; c < 4u; ++c) {
+						if(c != j)
+							*(copyIndexTarget++) = quadIndices[4u * i + c];
+					}
+					triCount += 1u;
+					break;
+				}
+			}
+		}
+	}
+
+	// Resize the buffer
+	auto& indexBuffer = m_indexBuffer.template get<IndexBuffer<Device::CPU>>();
+	indexBuffer.indices.reset(Allocator<Device::CPU>::realloc(indexBuffer.indices.release(), indexBuffer.reserved,
+															  3u * triCount + 4u * quadCount));
+
+	this->mark_changed(Device::CPU);
+}
+#endif // 0
 
 void Polygons::after_tessellation(const PolygonMeshType& mesh, const OpenMesh::FaceHandle tempHandle,
 								  const OpenMesh::FPropHandleT<OpenMesh::FaceHandle>& oldFaceProp) {
@@ -500,7 +848,7 @@ void Polygons::after_tessellation(const PolygonMeshType& mesh, const OpenMesh::F
 		if(const auto oldFace = mesh.property(oldFaceProp, face); oldFace.is_valid()) {
 			// Make sure we ignore the temporary face
 			const auto newFaceIdx = (i < static_cast<std::size_t>(tempHandle.idx())) ? i : (i - 1u);
-			m_faceAttributes.copy<Device::CPU>(static_cast<std::size_t>(oldFace.idx()),
+			m_faceAttributes.copy(static_cast<std::size_t>(oldFace.idx()),
 											   newFaceIdx);
 		}
 	}
@@ -510,7 +858,7 @@ void Polygons::after_tessellation(const PolygonMeshType& mesh, const OpenMesh::F
 		const auto face = mesh.face_handle(static_cast<unsigned>(i));
 		if(mesh.status(face).deleted()) {
 			const auto currSize = m_faceAttributes.get_attribute_elem_count();
-			m_faceAttributes.copy<Device::CPU>(currSize - 1u, i);
+			m_faceAttributes.copy(currSize - 1u, i);
 			m_faceAttributes.resize(currSize - 1u);
 		}
 	}

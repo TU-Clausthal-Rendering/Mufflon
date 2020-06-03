@@ -197,7 +197,7 @@ void CpuVcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeR
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
 		if(walk(m_sceneDesc, *previous, rnd, rndRoulette, true, throughput, vertex, sample,
-				numPhotons, mergeArea) != WalkResult::HIT)
+				nullptr, numPhotons, mergeArea) != WalkResult::HIT)
 			break;
 		++pathLen;
 
@@ -242,7 +242,7 @@ void CpuVcm::sample(const Pixel coord, int idx, int numPhotons, float currentMer
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
 		if(walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, false, throughput, vertex[otherV],
-				sample, numPhotons, mergeArea) == WalkResult::CANCEL)
+				sample, nullptr, numPhotons, mergeArea) == WalkResult::CANCEL)
 			break;
 		++viewPathLen;
 		currentV = otherV;

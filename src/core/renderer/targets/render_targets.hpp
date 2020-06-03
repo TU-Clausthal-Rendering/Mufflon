@@ -42,6 +42,12 @@ struct NormalTarget {
 	static constexpr u32 NUM_CHANNELS = 3u;
 };
 
+struct UvTarget {
+	static constexpr const char NAME[] = "UV";
+	using PixelType = float;
+	static constexpr u32 NUM_CHANNELS = 2u;
+};
+
 struct AlbedoTarget {
 	static constexpr const char NAME[] = "Albedo";
 	using PixelType = float;

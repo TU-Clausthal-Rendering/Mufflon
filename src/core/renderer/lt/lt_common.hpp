@@ -72,7 +72,7 @@ inline CUDA_FUNCTION void lt_sample(typename LtTargets::template RenderBufferTyp
 		// Walk
 		math::RndSet2_1 rnd { rng.next(), rng.next() };
 		float rndRoulette = math::sample_uniform(u32(rng.next()));
-		if(walk(scene, vertex, rnd, rndRoulette, true, throughput, vertex, sample) != WalkResult::HIT)
+		if(walk(scene, vertex, rnd, rndRoulette, true, throughput, vertex, sample, nullptr) != WalkResult::HIT)
 			break;
 		++pathLen;
 	} while(pathLen < params.maxPathLength);

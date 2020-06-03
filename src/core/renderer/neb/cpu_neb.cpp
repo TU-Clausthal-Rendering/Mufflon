@@ -184,7 +184,7 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 		math::RndSet2_1 rnd { m_rngs[pixelIdx].next(), m_rngs[pixelIdx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[pixelIdx].next()));
 		NebPathVertex& sourceVertex = previous ? *previous : vertex;	// Make sure the update function is called for the correct vertex.
-		if(walk(m_sceneDesc, sourceVertex, rnd, rndRoulette, false, throughput, vertex, sample) == WalkResult::CANCEL)
+		if(walk(m_sceneDesc, sourceVertex, rnd, rndRoulette, false, throughput, vertex, sample, nullptr) == WalkResult::CANCEL)
 			break;
 		++pathLen;
 		if(pathLen >= m_params.minPathLength) {
@@ -262,7 +262,7 @@ void CpuNextEventBacktracking::sample_photon_path(float photonMergeArea, math::R
 			math::RndSet2_1 rnd { rng.next(), rng.next() };
 			float rndRoulette = math::sample_uniform(u32(rng.next()));
 			VertexSample sample;
-			if(walk(m_sceneDesc, virtualLight, rnd, rndRoulette, true, lightThroughput, virtualLight, sample) != WalkResult::HIT)
+			if(walk(m_sceneDesc, virtualLight, rnd, rndRoulette, true, lightThroughput, virtualLight, sample, nullptr) != WalkResult::HIT)
 				break;
 			++lightPathLength;
 			virtualLight.set_path_len(lightPathLength);
@@ -302,7 +302,7 @@ void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 se
 		math::RndSet2 rndRoulette { m_rngs[idx].next() };
 		vertex[currentV].ext().rnd = rndRoulette.u1;
 		VertexSample sample;
-		if(walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette.u0, true, throughput, vertex[1-currentV], sample) != WalkResult::HIT)
+		if(walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette.u0, true, throughput, vertex[1-currentV], sample, nullptr) != WalkResult::HIT)
 			break;
 		++lightPathLength;
 		currentV = 1-currentV;
