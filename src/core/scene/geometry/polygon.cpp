@@ -1201,7 +1201,7 @@ void Polygons::synchronize() {
 	m_faceAttributes.synchronize<dev>();
 	// Synchronize the index buffer
 
-	if(m_indexBuffer.template get<IndexBuffer<dev>>().indices.get() != nullptr) {
+	if(m_indexBuffer.template get<IndexBuffer<dev>>().indices.get() == nullptr) {
 		// Try to find a valid device
 		bool synced = false;
 		m_indexBuffer.for_each([&](auto& buffer) {
