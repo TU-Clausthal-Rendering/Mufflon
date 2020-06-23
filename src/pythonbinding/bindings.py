@@ -179,8 +179,6 @@ class DllHolder:
             dir = binary_path
         else:
             dir = os.path.dirname(os.path.realpath(__file__))
-        self.openmeshcore = ctypes.CDLL(dir + "/OpenMeshCore.dll",mode=ctypes.RTLD_GLOBAL)
-        self.openmeshtools = ctypes.CDLL(dir + "/OpenMeshTools.dll",mode=ctypes.RTLD_GLOBAL)
         self.tbb = ctypes.CDLL(dir + "/tbb.dll",mode=ctypes.RTLD_GLOBAL)
         self.openimagedenoise = ctypes.CDLL(dir + "/OpenImageDenoise.dll",mode=ctypes.RTLD_GLOBAL)
         self.core = ctypes.CDLL(dir + "/core.dll",mode=ctypes.RTLD_GLOBAL)

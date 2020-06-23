@@ -4,9 +4,6 @@
 [submodule "deps/chinoise"]
 	path = deps/chinoise
 	url = https://github.com/Jojendersie/Chi-Noise.git
-[submodule "deps/cub"]
-	path = deps/cub
-	url = https://github.com/NVlabs/cub.git
 [submodule "deps/gli"]
 	path = deps/gli
 	url = https://github.com/g-truc/gli.git
