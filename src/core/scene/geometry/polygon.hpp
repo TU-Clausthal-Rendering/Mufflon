@@ -144,6 +144,8 @@ public:
 
 	// Default construction, creates material-index attribute.
 	Polygons();
+	// Create a polygon from an existing mesh
+	Polygons(const PolygonMeshType& mesh, const OpenMesh::FPropHandleT<MaterialIndex> mats = OpenMesh::FPropHandleT<MaterialIndex>{});
 
 	Polygons(const Polygons&);
 	Polygons(Polygons&&);
@@ -466,7 +468,7 @@ private:
 	VertexAttributeHandle m_pointsHdl;
 	VertexAttributeHandle m_normalsHdl;
 	VertexAttributeHandle m_uvsHdl;
-	std::atomic_uint32_t m_curvRefCount = 0u;
+	std::atomic_uint32_t m_curvRefCount;
 	std::optional<VertexAttributeHandle> m_curvatureHdl;
 	std::optional<VertexAttributeHandle> m_animationWeightHdl;
 	FaceAttributeHandle m_matIndicesHdl;
@@ -479,11 +481,11 @@ private:
 	util::TaggedTuple<DescFlags<Device::CPU>, DescFlags<Device::CUDA>> m_descFlags;
 
 	ei::Box m_boundingBox;
-	std::size_t m_triangles = 0u;
-	std::size_t m_quads = 0u;
+	std::size_t m_triangles;
+	std::size_t m_quads;
 
 	// Keeps track of whether displacement mapping was already applied or not
-	bool m_wasDisplaced = false;
+	bool m_wasDisplaced;
 };
 
 }}} // namespace mufflon::scene::geometry

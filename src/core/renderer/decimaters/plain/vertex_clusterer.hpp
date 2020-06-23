@@ -53,19 +53,27 @@ public:
 
 		if(!m_done) {
 			logInfo("[CpuUniformVertexClusterer::pre_reset()] Starting clustering...");
+			scene::geometry::PolygonMeshType mesh{};
+			std::vector<u32> vertexIndexBuffer{};
+			mesh.request_vertex_status();
+			mesh.request_face_status();
+			mesh.request_edge_status();
 			auto& objects = m_currentScene->get_objects();
 			for(auto& obj : objects) {
 				const auto lodCount = obj.first->get_lod_slot_count();
 				for(std::size_t i = 0u; i < lodCount; ++i) {
 					using namespace std::chrono;
 					const auto t0 = high_resolution_clock::now();
+					mesh.clean_keep_reservation();
 					if(!m_world.load_lod(*obj.first, static_cast<u32>(i)))
 						throw std::runtime_error("Failed to load LoD " + std::to_string(i)
 												 + " of object '" + std::string(obj.first->get_name()) + "'");
 					auto& lod = obj.first->add_reduced_lod(static_cast<u32>(i));
 					auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-					polygons.cluster_uniformly(ei::UVec3{ m_params.gridRes });
-
+					polygons.create_halfedge_structure(mesh);
+					scene::clustering::UniformVertexClusterer clusterer{ ei::UVec3{ static_cast<u32>(m_params.gridRes) } };
+					const auto clusterCount = clusterer.cluster(mesh, polygons.get_bounding_box());
+					polygons.reconstruct_from_reduced_mesh(mesh, &vertexIndexBuffer);
 					lod.clear_accel_structure();
 					obj.first->remove_original_lod(i);
 					logInfo("Object '", obj.first->get_name(), "': ",
@@ -89,7 +97,55 @@ private:
 	bool m_done = false;
 };
 
+class GpuUniformVertexClusterer final : public RendererBase<Device::CPU, TargetList<AlibiTarget>> {
+public:
+	GpuUniformVertexClusterer(mufflon::scene::WorldContainer& world) :
+		RendererBase{ world } {}
+	~GpuUniformVertexClusterer() = default;
 
+	bool uses_device(Device device) const noexcept override { return may_use_device(device); }
+	static constexpr bool may_use_device(Device device) noexcept { return device == Device::CUDA; }
+
+	void pre_reset() {
+		if(get_reset_event().geometry_changed())
+			m_done = false;
+
+		if(!m_done) {
+			logInfo("[GpuUniformVertexClusterer::pre_reset()] Starting clustering...");
+			auto& objects = m_currentScene->get_objects();
+			for(auto& obj : objects) {
+				const auto lodCount = obj.first->get_lod_slot_count();
+				for(std::size_t i = 0u; i < lodCount; ++i) {
+					using namespace std::chrono;
+					const auto t0 = high_resolution_clock::now();
+					if(!m_world.load_lod(*obj.first, static_cast<u32>(i)))
+						throw std::runtime_error("Failed to load LoD " + std::to_string(i)
+												 + " of object '" + std::string(obj.first->get_name()) + "'");
+					auto& lod = obj.first->add_reduced_lod(static_cast<u32>(i));
+					auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+					polygons.cluster_uniformly(ei::UVec3{ m_params.gridRes });
+					lod.clear_accel_structure();
+					obj.first->remove_original_lod(i);
+					logInfo("Object '", obj.first->get_name(), "': ",
+							duration_cast<milliseconds>(high_resolution_clock::now() - t0).count(), "ms");
+				}
+			}
+			m_currentScene->clear_accel_structure();
+			m_done = true;
+			logInfo("[GpuUniformVertexClusterer::pre_reset()] Finished clustering");
+		}
+	}
+	void iterate() final {}
+	IParameterHandler& get_parameters() final { return m_params; }
+	static constexpr StringView get_name_static() noexcept { return "Uniform vertex clusterer"; }
+	static constexpr StringView get_short_name_static() noexcept { return "UVC"; }
+	StringView get_name() const noexcept final { return get_name_static(); }
+	StringView get_short_name() const noexcept final { return get_short_name_static(); }
+
+private:
+	UniformClustererParameters m_params{};
+	bool m_done = false;
+};
 
 class CpuOctreeVertexClusterer final : public RendererBase<Device::CPU, TargetList<AlibiTarget>> {
 public:

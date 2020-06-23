@@ -45,8 +45,16 @@ Polygons::Polygons() :
 	m_pointsHdl{ this->template add_vertex_attribute<ei::Vec3>("points") },
 	m_normalsHdl{ this->template add_vertex_attribute<ei::Vec3>("normals") },
 	m_uvsHdl{ this->template add_vertex_attribute<ei::Vec2>("uvs") },
+	m_curvRefCount{ 0u },
 	m_curvatureHdl{},
-	m_matIndicesHdl{ this->template add_face_attribute<MaterialIndex>("materials") }
+	m_animationWeightHdl{},
+	m_matIndicesHdl{ this->template add_face_attribute<MaterialIndex>("materials") },
+	m_indexBuffer{},
+	m_attribBuffer{},
+	m_descFlags{},
+	m_triangles{ 0u },
+	m_quads{ 0u },
+	m_wasDisplaced{ false }
 {
 	// Invalidate bounding box
 	m_boundingBox.min = {
@@ -59,6 +67,53 @@ Polygons::Polygons() :
 		-std::numeric_limits<float>::max(),
 		-std::numeric_limits<float>::max()
 	};
+}
+
+Polygons::Polygons(const PolygonMeshType& mesh, const OpenMesh::FPropHandleT<MaterialIndex> mats) :
+	Polygons{}
+{
+	m_vertexAttributes.resize(mesh.n_vertices());
+	m_faceAttributes.resize(mesh.n_faces());
+	auto* points = this->template acquire<Device::CPU, ei::Vec3>(this->get_points_hdl());
+	auto* normals = this->template acquire<Device::CPU, ei::Vec3>(this->get_normals_hdl());
+	auto* uvs = this->template acquire<Device::CPU, ei::Vec2>(this->get_uvs_hdl());
+	for(const auto vertex : mesh.vertices()) {
+		const auto point = util::pun<ei::Vec3>(mesh.point(vertex));
+		points[vertex.idx()] = point;
+		normals[vertex.idx()] = util::pun<ei::Vec3>(mesh.normal(vertex));
+		uvs[vertex.idx()] = util::pun<ei::Vec2>(mesh.texcoord2D(vertex));
+		m_boundingBox = ei::Box{ m_boundingBox, ei::Box{ point } };
+	}
+
+	auto* matIndices = this->template acquire<Device::CPU, MaterialIndex>(this->get_material_indices_hdl());
+	for(const auto face : mesh.faces()) {
+		if(mats.is_valid())
+			matIndices[face.idx()] = mesh.property(mats, face);
+		else
+			matIndices[face.idx()] = 0u;
+
+		if(std::distance(mesh.cfv_ccwbegin(face), mesh.cfv_ccwend(face)) == 3u)
+			++m_triangles;
+		else
+			++m_quads;
+	}
+
+	this->reserve_index_buffer<Device::CPU>(3u * m_triangles + 4u * m_quads);
+	auto* indices = m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices.get();
+	auto* currTri = indices;
+	auto* currQuad = indices + 3u * m_triangles;
+	for(const auto face : mesh.faces()) {
+		u32** ind;
+		if(std::distance(mesh.cfv_ccwbegin(face), mesh.cfv_ccwend(face)) == 3u)
+			ind = &currTri;
+		else
+			ind = &currQuad;
+
+		for(auto iter = mesh.cfv_ccwbegin(face); iter != mesh.cfv_ccwend(face); ++iter) {
+			**ind = iter->idx();
+			(*ind) += 1u;
+		}
+	}
 }
 
 Polygons::Polygons(const Polygons& poly) :
@@ -928,7 +983,7 @@ void Polygons::rebuild_index_buffer(const PolygonMeshType& mesh, const OpenMesh:
 	// holes of deleted faces in the attributes
 	auto currEnd = mesh.n_faces() - 1u;
 	for(auto iter = mesh.faces_begin(); iter != mesh.faces_end(); ++iter) {
-		auto face = *iter;
+		auto face = iter.handle();
 		if(face == tempHandle)
 			continue;
 		if(static_cast<std::size_t>(face.idx()) > currEnd)

@@ -33,7 +33,8 @@ using Renderers = util::TaggedTuple<
 	GlForward, DebugBvhRenderer,
 	decimaters::CpuCombinedReducer,
 
-	decimaters::CpuUniformVertexClusterer, decimaters::CpuOctreeVertexClusterer
+	decimaters::CpuUniformVertexClusterer, decimaters::GpuUniformVertexClusterer,
+	decimaters::CpuOctreeVertexClusterer
 >;
 
 } // namespace mufflon::renderer
