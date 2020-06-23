@@ -3713,8 +3713,8 @@ Boolean render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename,
 
 	// Make the image a PFM by default
 	auto fileName = fs::u8path(filename);
-	if(fileName.extension() != ".pfm" && fileName.extension() != ".exr")
-		fileName += ".pfm";
+	if(fileName.extension() == "" || fileName.extension() == ".")
+		fileName.replace_extension(".pfm");
 	if(!fileName.is_absolute())
 		fileName = fs::absolute(fileName);
 
@@ -3746,14 +3746,16 @@ Boolean render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename,
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
 			if(plugin.can_store_format(fileName.extension().u8string())) {
-				if(plugin.store(fileName.u8string(), &texData))
-					break;
+				if(plugin.store(fileName.u8string(), &texData)) {
+					logInfo("[", FUNCTION_NAME, "] Saved screenshot '", fileName.u8string(), "'");
+					return true;
+				}
 			}
 		}
 	}
-	logInfo("[", FUNCTION_NAME, "] Saved screenshot '", fileName.u8string(), "'");
 
-	return true;
+	logError("[", FUNCTION_NAME, "] No exporter could save screenshot of file type '", fileName.extension().string(), "'");
+	return false;
 	CATCH_ALL(false)
 }
 

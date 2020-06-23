@@ -207,49 +207,6 @@ gli::format get_format(const TextureData& texData) {
 	}
 }
 
-
-std::size_t get_component_size(TextureFormat format) {
-	switch(format) {
-		case TextureFormat::FORMAT_R8U:
-		case TextureFormat::FORMAT_RG8U:
-		case TextureFormat::FORMAT_RGBA8U:
-			return 1u;
-		case TextureFormat::FORMAT_R16U:
-		case TextureFormat::FORMAT_RG16U:
-		case TextureFormat::FORMAT_RGBA16U:
-		case TextureFormat::FORMAT_R16F:
-		case TextureFormat::FORMAT_RG16F:
-		case TextureFormat::FORMAT_RGBA16F:
-			return 2u;
-		case TextureFormat::FORMAT_R32F:
-		case TextureFormat::FORMAT_RG32F:
-		case TextureFormat::FORMAT_RGBA32F:
-			return 4u;
-		default: return 0u;
-	}
-}
-
-std::size_t get_channels(TextureFormat format) {
-	switch(format) {
-		case TextureFormat::FORMAT_R8U:
-		case TextureFormat::FORMAT_R16U:
-		case TextureFormat::FORMAT_R16F:
-		case TextureFormat::FORMAT_R32F:
-			return 1u;
-		case TextureFormat::FORMAT_RG8U:
-		case TextureFormat::FORMAT_RG16U:
-		case TextureFormat::FORMAT_RG16F:
-		case TextureFormat::FORMAT_RG32F:
-			return 2u;
-		case TextureFormat::FORMAT_RGBA8U:
-		case TextureFormat::FORMAT_RGBA16U:
-		case TextureFormat::FORMAT_RGBA16F:
-		case TextureFormat::FORMAT_RGBA32F:
-			return 4u;
-		default: return 0u;
-	}
-}
-
 } // namespace
 
 Boolean can_load_texture_format(const char* ext) {
@@ -341,8 +298,8 @@ Boolean load_texture(const char* path, TextureData* texData) {
 				}
 			}
 		} else {
-			const std::size_t channels = get_channels(texData->format);
-			const std::size_t componentSize = get_component_size(texData->format);
+			const std::size_t channels = util::get_channel_count(texData->format);
+			const std::size_t componentSize = util::get_channel_size(texData->format);
 			const std::size_t texelSize = channels * componentSize;
 			const std::size_t origTexelSize = origChannels * componentSize;
 			const std::size_t layerSize = texData->width * texData->height * texelSize;
@@ -398,8 +355,8 @@ Boolean store_texture(const char* path, const TextureData* texData) {
 		} else {
 			tex = gli::texture(gli::TARGET_2D, get_format(*texData), extent, 1, texData->layers, 1);
 		}
-		const std::size_t channels = get_channels(texData->format);
-		const std::size_t componentSize = get_component_size(texData->format);
+		const std::size_t channels = util::get_channel_count(texData->format);
+		const std::size_t componentSize = util::get_channel_size(texData->format);
 		const std::size_t texelSize = channels * componentSize;
 		const std::size_t layerSize = texData->width * texData->height * texelSize;
 		for(std::size_t layer = 0u; layer < tex.layers(); ++layer) {
