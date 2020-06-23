@@ -485,12 +485,6 @@ void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::v
 	this->reserve_index_buffer<Device::CPU>(3u * m_triangles + 4u * m_quads);
 	auto* indexBuffer = m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices.get();
 
-	// To recalculate the normals we would either have to garbage collect the mesh,
-	// use skipping iterators (severe overhead in heavily decimated meshes), or use
-	// a buffer to keep track of cumulative normals
-	std::vector<ei::Vec3> normalBuffer;
-	if(normals == nullptr)
-		normals = &normalBuffer;
 
 	FaceAttributePoolType faceAttribs{ m_faceAttributes };
 	std::size_t currTri = 0u;
@@ -509,10 +503,6 @@ void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::v
 			faceIndex = m_triangles + currQuad;
 			currIndices += 3u * m_triangles + 4u * currQuad++;
 		}
-		// Compute the sector normals
-		{
-			// TODO
-		}
 
 		// Copy the attributes (we can make the assumption of face.idx() == index in face attributes
 		// because the mesh was created by first inserting triangles, then quads, and no faces were
@@ -529,12 +519,67 @@ void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::v
 		}
 	}
 
-	// TODO: set the normals
-
 	m_faceAttributes = std::move(faceAttribs);
 	this->mark_changed(Device::CPU);
+
+	// To recalculate the normals we would either have to garbage collect the mesh,
+	// use skipping iterators (severe overhead in heavily decimated meshes), or use
+	// a buffer to keep track of cumulative normals
+	recompute_vertex_normals(normals);
 }
 
+void Polygons::recompute_vertex_normals(std::vector<ei::Vec3>* normals) {
+	std::vector<ei::Vec3> normalBuffer;
+	if(normals == nullptr)
+		normals = &normalBuffer;
+	normals->resize(m_vertexAttributes.get_attribute_elem_count());
+	const auto* points = this->template acquire_const<Device::CPU, ei::Vec3>(this->get_points_hdl());
+
+	for(const auto tri : this->triangles()) {
+		// Compute the face normal
+		const auto p0 = points[tri.x];
+		const auto p1 = points[tri.y];
+		const auto p2 = points[tri.z];
+		const auto e01 = p1 - p0;
+		const auto e02 = p2 - p0;
+		const auto e12 = p2 - p1;
+		const auto normal = ei::cross(e01, e02);
+		const auto a0 = std::acos(ei::dot(e01, e02));
+		const auto a1 = std::acos(-ei::dot(e01, e12));
+		const auto a2 = std::acos(ei::dot(e02, e12));
+		(*normals)[tri.x] += normal * a0;
+		(*normals)[tri.y] += normal * a1;
+		(*normals)[tri.z] += normal * a2;
+	}
+
+	for(const auto quad : this->quads()) {
+		// Compute the face normals
+		const auto p0 = points[quad.x];
+		const auto p1 = points[quad.y];
+		const auto p2 = points[quad.z];
+		const auto p3 = points[quad.w];
+		const auto e01 = p1 - p0;
+		const auto e12 = p2 - p1;
+		const auto e23 = p3 - p2;
+		const auto e30 = p0 - p3;
+		const auto n0 = ei::cross(e30, e01);
+		const auto n1 = ei::cross(e01, e12);
+		const auto n2 = ei::cross(e12, e23);
+		const auto n3 = ei::cross(e23, e30);
+		const auto a0 = std::acos(-ei::dot(e30, e01));
+		const auto a1 = std::acos(-ei::dot(e01, e12));
+		const auto a2 = std::acos(-ei::dot(e12, e23));
+		const auto a3 = std::acos(-ei::dot(e23, e30));
+		(*normals)[quad.x] += n0 * a0;
+		(*normals)[quad.y] += n1 * a1;
+		(*normals)[quad.z] += n2 * a2;
+		(*normals)[quad.w] += n3 * a3;
+	}
+
+	auto* vertexNormals = this->template acquire<Device::CPU, ei::Vec3>(this->get_normals_hdl());
+	for(std::size_t i = 0u; i < normals->size(); ++i)
+		vertexNormals[i] = ei::normalize((*normals)[i]);
+}
 
 #if 0
 void Polygons::cluster_uniformly(const ei::UVec3& gridRes) {

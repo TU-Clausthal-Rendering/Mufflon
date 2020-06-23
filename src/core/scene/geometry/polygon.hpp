@@ -288,6 +288,8 @@ public:
 									   std::vector<u32>* newVertexPosition = nullptr,
 									   std::vector<ei::Vec3>* normals = nullptr);
 
+	void recompute_vertex_normals(std::vector<ei::Vec3>* normals);
+
 	void cluster_uniformly(const ei::UVec3& gridRes);
 
 	// Implements tessellation for the mesh
