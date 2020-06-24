@@ -52,6 +52,13 @@ struct PVertexThreshold {
 	}
 };
 
+struct PLoadMaxMemory {
+	int maxMemory{ 8'000 };
+	static constexpr ParamDesc get_desc() noexcept {
+		return { "Max. load memory (MB)", ParameterTypes::INT };
+	}
+};
+
 struct PDecimationIterations {
 	int decimationIterations{ 1 };
 	static constexpr ParamDesc get_desc() noexcept {
@@ -132,7 +139,7 @@ struct PSlidingWindow {
 
 using CombinedParameters = ParameterHandler <
 	PImportanceIterations, PTargetReduction,
-	PInitialReduction, PInitialGridRes, PVertexThreshold,
+	PInitialReduction, PInitialGridRes, PVertexThreshold, PLoadMaxMemory,
 	PSelectiveImportance, PImpSumStrat,
 	PClusterMaxDensity, PInstanceMaxDensity, PImpStructCapacity,
 	PVertexDistMethod, PImpWeightMethod,

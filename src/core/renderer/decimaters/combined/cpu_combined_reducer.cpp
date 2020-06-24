@@ -8,6 +8,7 @@
 #include <random>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Tools/Decimater/ModQuadricT.hh>
+#include <OpenMesh/Tools/Decimater/ModNormalDeviationT.hh>
 
 namespace mufflon::renderer::decimaters {
 
@@ -66,180 +67,189 @@ void CpuCombinedReducer::post_iteration(IOutputHandler& outputBuffer) {
 	} else if(m_stage == Stage::IMPORTANCE_GATHERED && !m_isFrameReduced[m_world.get_frame_current()]) {
 		logInfo("Performing decimation iteration...");
 
-		const auto windowHalfWidth = (m_params.slidingWindowHalfWidth == 0u)
-			? m_world.get_frame_count()
-			: m_params.slidingWindowHalfWidth;
-		const u32 startFrame = std::max<u32>(m_world.get_frame_current(), m_params.slidingWindowHalfWidth)
-			- m_params.slidingWindowHalfWidth;
-		const u32 endFrame = std::min<u32>(m_world.get_frame_current() + m_params.slidingWindowHalfWidth,
-										   m_world.get_frame_count() - 1u);
+		if(m_params.reduction > 0.f) {
+			const auto windowHalfWidth = (m_params.slidingWindowHalfWidth == 0u)
+				? m_world.get_frame_count()
+				: m_params.slidingWindowHalfWidth;
+			const u32 startFrame = std::max<u32>(m_world.get_frame_current(), m_params.slidingWindowHalfWidth)
+				- m_params.slidingWindowHalfWidth;
+			const u32 endFrame = std::min<u32>(m_world.get_frame_current() + m_params.slidingWindowHalfWidth,
+											   m_world.get_frame_count() - 1u);
 
-		// Remove instances that are below our threshold
-		// TODO: how to get access to other frames? Are they present in the scene?
-		auto& objects = m_currentScene->get_objects();
-		const auto& instances = m_currentScene->get_instances();
-		std::vector<std::tuple<scene::ObjectHandle, u32, double>> instanceList;
-		instanceList.reserve(instances.size());
-		double currRemovedImp = 0.0;
-		const auto& instImpSums = m_instanceImportanceSums->active_slot();
-		for(auto& obj : objects) {
-			// Beware: obj is a reference, and the count may be changed in 'remove_instance'!
-			for(u32 curr = 0u; curr < obj.second.count; ++curr) {
-				const auto instIdx = instances[obj.second.offset + curr]->get_index();
-				if(const auto currSum = instImpSums[instIdx].load(std::memory_order_acquire);
-				   currSum < m_params.maxInstanceDensity)
-					instanceList.emplace_back(obj.first, curr, currSum);
-			}
-		}
-		// Sort by importance sum
-		std::sort(instanceList.begin(), instanceList.end(), [](const auto& a, const auto& b) { return std::get<2>(a) < std::get<2>(b); });
-		// Find the cutoff (all instances to be removed, determined by sum of importance sums)
-		double removedImpSum = 0.f;
-		std::size_t maxIndex;
-		for(maxIndex = 0u; maxIndex < instanceList.size(); ++maxIndex) {
-			removedImpSum += std::get<2>(instanceList[maxIndex]);
-			if(removedImpSum > static_cast<double>(m_params.maxInstanceDensity))
-				break;
-		}
-		// Sort sub-range again by object and index
-		std::sort(instanceList.begin(), instanceList.begin() + maxIndex, [](const auto& a, const auto& b) {
-			if(std::get<0>(a) == std::get<0>(b))
-				return std::get<1>(a) > std::get<1>(b);
-			else
-				return std::get<0>(a) < std::get<0>(b);
-		});
-		// Now we can remove the instances
-		for(std::size_t i = 0u; i < maxIndex; ++i)
-			m_currentScene->remove_instance(std::get<0>(instanceList[i]), std::get<1>(instanceList[i]));
-		logInfo("Removed ", maxIndex, " instances with low importance");
-
-		// Update the reduction factors
-		this->update_reduction_factors(startFrame, endFrame);
-
-		const auto processTime = CpuProfileState::get_process_time();
-		const auto cycles = CpuProfileState::get_cpu_cycle();
-		
-		std::vector<std::vector<bool>> octreeNodeMasks(get_max_thread_num());
-		std::vector<std::vector<renderer::decimaters::FloatOctree::NodeIndex>> currLevels(get_max_thread_num());
-		std::vector<std::vector<renderer::decimaters::FloatOctree::NodeIndex>> nextLevels(get_max_thread_num());
-		std::vector<scene::geometry::PolygonMeshType> meshes(get_max_thread_num());
-		std::vector<std::vector<u32>> vertexPositions(get_max_thread_num());
-
-		// Create curvature and importance properties for the meshes
-		std::vector<OpenMesh::VPropHandleT<float>> curvProps;
-		std::vector<OpenMesh::VPropHandleT<float>> accumImpProps;
-		curvProps.reserve(get_max_thread_num());
-		accumImpProps.reserve(get_max_thread_num());
-		for(auto& mesh : meshes) {
-			curvProps.emplace_back();
-			accumImpProps.emplace_back();
-			mesh.add_property(curvProps.back());
-			mesh.add_property(accumImpProps.back());
-		}
-
-#pragma omp parallel for schedule(dynamic)
-		for(i32 i = 0; i < static_cast<i32>(m_viewOctrees[m_world.get_frame_current()].octree_count()); ++i) {
-			// Only update objects that have instances left
-			auto& obj = objects.cbegin() + i;
-			if(obj->second.count > 0u) {
-				const auto threadIdx = get_current_thread_idx();
-				octreeNodeMasks[threadIdx].reserve(m_viewOctrees.front().size());
-				currLevels[threadIdx].reserve(50000u);
-				nextLevels[threadIdx].reserve(50000u);
-
-				// First create the mesh
-				auto& mesh = meshes[threadIdx];
-				mesh.clean_keep_reservation();
-				// Reload the original LoD
-				const auto lodLevel = 0u;
-				if(!m_world.load_lod(*obj->first, lodLevel, true))
-					throw std::runtime_error("Failed to reload LoD " + std::to_string(lodLevel) + " for object '"
-											 + std::string(obj->first->get_name()) + "'");
-				auto& lod = obj->first->get_lod(lodLevel);
-				auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
-				polygons.create_halfedge_structure(mesh);
-
-				// Compute the per-vertex importance
-				// TODO
-				for(const auto vertex : mesh.vertices())
-					mesh.property(curvProps[threadIdx], vertex) = 1.f;
-
-				// Map the importance back to the original mesh
-				for(const auto vertex : mesh.vertices()) {
-					// Put importance into temporary storage
-					// TODO: end of frame sequence!
-					float importance = 0.f;
-					const auto area = compute_area(mesh, vertex);
-					const auto curv = std::abs(mesh.property(curvProps[threadIdx], vertex));
-
-					auto actualStartFrame = startFrame;
-					auto actualEndFrame = endFrame;
-
-					switch(m_params.impWeightMethod) {
-						case combined::PImpWeightMethod::Values::AVERAGE_ALL:
-							actualStartFrame = 0u;
-							actualEndFrame = m_world.get_frame_count() - 1u;
-							[[fallthrough]];
-						case combined::PImpWeightMethod::Values::AVERAGE:
-							for(u32 f = actualStartFrame; f <= actualEndFrame; ++f) {
-								// Fetch octree value (TODO)
-								const auto imp = m_viewOctrees[f][i].get_density(util::pun<ei::Vec3>(mesh.point(vertex)),
-																				 util::pun<ei::Vec3>(mesh.normal(vertex)));
-								importance += imp;
-							}
-							importance /= static_cast<float>(actualEndFrame - actualStartFrame + 1u);
-							break;
-						case combined::PImpWeightMethod::Values::MAX_ALL:
-							actualStartFrame = 0u;
-							actualEndFrame = m_world.get_frame_count() - 1u;
-							[[fallthrough]];
-						case combined::PImpWeightMethod::Values::MAX:
-							for(u32 f = actualStartFrame; f <= actualEndFrame; ++f) {
-								// Fetch octree value (TODO)
-								const auto imp = m_viewOctrees[f][i].get_density(util::pun<ei::Vec3>(mesh.point(vertex)),
-																				 util::pun<ei::Vec3>(mesh.normal(vertex)));
-								importance = std::max<float>(importance, imp);
-							}
-							break;
-					}
-					const auto weightedImportance = std::sqrt(importance * curv) / area;
-					mesh.property(accumImpProps[threadIdx], vertex) = weightedImportance;
+			// Remove instances that are below our threshold
+			// TODO: how to get access to other frames? Are they present in the scene?
+			auto& objects = m_currentScene->get_objects();
+			const auto& instances = m_currentScene->get_instances();
+			std::vector<std::tuple<scene::ObjectHandle, u32, double>> instanceList;
+			instanceList.reserve(instances.size());
+			double currRemovedImp = 0.0;
+			const auto& instImpSums = m_instanceImportanceSums->active_slot();
+			for(auto& obj : objects) {
+				// Beware: obj is a reference, and the count may be changed in 'remove_instance'!
+				for(u32 curr = 0u; curr < obj.second.count; ++curr) {
+					const auto instIdx = instances[obj.second.offset + curr]->get_index();
+					if(const auto currSum = instImpSums[instIdx].load(std::memory_order_acquire);
+					   currSum < m_params.maxInstanceDensity)
+						instanceList.emplace_back(obj.first, curr, currSum);
 				}
+			}
+			// Sort by importance sum
+			std::sort(instanceList.begin(), instanceList.end(), [](const auto& a, const auto& b) { return std::get<2>(a) < std::get<2>(b); });
+			// Find the cutoff (all instances to be removed, determined by sum of importance sums)
+			double removedImpSum = 0.f;
+			std::size_t maxIndex;
+			for(maxIndex = 0u; maxIndex < instanceList.size(); ++maxIndex) {
+				removedImpSum += std::get<2>(instanceList[maxIndex]);
+				if(removedImpSum > static_cast<double>(m_params.maxInstanceDensity))
+					break;
+			}
+			// Sort sub-range again by object and index
+			std::sort(instanceList.begin(), instanceList.begin() + maxIndex, [](const auto& a, const auto& b) {
+				if(std::get<0>(a) == std::get<0>(b))
+					return std::get<1>(a) > std::get<1>(b);
+				else
+					return std::get<0>(a) < std::get<0>(b);
+			});
+			// Now we can remove the instances
+			for(std::size_t i = 0u; i < maxIndex; ++i)
+				m_currentScene->remove_instance(std::get<0>(instanceList[i]), std::get<1>(instanceList[i]));
+			logInfo("Removed ", maxIndex, " instances with low importance");
 
-				if(m_remainingVertices[i] < mesh.n_vertices()) {
-					const auto t0 = std::chrono::high_resolution_clock::now();
+			// Update the reduction factors
+			this->update_reduction_factors(startFrame, endFrame);
 
-					// Perform decimation
-					OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
-					combined::modules::ImportanceDecimationModule<>::Handle impHandle;
-					decimater.add(impHandle);
-					decimater.module(impHandle).set_properties(mesh, accumImpProps[threadIdx]);
-					decimater.initialize();
+			const auto processTime = CpuProfileState::get_process_time();
+			const auto cycles = CpuProfileState::get_cpu_cycle();
 
-					// TODO: cluster!
-					/*
-					collapses = m_decimatedPoly->cluster_decimate(*m_viewImportance[frame], decimater,
-																  targetVertexCount, maxDensity, &octreeNodeMask,
-																  &currLevel, &nextLevel);*/
-					//collapses = m_decimatedPoly->decimate(decimater, targetVertexCount, false);
-					//const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
-					const auto collapses = decimater.decimate_to(m_remainingVertices[i]);
-					const auto t1 = std::chrono::high_resolution_clock::now();
-					const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
-					logInfo("Collapse duration: ", duration.count(), "ms");
-					if(collapses > 0u) {
-						polygons.reconstruct_from_reduced_mesh(mesh, &vertexPositions[threadIdx]);
+			std::vector<std::vector<bool>> octreeNodeMasks(get_max_thread_num());
+			std::vector<std::vector<renderer::decimaters::FloatOctree::NodeIndex>> currLevels(get_max_thread_num());
+			std::vector<std::vector<renderer::decimaters::FloatOctree::NodeIndex>> nextLevels(get_max_thread_num());
+			std::vector<scene::geometry::PolygonMeshType> meshes(get_max_thread_num());
+			std::vector<std::vector<u32>> vertexPositions(get_max_thread_num());
+
+			// Create curvature and importance properties for the meshes
+			std::vector<OpenMesh::VPropHandleT<float>> curvProps;
+			std::vector<OpenMesh::VPropHandleT<float>> accumImpProps;
+			curvProps.reserve(get_max_thread_num());
+			accumImpProps.reserve(get_max_thread_num());
+			for(auto& mesh : meshes) {
+				curvProps.emplace_back();
+				accumImpProps.emplace_back();
+				mesh.add_property(curvProps.back());
+				mesh.add_property(accumImpProps.back());
+			}
+
+	#pragma omp parallel for schedule(dynamic)
+			for(i32 i = 0; i < static_cast<i32>(m_viewOctrees[m_world.get_frame_current()].octree_count()); ++i) {
+				// Only update objects that have instances left
+				auto& obj = objects.cbegin() + i;
+				if(obj->second.count > 0u) {
+					const auto threadIdx = get_current_thread_idx();
+					octreeNodeMasks[threadIdx].reserve(m_viewOctrees.front().size());
+					currLevels[threadIdx].reserve(50000u);
+					nextLevels[threadIdx].reserve(50000u);
+
+					// First create the mesh
+					auto& mesh = meshes[threadIdx];
+					mesh.clean_keep_reservation();
+					// Reload the original LoD
+					const auto lodLevel = 0u;
+					if(!m_world.load_lod(*obj->first, lodLevel, true))
+						throw std::runtime_error("Failed to reload LoD " + std::to_string(lodLevel) + " for object '"
+												 + std::string(obj->first->get_name()) + "'");
+					auto& lod = obj->first->get_lod(lodLevel);
+					auto& polygons = lod.template get_geometry<scene::geometry::Polygons>();
+					polygons.create_halfedge_structure(mesh);
+
+					// Compute the per-vertex importance
+					// TODO
+					for(const auto vertex : mesh.vertices())
+						mesh.property(curvProps[threadIdx], vertex) = 1.f;
+
+					// Map the importance back to the original mesh
+					for(const auto vertex : mesh.vertices()) {
+						// Put importance into temporary storage
+						// TODO: end of frame sequence!
+						float importance = 0.f;
+						const auto area = compute_area(mesh, vertex);
+						const auto curv = std::abs(mesh.property(curvProps[threadIdx], vertex));
+
+						auto actualStartFrame = startFrame;
+						auto actualEndFrame = endFrame;
+
+						switch(m_params.impWeightMethod) {
+							case combined::PImpWeightMethod::Values::AVERAGE_ALL:
+								actualStartFrame = 0u;
+								actualEndFrame = m_world.get_frame_count() - 1u;
+								[[fallthrough]];
+							case combined::PImpWeightMethod::Values::AVERAGE:
+								for(u32 f = actualStartFrame; f <= actualEndFrame; ++f) {
+									// Fetch octree value (TODO)
+									const auto imp = m_viewOctrees[f][i].get_density(util::pun<ei::Vec3>(mesh.point(vertex)),
+																					 util::pun<ei::Vec3>(mesh.normal(vertex)));
+									importance += imp;
+								}
+								importance /= static_cast<float>(actualEndFrame - actualStartFrame + 1u);
+								break;
+							case combined::PImpWeightMethod::Values::MAX_ALL:
+								actualStartFrame = 0u;
+								actualEndFrame = m_world.get_frame_count() - 1u;
+								[[fallthrough]];
+							case combined::PImpWeightMethod::Values::MAX:
+								for(u32 f = actualStartFrame; f <= actualEndFrame; ++f) {
+									// Fetch octree value (TODO)
+									const auto imp = m_viewOctrees[f][i].get_density(util::pun<ei::Vec3>(mesh.point(vertex)),
+																					 util::pun<ei::Vec3>(mesh.normal(vertex)));
+									importance = std::max<float>(importance, imp);
+								}
+								break;
+						}
+						const auto weightedImportance = std::sqrt(importance * curv) / area;
+						mesh.property(accumImpProps[threadIdx], vertex) = weightedImportance;
+					}
+
+					if(m_remainingVertices[i] < mesh.n_vertices()) {
+						const auto t0 = std::chrono::high_resolution_clock::now();
+
+						// Perform decimation
+						OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
+						combined::modules::ImportanceDecimationModule<>::Handle impHandle;
+						decimater.add(impHandle);
+						decimater.module(impHandle).set_properties(mesh, accumImpProps[threadIdx]);
+						decimater.initialize();
+
+						/*polygons.cluster_uniformly(ei::UVec3{ m_params.initialGridRes });
 						lod.clear_accel_structure();
-					}
-					logInfo("Performed ", collapses, " collapses for object '", obj->first->get_name(),
+						const auto collapses = 0llu;
+						// TODO: cluster!
+						collapses = m_decimatedPoly->cluster_decimate(*m_viewImportance[frame], decimater,
+																	  targetVertexCount, maxDensity, &octreeNodeMask,
+																	  &currLevel, &nextLevel);*/
+																	  //collapses = m_decimatedPoly->decimate(decimater, targetVertexCount, false);
+																	  //const auto collapses = m_decimatedPoly->decimate(decimater, targetCount, false);
+						const auto collapses = decimater.decimate_to(m_remainingVertices[i]);
+						const auto t1 = std::chrono::high_resolution_clock::now();
+						const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
+						logInfo("Collapse duration: ", duration.count(), "ms");
+						if(collapses > 0u) {
+							polygons.~Polygons();
+							mesh.garbage_collection();
+							new (&polygons) scene::geometry::Polygons{ mesh };
+							// TODO!
+							//polygons.reconstruct_from_reduced_mesh(mesh, &vertexPositions[threadIdx]);
+							lod.clear_accel_structure();
+						}
+
+						logInfo("Performed ", collapses, " collapses for object '", obj->first->get_name(),
 								"', remaining vertices: ", polygons.get_vertex_count());
+					}
 				}
 			}
-		}
 
-		m_currentScene->clear_accel_structure();
-		logInfo("Finished decimation iteration (", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
-				"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles)");
+			m_currentScene->clear_accel_structure();
+			logInfo("Finished decimation iteration (", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - processTime).count(),
+					"ms, ", (CpuProfileState::get_cpu_cycle() - cycles) / 1'000'000, " MCycles)");
+		}
 
 		this->on_manual_reset();
 		m_isFrameReduced[m_world.get_frame_current()] = true;
@@ -374,7 +384,7 @@ void CpuCombinedReducer::initialize_decimaters() {
 	const auto& instances = m_currentScene->get_instances();
 	m_originalVertices.resize(objects.size());
 
-	const auto timeBegin = CpuProfileState::get_process_time();
+	const auto timeBegin = std::chrono::high_resolution_clock::now();
 
 	m_viewOctrees.clear();
 	m_irradianceOctrees.clear();
@@ -393,6 +403,7 @@ void CpuCombinedReducer::initialize_decimaters() {
 	std::unique_ptr<std::pair<std::atomic_uint32_t, u32>[]> threadLodStarts;
 	// We only need extra coordination if we reduce initially
 	if(m_params.initialReduction > 0.f) {
+		const auto preBudgeting = std::chrono::high_resolution_clock::now();
 		for(auto& mesh : meshes) {
 			mesh.request_vertex_status();
 			mesh.request_face_status();
@@ -476,7 +487,7 @@ void CpuCombinedReducer::initialize_decimaters() {
 														+ sizeof(float)									// Collapse priority
 														+ sizeof(int)									// Heap position
 														+ sizeof(OpenMesh::VertexHandle));				// Heap reference
-					return lodSize + meshSize + decimaterSize;
+					return lodSize;// +meshSize + decimaterSize;
 				};
 				const auto estimateCumSize = [&estimateSize, &lodSizeMap, &threadLodStarts, &partitionCount]() {
 					std::size_t size = 0u;
@@ -490,7 +501,8 @@ void CpuCombinedReducer::initialize_decimaters() {
 						cumCost += estimateCost(lodSizeMap[i].second);
 					return cumCost;
 				};
-				const auto budgetSize = std::max<std::size_t>(8'000'000'000llu, estimateSize(threadLodStarts[0u].first.load(std::memory_order_acquire)));
+				const auto budgetSize = std::max<std::size_t>(static_cast<std::size_t>(m_params.maxMemory) * 1'000'000llu,
+															  estimateSize(threadLodStarts[0u].first.load(std::memory_order_acquire)));
 				std::size_t cumSize;
 				while((cumSize = estimateCumSize()) > budgetSize) {
 					// TODO: we could also reallocate on the fly and add extra threads once the heavy meshes are done,
@@ -526,6 +538,25 @@ void CpuCombinedReducer::initialize_decimaters() {
 			// Make sure that every thread has a valid lookup (even if it means they won't do work)
 			threadCount = partitionCount;
 		}
+		const auto postBudgeting = std::chrono::high_resolution_clock::now();
+		logInfo("Finished budgeting (", std::chrono::duration_cast<std::chrono::milliseconds>(postBudgeting - preBudgeting).count(),
+				"ms, ", threadCount, " threads)");
+	} else {
+		// TODO: also have multiple threads load without initial reduction?
+		const auto lodSizes = m_world.load_lods_metadata();
+		auto currObject = objects.cbegin();
+		for(u32 o = 0; o < static_cast<u32>(objects.size()); ++o) {
+			const auto objId = currObject->first->get_object_id();
+			// TODO: proper LoD level
+			// TODO: the metadata also contains data for multiple LoDs which we have to skip!
+			if(currObject->first->get_lod_slot_count() > 1u)
+				throw std::runtime_error("We currently cannot support multiple LoDs in file for this");
+			lodSizeMap[o] = std::make_pair(o, scene::WorldContainer::LodMetadata{});
+			++currObject;
+		}
+		threadLodStarts = std::make_unique<std::pair<std::atomic_uint32_t, u32>[]>(1u);
+		threadLodStarts[0u] = std::make_pair(0u, static_cast<u32>(lodSizeMap.size()));
+		threadCount = 1u;
 	}
 
 	combined::GpuReductionQueue gpuQueue{ ei::UVec3{ static_cast<u32>(m_params.initialGridRes) } };
@@ -559,11 +590,12 @@ void CpuCombinedReducer::initialize_decimaters() {
 						// Pre-reduce
 						const auto targetVertexCount = static_cast<std::size_t>((1.f - m_params.initialReduction)
 																				* static_cast<float>(origVertCount));
-						const auto gridRes = static_cast<std::size_t>(std::ceil(std::cbrt(2.f * static_cast<float>(targetVertexCount))));
-						if(polygons.get_vertex_count() > 50000u) {
+						const auto gridRes = static_cast<u32>(std::ceil(std::cbrt(2.f * static_cast<float>(targetVertexCount))));
+						//polygons.cluster_uniformly(ei::UVec3{ gridRes });
+						/*if(polygons.get_vertex_count() > 50000u) {
 							auto res = gpuQueue.queue(&polygons);
 							res.wait();
-						}
+						}*/
 						//scene::clustering::UniformVertexClusterer clusterer{ ei::UVec3{ 20u }};
 						//clusterer.cluster(mesh, polygons.get_bounding_box(), false);
 						// TODO: we can cluster directly on the index buffer
@@ -575,9 +607,18 @@ void CpuCombinedReducer::initialize_decimaters() {
 						polygons.create_halfedge_structure(mesh);
 						OpenMesh::Decimater::DecimaterT<scene::geometry::PolygonMeshType> decimater{ mesh };
 						OpenMesh::Decimater::ModQuadricT<scene::geometry::PolygonMeshType>::Handle modQuadricHandle;
+						OpenMesh::Decimater::ModNormalDeviationT<scene::geometry::PolygonMeshType>::Handle modNormalHandle;
 						decimater.add(modQuadricHandle);
+						decimater.add(modNormalHandle);
+						decimater.module(modQuadricHandle).unset_max_err();
+						decimater.module(modNormalHandle).set_normal_deviation(60.f);
 						decimater.initialize();
 						const auto performedCollapses = decimater.decimate_to(targetVertexCount);
+
+						/*polygons.~Polygons();
+						mesh.garbage_collection();
+						new (&polygons) scene::geometry::Polygons{ mesh };*/
+
 						polygons.reconstruct_from_reduced_mesh(mesh);
 						logPedantic("Loaded reduced LoD '", obj.first->get_name(), "' (",
 									origVertCount, " -> ", polygons.get_vertex_count(), ")");
@@ -588,6 +629,8 @@ void CpuCombinedReducer::initialize_decimaters() {
 			}
 		}
 	};
+
+	const auto preLodLoad = std::chrono::high_resolution_clock::now();
 	std::vector<std::thread> workerThreads;
 	workerThreads.reserve(threadCount);
 	for(std::size_t i = 0u; i < threadCount; ++i)
@@ -597,6 +640,8 @@ void CpuCombinedReducer::initialize_decimaters() {
 			thread.join();
 	}
 	gpuQueue.join();
+	const auto postLodLoad = std::chrono::high_resolution_clock::now();
+	logInfo("Finished LoD loading (", std::chrono::duration_cast<std::chrono::milliseconds>(postLodLoad - preLodLoad).count(), "ms)");
 
 
 	for(std::size_t i = 0u; i < m_world.get_frame_count(); ++i) {
@@ -644,7 +689,7 @@ void CpuCombinedReducer::initialize_decimaters() {
 			throw std::runtime_error("Unsupported LoD level (will be fixed soonTM)!");
 	}
 	m_currentScene->clear_accel_structure();
-	logInfo("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(CpuProfileState::get_process_time() - timeBegin).count(), "ms");
+	logInfo("Initial decimation: ", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - timeBegin).count(), "ms");
 }
 
 void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) {
@@ -681,9 +726,9 @@ void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) 
 			for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
 				m_instanceImportanceSums->change_slot(frame, false, true);
 				auto iter = m_currentScene->get_objects().cbegin();
-				for(std::size_t i = 0u; i < m_originalVertices.size(); ++i) {
+				for(std::size_t i = 0u; i < m_originalVertices.size(); ++i, ++iter) {
 					if(m_originalVertices[i] > m_params.threshold)
-						importance[i] += get_lod_importance(frame, (iter++)->second);
+						importance[i] += get_lod_importance(frame, iter->second);
 				}
 			}
 
@@ -709,14 +754,12 @@ void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) 
 			for(u32 frame = frameStart; frame <= frameEnd; ++frame) {
 				m_instanceImportanceSums->change_slot(frame, false, true);
 				auto iter = m_currentScene->get_objects().cbegin();
-				for(std::size_t i = 0u; i < m_originalVertices.size(); ++i) {
+				for(std::size_t i = 0u; i < m_originalVertices.size(); ++i, ++iter) {
 					totalVertexCount += m_originalVertices[i];
-					if(iter->second.count == 0) {
-						++iter;
+					if(iter->second.count == 0)
 						continue;
-					}
 					if(m_originalVertices[i] > m_params.threshold) {
-						importance[i] = std::max(importance[i], get_lod_importance(frame, (iter++)->second));
+						importance[i] = std::max(importance[i], get_lod_importance(frame, iter->second));
 						reducibleVertices += m_originalVertices[i];
 					} else {
 						nonReducibleVertices += m_originalVertices[i];
@@ -734,7 +777,7 @@ void CpuCombinedReducer::update_reduction_factors(u32 frameStart, u32 frameEnd) 
 	std::size_t reducedVertexPool = totalTargetVertexCount - nonReducibleVertices;
 
 	auto iter = m_currentScene->get_objects().cbegin();
-	for(std::size_t i = 0u; i < m_originalVertices.size(); ++i) {
+	for(std::size_t i = 0u; i < m_originalVertices.size(); ++i, ++iter) {
 		if(iter->second.count == 0) {
 			m_remainingVertices.push_back(0u);
 			continue;

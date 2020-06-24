@@ -438,13 +438,18 @@ void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::v
 	// Find the next vertex from the back to move to a potential hole
 	while(currEnd > currPos && mesh.status(mesh.vertex_handle(static_cast<unsigned>(currEnd))).deleted())
 		currEnd -= 1u;
+	// It is important that the iterator does not skip deleted vertices (we do that ourselves)!
 	for(auto iter = mesh.vertices_begin(); iter != mesh.vertices_end(); ++iter) {
-		if(currPos >= currEnd)
+		if(currPos >= currEnd) {
+			// Increment the position (and thus the size) if our last vertex is not deleted
+			if(!mesh.status(*iter).deleted())
+				++currPos;
 			break;
+		}
 
 		const auto vertex = *iter;
+		// If the vertex is deleted, then we take the last non-deleted vertex to fill the gap
 		if(mesh.status(vertex).deleted()) {
-			// Fill the gap and set where to find the vertex
 			m_vertexAttributes.copy(currEnd, currPos);
 			(*newVertexPosition)[currEnd] = static_cast<u32>(currPos);
 
@@ -481,11 +486,14 @@ void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::v
 	}
 	if(m_triangles == 0u && m_quads == 0u)
 		throw std::runtime_error("Something went wrong: no faces!");
+
+	// With the correct tri/quad counts we can resize the index buffer
 	this->unload_index_buffer<Device::CPU>();
 	this->reserve_index_buffer<Device::CPU>(3u * m_triangles + 4u * m_quads);
 	auto* indexBuffer = m_indexBuffer.template get<IndexBuffer<Device::CPU>>().indices.get();
 
-
+	// We don't bother with switching around faces and whatnot - we simply allocate a new buffer
+	// TODO: that DOES cost a lot of extra memory, maybe we should switch around
 	FaceAttributePoolType faceAttribs{ m_faceAttributes };
 	std::size_t currTri = 0u;
 	std::size_t currQuad = 0u;
@@ -518,6 +526,8 @@ void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::v
 			*(currIndices++) = index;
 		}
 	}
+
+
 
 	m_faceAttributes = std::move(faceAttribs);
 	this->mark_changed(Device::CPU);
