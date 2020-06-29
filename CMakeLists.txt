@@ -25,6 +25,16 @@ else(MSVC)
 	find_package(OpenMesh REQUIRED PATHS "${CMAKE_CURRENT_SOURCE_DIR}/external/OpenMesh-8.1/Linux")
 endif(MSVC)
 
+# OpenMesh doesn't provide RelWithDebInfo targets
+set_target_properties(OpenMeshCore PROPERTIES
+  MAP_IMPORTED_CONFIG_MINSIZEREL Release
+  MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+)
+set_target_properties(OpenMeshTools PROPERTIES
+  MAP_IMPORTED_CONFIG_MINSIZEREL Release
+  MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+)
+
 if(NOT OpenMP_CXX_FOUND)
 	message(WARNING "OpenMP is strongly recommended, as all CPU-side parallel code relies on it and will run serially without it")
 endif()
