@@ -17,26 +17,9 @@
 #include <OpenMesh/Tools/Subdivider/Adaptive/Composite/CompositeT.hh>
 #include <OpenMesh/Tools/Decimater/DecimaterT.hh>
 #include <OpenMesh/Core/Geometry/QuadricT.hh>
+#include <cmath>
 
 namespace mufflon::scene::geometry {
-
-namespace {
-
-template < class Iter >
-void compute_vertex_normals(PolygonMeshType& mesh, const Iter begin, const Iter end) {
-	for(auto iter = begin; iter != end; ++iter) {
-		const auto vertex = *iter;
-		PolygonMeshType::Normal normal;
-		// Ignoring warning about OpenMesh initializing a float vector with '0.0'...
-#pragma warning(push)
-#pragma warning(disable : 4244)
-		mesh.calc_vertex_normal_correct(vertex, normal);
-#pragma warning(pop)
-		mesh.set_normal(vertex, normal);
-	}
-}
-
-} // namespace
 
 // Default construction, creates material-index attribute.
 Polygons::Polygons() :
@@ -539,56 +522,55 @@ void Polygons::reconstruct_from_reduced_mesh(const PolygonMeshType& mesh, std::v
 }
 
 void Polygons::recompute_vertex_normals(std::vector<ei::Vec3>* normals) {
+	// TODO: this really lends itself to SIMD
 	std::vector<ei::Vec3> normalBuffer;
 	if(normals == nullptr)
 		normals = &normalBuffer;
 	normals->resize(m_vertexAttributes.get_attribute_elem_count());
+	std::fill(normals->begin(), normals->end(), ei::Vec3{ 0.f });
 	const auto* points = this->template acquire_const<Device::CPU, ei::Vec3>(this->get_points_hdl());
 
 	for(const auto tri : this->triangles()) {
 		// Compute the face normal
-		const auto p0 = points[tri.x];
-		const auto p1 = points[tri.y];
-		const auto p2 = points[tri.z];
-		const auto e01 = p1 - p0;
-		const auto e02 = p2 - p0;
-		const auto e12 = p2 - p1;
-		const auto normal = ei::cross(e01, e02);
-		const auto a0 = std::acos(ei::dot(e01, e02));
-		const auto a1 = std::acos(-ei::dot(e01, e12));
-		const auto a2 = std::acos(ei::dot(e02, e12));
-		(*normals)[tri.x] += normal * a0;
-		(*normals)[tri.y] += normal * a1;
-		(*normals)[tri.z] += normal * a2;
+		ei::Vec3 edges[3u];
+		{
+			ei::Vec3 triPoints[3u];
+			for(unsigned i = 0u; i < 3u; ++i)
+				triPoints[i] = points[tri[i]];
+			for(unsigned i = 0u; i < 3u; ++i)
+				edges[i] = triPoints[(i + 1u) % 3u] - triPoints[i];
+		}
+		const auto normal = ei::cross(edges[0], edges[1]);
+
+		for(unsigned i = 0u; i < 3u; ++i) {
+			const auto angle = std::acos(-ei::dot(edges[(i + 3u) % 3u], edges[i]));
+			(*normals)[tri[i]] += normal * angle;
+		}
 	}
 
 	for(const auto quad : this->quads()) {
 		// Compute the face normals
-		const auto p0 = points[quad.x];
-		const auto p1 = points[quad.y];
-		const auto p2 = points[quad.z];
-		const auto p3 = points[quad.w];
-		const auto e01 = p1 - p0;
-		const auto e12 = p2 - p1;
-		const auto e23 = p3 - p2;
-		const auto e30 = p0 - p3;
-		const auto n0 = ei::cross(e30, e01);
-		const auto n1 = ei::cross(e01, e12);
-		const auto n2 = ei::cross(e12, e23);
-		const auto n3 = ei::cross(e23, e30);
-		const auto a0 = std::acos(-ei::dot(e30, e01));
-		const auto a1 = std::acos(-ei::dot(e01, e12));
-		const auto a2 = std::acos(-ei::dot(e12, e23));
-		const auto a3 = std::acos(-ei::dot(e23, e30));
-		(*normals)[quad.x] += n0 * a0;
-		(*normals)[quad.y] += n1 * a1;
-		(*normals)[quad.z] += n2 * a2;
-		(*normals)[quad.w] += n3 * a3;
+		ei::Vec3 edges[4u];
+		{
+			ei::Vec3 quadPoints[4u];
+			for(unsigned i = 0u; i < 4u; ++i)
+				quadPoints[i] = points[quad[i]];
+			for(unsigned i = 0u; i < 4u; ++i)
+				edges[i] = quadPoints[(i + 1u) % 4u] - quadPoints[i];
+		}
+
+		for(unsigned i = 0u; i < 4u; ++i) {
+			const auto normal = ei::cross(edges[(i + 4u) % 4u], edges[i]);
+			const auto angle = std::acos(-ei::dot(edges[(i + 4u) % 4u], edges[i]));
+			(*normals)[quad[i]] += normal * angle;
+		}
 	}
 
+	// Normalize and write to the buffer
 	auto* vertexNormals = this->template acquire<Device::CPU, ei::Vec3>(this->get_normals_hdl());
-	for(std::size_t i = 0u; i < normals->size(); ++i)
+	for(std::size_t i = 0u; i < normals->size(); ++i) {
 		vertexNormals[i] = ei::normalize((*normals)[i]);
+	}
 }
 
 #if 0

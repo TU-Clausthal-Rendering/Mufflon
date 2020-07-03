@@ -154,6 +154,7 @@ void CpuCombinedReducer::post_iteration(IOutputHandler& outputBuffer) {
 					mesh.clean_keep_reservation();
 					// Reload the original LoD
 					const auto lodLevel = 0u;
+					obj->first->remove_original_lod(lodLevel);
 					if(!m_world.load_lod(*obj->first, lodLevel, true))
 						throw std::runtime_error("Failed to reload LoD " + std::to_string(lodLevel) + " for object '"
 												 + std::string(obj->first->get_name()) + "'");
@@ -232,11 +233,7 @@ void CpuCombinedReducer::post_iteration(IOutputHandler& outputBuffer) {
 						const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
 						logInfo("Collapse duration: ", duration.count(), "ms");
 						if(collapses > 0u) {
-							polygons.~Polygons();
-							mesh.garbage_collection();
-							new (&polygons) scene::geometry::Polygons{ mesh };
-							// TODO!
-							//polygons.reconstruct_from_reduced_mesh(mesh, &vertexPositions[threadIdx]);
+							polygons.reconstruct_from_reduced_mesh(mesh, &vertexPositions[threadIdx]);
 							lod.clear_accel_structure();
 						}
 
