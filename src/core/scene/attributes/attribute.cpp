@@ -88,9 +88,10 @@ AttributeHandle AttributePool::add_attribute(const AttributeIdentifier& ident) {
 		m_poolSize,
 		util::UniqueStringPool::instance().insert(ident.name)
 	};
-	m_poolSize += info.elemSize * m_attribElemCapacity;
 	// ...and map the name to the index
 	const auto index = insert_attribute_at_first_empty(std::move(info));
+	// Force a resize to increase the pool size
+	this->resize(m_attribElemCapacity, true);
 	return AttributeHandle{ ident, static_cast<u32>(index) };
 }
 
@@ -126,8 +127,8 @@ void AttributePool::remove(AttributeHandle handle) {
 
 // Causes force-unload on actual reserve
 // Capacity is in terms of elements, not bytes
-void AttributePool::reserve(std::size_t capacity) {
-	if(capacity <= m_attribElemCapacity)
+void AttributePool::reserve(std::size_t capacity, const bool forceRecompute) {
+	if(capacity <= m_attribElemCapacity && !forceRecompute)
 		return;
 	this->unload<Device::CUDA>();
 	this->unload<Device::OPENGL>();
@@ -154,8 +155,8 @@ void AttributePool::reserve(std::size_t capacity) {
 
 // Resizes the attribute, leaves the memory uninitialized
 // Force-unloads non-CPU pools if reserve necessary
-void AttributePool::resize(std::size_t size) {
-	this->reserve(size);
+void AttributePool::resize(std::size_t size, const bool forceRecompute) {
+	this->reserve(size, forceRecompute);
 	m_attribElemCount = size;
 }
 

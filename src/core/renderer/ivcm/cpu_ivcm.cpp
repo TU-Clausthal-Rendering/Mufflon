@@ -294,7 +294,9 @@ CpuIvcm::CpuIvcm(mufflon::scene::WorldContainer& world) :
 CpuIvcm::~CpuIvcm() {}
 
 void CpuIvcm::pre_reset() {
-	m_currentScene->compute_curvature();
+	// TODO: since curvature is reference counted, it would be advisable to remove it at some point
+	if(get_reset_event().geometry_changed())
+		m_currentScene->compute_curvature();
 }
 
 void CpuIvcm::post_reset() {

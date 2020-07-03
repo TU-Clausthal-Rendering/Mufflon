@@ -679,11 +679,12 @@ u32 Scene::remove_instance(ObjectHandle object, const u32 objInstIdx) {
 void Scene::compute_curvature() {
 	for(auto& obj : m_objects) {
 		for(u32 level = 0; level < obj.first->get_lod_slot_count(); ++level) {
-			if(obj.first->has_original_lod_available(level)) {
-				Lod& lod = obj.first->get_lod(level);
-				geometry::Polygons& polygons = lod.get_geometry<geometry::Polygons>();
-				polygons.compute_curvature();
-			}
+			if(!obj.first->has_original_lod_available(level))
+				if(!m_world.load_lod(*obj.first, level))
+					throw std::runtime_error("Failed to load missing LoD for scene descriptor!");
+			Lod& lod = obj.first->get_lod(level);
+			geometry::Polygons& polygons = lod.get_geometry<geometry::Polygons>();
+			polygons.compute_curvature();
 		}
 	}
 }

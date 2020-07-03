@@ -892,13 +892,13 @@ void Polygons::rebuild_index_buffer(const PolygonMeshType& mesh, const OpenMesh:
 	// holes of deleted faces in the attributes
 	auto currEnd = mesh.n_faces() - 1u;
 	for(auto iter = mesh.faces_begin(); iter != mesh.faces_end(); ++iter) {
-		auto face = iter.handle();
+		auto face = *iter;
 		if(face == tempHandle)
 			continue;
 		if(static_cast<std::size_t>(face.idx()) > currEnd)
 			break;
 		if(mesh.status(face).deleted()) {
-			face = mesh.face_handle(static_cast<unsigned>(currEnd));
+			face = OpenMesh::SmartFaceHandle{ static_cast<int>(currEnd), &mesh };
 			currEnd -= 1u;
 		}
 
@@ -1105,12 +1105,12 @@ void Polygons::remove_curvature() {
 }
 
 void Polygons::compute_curvature() {
-#if 0
 	// Check if the curvature has been computed before
 	if(m_curvRefCount.fetch_add(1u) == 0 && !m_curvatureHdl.has_value())
 		m_curvatureHdl = this->template add_vertex_attribute<float>("mean_curvature");
 
 	// TODO: we need neighborhood information
+	const auto mesh = this->create_halfedge_structure();
 
 	auto* curv = m_vertexAttributes.template acquire<Device::CPU, float>(m_curvatureHdl.value());
 	const auto* points = this->template acquire_const<Device::CPU, ei::Vec3>(this->get_points_hdl());
@@ -1129,9 +1129,10 @@ void Polygons::compute_curvature() {
 		ei::Mat2x2 ATA { 0.0f };
 		ei::Vec2 ATb { 0.0f };
 		// For each edge add an equation
-		for(auto vi = m_meshData->vv_ccwiter(v); vi.is_valid(); ++vi) {
-			Point viPos = ei::details::hard_cast<ei::Vec3>(m_meshData->point(*vi));
-			Direction viNrm = ei::details::hard_cast<ei::Vec3>(m_meshData->normal(*vi));
+		const auto v = mesh.vertex_handle(static_cast<unsigned>(vertex));
+		for(auto vi = mesh.cvv_ccwiter(v); vi.is_valid(); ++vi) {
+			Point viPos = ei::details::hard_cast<ei::Vec3>(mesh.point(*vi));
+			Direction viNrm = ei::details::hard_cast<ei::Vec3>(mesh.normal(*vi));
 			ei::Vec3 edge = vPos - viPos;
 			// Normal curvature fit with different curvature estimations
 			const ei::Vec2 y { dot(dirU, edge), dot(dirV, edge) };
@@ -1155,7 +1156,6 @@ void Polygons::compute_curvature() {
 		mAssert(!std::isnan(meanc));
 		curv[v.idx()] = meanc;
 	}
-#endif // 0
 }
 
 

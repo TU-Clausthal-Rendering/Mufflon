@@ -57,11 +57,11 @@ public:
 
 	// Causes force-unload on actual reserve
 	// Capacity is in terms of elements, not bytes
-	void reserve(std::size_t capacity);
+	void reserve(std::size_t capacity, const bool forceRecompute = false);
 
 	// Resizes the attribute, leaves the memory uninitialized
 	// Force-unloads non-CPU pools if reserve necessary
-	void resize(std::size_t size);
+	void resize(std::size_t size, const bool forceRecompute = false);
 
 	// Shrinks the memory to fit the element count on all devices
 	// Does not unload any device memory
