@@ -1,7 +1,7 @@
 #pragma once
 
 #include "util/int_types.hpp"
-#include "core/renderer/decimaters/util/octree.hpp"
+#include "core/renderer/decimaters/octree/octree.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
 #include <ei/3dtypes.hpp>
 #include <ei/vector.hpp>

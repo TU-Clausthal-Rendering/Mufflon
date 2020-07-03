@@ -1,7 +1,7 @@
 #include "octree_clustering.hpp"
 #include "util.hpp"
 #include "util/log.hpp"
-#include "core/renderer/decimaters/util/octree.inl"
+#include "core/renderer/decimaters/octree/octree.inl"
 #include <OpenMesh/Core/Geometry/QuadricT.hh>
 
 namespace mufflon::scene::clustering {

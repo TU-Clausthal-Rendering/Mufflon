@@ -4,7 +4,7 @@
 #include "util/range.hpp"
 #include "util/string_view.hpp"
 #include "core/memory/unique_device_ptr.hpp"
-#include "core/renderer/decimaters/util/octree.hpp"
+#include "core/renderer/decimaters/octree/octree.hpp"
 #include "core/scene/types.hpp"
 #include "core/scene/attributes/attribute.hpp"
 #include "core/scene/attributes/attribute_handles.hpp"

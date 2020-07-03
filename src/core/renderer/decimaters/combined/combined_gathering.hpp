@@ -7,8 +7,8 @@
 #include "core/memory/residency.hpp"
 #include "core/renderer/random_walk.hpp"
 #include "core/renderer/pt/pt_common.hpp"
-#include "core/renderer/decimaters/util/octree.inl"
-#include "core/renderer/decimaters/util/float_octree.inl"
+#include "core/renderer/decimaters/octree/octree.inl"
+#include "core/renderer/decimaters/octree/float_octree.inl"
 #include "core/scene/descriptors.hpp"
 #include "core/scene/util.hpp"
 #include "core/scene/lights/lights.hpp"
@@ -67,7 +67,7 @@ inline CUDA_FUNCTION void distribute_sample(const scene::PolygonsDescriptor<CURR
 		for(u32 i = 0u; i < 3u; ++i) {
 			const auto dist = ei::len(tri.v(i) - objSpacePos);
 			// TODO: normal!
-			octree.add_sample(tri.v(i), ei::Vec3{ 0.f, 1.f, 0.f }, value * dist / distSum);
+			octree.add_sample(tri.v(i), ei::Vec3{ 0.f, 1.f, 0.f }, value);// *dist / distSum);
 		}
 	} else {
 		const auto quad = scene::get_quad(polygon, primId);
@@ -534,11 +534,12 @@ inline CUDA_FUNCTION void sample_vis_importance_octree(CombinedTargets::RenderBu
 				distSum += dist;
 			}
 		}
-		const auto area = scene::compute_area(scene, polygon, hitId);
+		const auto area = 1.f;// scene::compute_area(scene, polygon, hitId);
 
 		const auto importance = viewImp / (area * distSum);
 		outputBuffer.template set<ImportanceTarget>(coord, importance);
-		outputBuffer.template set<InstanceImportanceSumTarget>(coord, static_cast<float>(cuda::atomic_load<CURRENT_DEV, double>(instanceImpSums[hitId.instanceId])));
+		if(instanceImpSums != nullptr)
+			outputBuffer.template set<InstanceImportanceSumTarget>(coord, static_cast<float>(cuda::atomic_load<CURRENT_DEV, double>(instanceImpSums[hitId.instanceId])));
 	}
 }
 

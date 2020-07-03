@@ -260,6 +260,7 @@ void CpuCombinedReducer::post_iteration(IOutputHandler& outputBuffer) {
 void CpuCombinedReducer::iterate() {
 	if(m_stage == Stage::INITIALIZED) {
 		if(m_hasFrameImp[m_world.get_frame_current()]) {
+			display_importance();
 			//if(m_params.reduction == 0)
 			//	display_importance();
 		} else {
@@ -349,26 +350,29 @@ void CpuCombinedReducer::gather_importance() {
 	// TODO: allow for this with proper reset "events"
 }
 
-#if 0
 void CpuCombinedReducer::display_importance(const bool accumulated) {
+	if(!(m_outputBuffer.template is_target_enabled<combined::InstanceImportanceSumTarget>()
+		 || m_outputBuffer.template is_target_enabled<combined::ImportanceTarget>()))
+		return;
+
 	// TODO: accumulated!
 	const u32 NUM_PIXELS = m_outputBuffer.get_num_pixels();
 #pragma PARALLEL_FOR
 	for(int pixel = 0; pixel < (int)NUM_PIXELS; ++pixel) {
 		const Pixel coord{ pixel % m_outputBuffer.get_width(), pixel / m_outputBuffer.get_width() };
-		if(accumulated)
+		/*if(accumulated)
 			combined::sample_vis_importance(m_outputBuffer, m_sceneDesc, coord,
 											m_rngs[pixel], m_accumImpAccess.data(),
 											&m_instanceImportanceSums[m_sceneDesc.numInstances * m_world.get_frame_current()],
 											m_world.get_frame_current());
-		else
+		else*/
 			combined::sample_vis_importance_octree(m_outputBuffer, m_sceneDesc, coord,
 												   m_rngs[pixel], m_viewOctrees[m_world.get_frame_current()].data(),
-												   &m_instanceImportanceSums[m_sceneDesc.numInstances * m_world.get_frame_current()], 
+												   nullptr,
+												   //&m_instanceImportanceSums[m_sceneDesc.numInstances * m_world.get_frame_current()], 
 												   m_world.get_frame_current());
 	}
 }
-#endif // 0
 
 double CpuCombinedReducer::get_lod_importance(const u32 frame, const scene::Scene::InstanceRef obj) const noexcept {
 	double sum = 0.0;

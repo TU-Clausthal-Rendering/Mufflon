@@ -5,8 +5,9 @@
 #include "util/swapped_vector.hpp"
 #include "core/math/rng.hpp"
 #include "core/renderer/renderer_base.hpp"
-#include "core/renderer/decimaters/util/octree.hpp"
-#include "core/renderer/decimaters/util/octree_manager.hpp"
+#include "core/renderer/decimaters/octree/octree.hpp"
+#include "core/renderer/decimaters/octree/octree_manager.hpp"
+#include "core/renderer/decimaters/util/collapse_history.hpp"
 
 namespace mufflon::renderer::decimaters {
 
@@ -40,9 +41,7 @@ private:
 	void gather_importance();
 	void update_reduction_factors(u32 frameStart, u32 frameEnd);
 	void initialize_decimaters();
-#if 0
 	void display_importance(const bool accumulated = false);
-#endif // 0
 	double get_lod_importance(const u32 frame, const scene::Scene::InstanceRef obj) const noexcept;
 
 	combined::CombinedParameters m_params = {};

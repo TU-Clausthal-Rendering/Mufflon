@@ -2,6 +2,7 @@
 
 #include "util/int_types.hpp"
 #include "core/scene/geometry/polygon_mesh.hpp"
+#include "core/renderer/decimaters/util/collapse_history.hpp"
 #include <OpenMesh/Tools/Decimater/ModBaseT.hh>
 
 namespace mufflon::renderer::decimaters::modules {
@@ -20,26 +21,26 @@ public:
 	CollapseTrackerModule& operator=(const CollapseTrackerModule&) = delete;
 	CollapseTrackerModule& operator=(CollapseTrackerModule&&) = delete;
 
-	void set_properties(MeshT& originalMesh, OpenMesh::VPropHandleT<bool> collapsed,
-						OpenMesh::VPropHandleT<typename MeshT::VertexHandle> collapsedTo) {
-		m_originalMesh = &originalMesh;
-		m_collapsed = collapsed;
-		m_collapsedTo = collapsedTo;
+	void set_properties(CollapseHistory* history, const u32 frameIndex) {
+		m_history = history;
+		m_frameIndex = frameIndex;
 	}
 
 	void postprocess_collapse(const CollapseInfo& ci) final {
-		// Assumes that the two meshes are initially equal
-		m_originalMesh->property(m_collapsed, ci.v0) = true;
-		m_originalMesh->property(m_collapsedTo, ci.v0) = ci.v1;
+		auto history = m_history[ci.v0.idx()];
+
+		// Check if we constrained this collapse (meaning we won't update the frame)
+		if(!history.collapsed || history.collapsedTo != static_cast<u32>(ci.v1.idx())) {
+			history.frameIndex = m_frameIndex;
+		}
+		history.collapsedTo = static_cast<u32>(ci.v1.idx());
+		history.collapsed = true;
+		m_history[ci.v0.idx()] = history;
 	}
 
 private:
-	MeshT* m_originalMesh;
-
-	// Original mesh properties
-	OpenMesh::VPropHandleT<bool> m_collapsed;										// Whether collapsedTo refers to original or decimated mesh
-	OpenMesh::VPropHandleT<typename MeshT::VertexHandle> m_collapsedTo;				// References either the vertex in the original mesh we collapsed to or the vertex in the decimated mesh
+	CollapseHistory* m_history;
+	u32 m_frameIndex;
 };
-
 
 } // namespace mufflon::renderer::decimaters::modules
