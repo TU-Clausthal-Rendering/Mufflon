@@ -15,7 +15,7 @@ namespace renderer {
 
 class GpuWireframe final : public RendererBase<Device::CUDA, WireframeTargets> {
 public:
-	GpuWireframe();
+	GpuWireframe(mufflon::scene::WorldContainer& world);
 	~GpuWireframe() = default;
 
 	// This is just a test method, don't use this as an actual interface

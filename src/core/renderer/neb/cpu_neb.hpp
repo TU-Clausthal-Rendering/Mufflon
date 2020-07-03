@@ -2,6 +2,7 @@
 
 #include "neb_params.hpp"
 #include "core/scene/handles.hpp"
+#include "core/renderer/path_util.hpp"
 #include "core/renderer/renderer_base.hpp"
 #include "core/scene/scene.hpp"
 #include "core/math/rng.hpp"
@@ -18,13 +19,49 @@ namespace mufflon::cameras {
 
 namespace mufflon::renderer {
 
-class NebPathVertex;
-struct NebVertexExt;
+struct NebVertexExt {
+	Spectrum throughput;
+	AngularPdf pdfBack;
+	AreaPdf incidentPdf{ 0.0f };
+	union {
+		int pixelIndex;
+		float rnd;		// An additional input random value (first vertex of light paths only).
+	};
+	float density{ -1.0f };
+
+	CUDA_FUNCTION void init(const PathVertex<NebVertexExt>& /*thisVertex*/,
+							const AreaPdf inAreaPdf,
+							const AngularPdf inDirPdf,
+							const float pChoice);
+
+	CUDA_FUNCTION void update(const PathVertex<NebVertexExt>& prevVertex,
+							  const PathVertex<NebVertexExt>& thisVertex,
+							  const math::PdfPair pdf,
+							  const Connection& incident,
+							  const Spectrum& throughput,
+							  const float /*continuationPropability*/,
+							  const Spectrum& /*transmission*/);
+
+	CUDA_FUNCTION void update(const PathVertex<NebVertexExt>& /*thisVertex*/,
+							  const scene::Direction& /*excident*/,
+							  const VertexSample& sample);
+};
+
+class NebPathVertex : public PathVertex<NebVertexExt> {
+public:
+	// Overload the vertex sample operator to have more RR control.
+	CUDA_FUNCTION VertexSample sample(const ei::Box& sceneBounds,
+									  const scene::materials::Medium* media,
+									  const math::RndSet2_1& rndSet,
+									  bool adjoint) const;
+};
 
 class CpuNextEventBacktracking final : public RendererBase<Device::CPU, NebTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuNextEventBacktracking();
+	CpuNextEventBacktracking(mufflon::scene::WorldContainer& world) :
+		RendererBase<Device::CPU, NebTargets>{ world }
+	{}
 	~CpuNextEventBacktracking() = default;
 
 	void iterate() final;
@@ -89,7 +126,7 @@ private:
 #ifdef NEB_KDTREE
 	data_structs::KdTree<char, 3> m_density;		// A kd-tree with positions only, TODO: data is not needed
 #else
-	std::unique_ptr<data_structs::DmOctree> m_density;
+	std::unique_ptr<data_structs::DmOctree<>> m_density;
 #endif
 };
 

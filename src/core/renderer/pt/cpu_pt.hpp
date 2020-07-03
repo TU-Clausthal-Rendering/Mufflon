@@ -16,7 +16,7 @@ namespace mufflon::renderer {
 class CpuPathTracer final : public RendererBase<Device::CPU, PtTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuPathTracer();
+	CpuPathTracer(mufflon::scene::WorldContainer& world);
 	~CpuPathTracer() = default;
 
 	void iterate() final;

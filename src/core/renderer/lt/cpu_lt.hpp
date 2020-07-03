@@ -14,7 +14,7 @@ namespace mufflon::renderer {
 class CpuLightTracer final : public RendererBase<Device::CPU, LtTargets> {
 public:
 	// Initialize all resources required by this renderer.
-	CpuLightTracer();
+	CpuLightTracer(mufflon::scene::WorldContainer& world);
 	~CpuLightTracer() = default;
 
 	void iterate() final;

@@ -88,7 +88,7 @@ public:
 	void clear(float cellEdgeLength) {
 		m_cellDensity = 1.0f / cellEdgeLength;
 		m_dataCount->store(0, std::memory_order_relaxed);
-		for(uint i = 0; i < m_mapSize; ++i) {
+		for(u32 i = 0; i < m_mapSize; ++i) {
 			m_map[i].store(~0u, std::memory_order_relaxed);
 		}
 	}
@@ -229,7 +229,8 @@ class HashGridManager {
 	}
 public:
 	HashGridManager(int numExpectedEntries = 0) :
-		m_cpuHMCounter{0}
+		m_dataCapacity{ 0 },
+		m_cpuHMCounter{ 0 }
 	{
 		resize(numExpectedEntries);
 	}

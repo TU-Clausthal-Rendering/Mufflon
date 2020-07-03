@@ -35,7 +35,7 @@ public:
 		m_capacity{ entries }
 	{
 		// Make sure we have a map size that allows for good collision resistance
-		auto mapEntries = entries;
+		auto mapEntries = 2u * entries;
 		do {
 			mapEntries = ei::nextPrime(mapEntries);
 		} while((mapEntries & 3) != 3);

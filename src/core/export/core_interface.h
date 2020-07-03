@@ -74,6 +74,14 @@ typedef struct {
 	uint64_t microseconds;
 } ProcessTime;
 
+typedef struct {
+	uint32_t vertices;
+	uint32_t triangles;
+	uint32_t quads;
+	uint32_t edges;
+	uint32_t spheres;
+} LodMetadata;
+
 typedef enum {
 	CAM_PINHOLE,
 	CAM_FOCUS,
@@ -344,7 +352,9 @@ CORE_API void CDECL mufflon_destroy(MufflonInstanceHdl instHdl);
 CORE_API Boolean CDECL mufflon_initialize_opengl(MufflonInstanceHdl instHdl);
 CORE_API int32_t CDECL mufflon_get_cuda_device_index();
 CORE_API Boolean CDECL mufflon_is_cuda_available();
-CORE_API Boolean CDECL mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t), void* userParams);
+CORE_API Boolean CDECL mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t, Boolean),
+											  Boolean(*objFunc)(void*, uint32_t, uint16_t*, uint32_t*),
+											  Boolean(*metaFunc)(void*, LodMetadata*, size_t*), void* userParams);
 
 // Render image functions
 CORE_API Boolean CDECL mufflon_get_target_image(MufflonInstanceHdl instHdl, const char* name, Boolean variance, const float** ptr);
@@ -354,10 +364,10 @@ CORE_API Boolean CDECL mufflon_get_pixel_info(MufflonInstanceHdl instHdl, uint32
 
 // World loading/clearing
 CORE_API void CDECL world_clear_all(MufflonInstanceHdl instHdl);
-CORE_API Boolean CDECL world_finalize(MufflonInstanceHdl instHdl, const char** msg);
+CORE_API Boolean CDECL world_finalize(MufflonInstanceHdl instHdl, const Vec3 min, const Vec3 max, const char** msg);
 
 // Polygon interface
-CORE_API Boolean CDECL polygon_reserve(LodHdl lvlDtl, size_t vertices, size_t edges, size_t tris, size_t quads);
+CORE_API Boolean CDECL polygon_reserve(LodHdl lvlDtl, size_t vertices, size_t tris, size_t quads);
 CORE_API VertexAttributeHdl CDECL polygon_request_vertex_attribute(LodHdl lvlDtl, const char* name,
 																   GeomAttributeType type);
 CORE_API FaceAttributeHdl CDECL polygon_request_face_attribute(LodHdl lvlDtl, const char* name,
@@ -389,7 +399,6 @@ CORE_API size_t CDECL polygon_set_face_attribute_bulk(LodHdl lvlDtl, const FaceA
 CORE_API size_t CDECL polygon_set_material_idx_bulk(LodHdl lvlDtl, FaceHdl startFace, size_t count,
 													const BulkLoader* stream);
 CORE_API size_t CDECL polygon_get_vertex_count(LodHdl lvlDtl);
-CORE_API size_t CDECL polygon_get_edge_count(LodHdl lvlDtl);
 CORE_API size_t CDECL polygon_get_face_count(LodHdl lvlDtl);
 CORE_API size_t CDECL polygon_get_triangle_count(LodHdl lvlDtl);
 CORE_API size_t CDECL polygon_get_quad_count(LodHdl lvlDtl);
@@ -420,7 +429,8 @@ CORE_API ObjectHdl CDECL world_create_object(MufflonInstanceHdl instHdl, const c
 CORE_API ObjectHdl CDECL world_get_object(MufflonInstanceHdl instHdl, const char* name);
 CORE_API const char* CDECL world_get_object_name(ObjectHdl obj);
 CORE_API Boolean CDECL object_has_lod(ConstObjectHdl obj, LodLevel level);
-CORE_API LodHdl CDECL object_add_lod(ObjectHdl obj, LodLevel level);
+CORE_API Boolean CDECL object_allocate_lod_slots(ObjectHdl obj, LodLevel slots);
+CORE_API LodHdl CDECL object_add_lod(ObjectHdl obj, LodLevel level, Boolean asReduced);
 CORE_API Boolean CDECL object_get_id(ObjectHdl obj, uint32_t* id);
 
 // Instance interface
@@ -513,7 +523,7 @@ CORE_API ScenarioHdl CDECL world_find_scenario(MufflonInstanceHdl instHdl, const
 CORE_API uint32_t CDECL world_get_scenario_count(MufflonInstanceHdl instHdl);
 CORE_API ScenarioHdl CDECL world_get_scenario_by_index(MufflonInstanceHdl instHdl, uint32_t index);
 CORE_API ConstScenarioHdl CDECL world_get_current_scenario(MufflonInstanceHdl instHdl);
-CORE_API Boolean CDECL world_finalize_scenario(MufflonInstanceHdl instHdl, ConstScenarioHdl scenario, const char** msg);
+CORE_API Boolean CDECL world_finalize_scenario(MufflonInstanceHdl instHdl, ScenarioHdl scenario, const char** msg);
 CORE_API SceneHdl CDECL world_load_scenario(MufflonInstanceHdl instHdl, ScenarioHdl scenario);
 CORE_API const char* CDECL scenario_get_name(ScenarioHdl scenario);
 CORE_API LodLevel CDECL scenario_get_global_lod_level(ScenarioHdl scenario);
@@ -618,7 +628,7 @@ CORE_API const char* CDECL render_get_renderer_name(MufflonInstanceHdl instHdl, 
 CORE_API const char* CDECL render_get_renderer_short_name(MufflonInstanceHdl instHdl, uint32_t index);
 CORE_API RenderDevice CDECL render_get_renderer_devices(MufflonInstanceHdl instHdl, uint32_t index, uint32_t variation);
 CORE_API Boolean CDECL render_enable_renderer(MufflonInstanceHdl instHdl, uint32_t index, uint32_t variation);
-CORE_API Boolean CDECL render_iterate(MufflonInstanceHdl instHdl, ProcessTime* time);
+CORE_API Boolean CDECL render_iterate(MufflonInstanceHdl instHdl, ProcessTime* time, ProcessTime* preTime, ProcessTime* postTime);
 CORE_API uint32_t CDECL render_get_current_iteration(ConstMufflonInstanceHdl instHdl);
 CORE_API Boolean CDECL render_reset(MufflonInstanceHdl instHdl);
 CORE_API Boolean CDECL render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename, const char* targetName, Boolean variance);

@@ -26,7 +26,7 @@ float get_density(const scene::accel_struct::KdTree<char, 3>& tree, const ei::Ve
 	return 1.0f / queryArea;
 }
 #else
-float get_density(const std::unique_ptr<data_structs::DmOctree>& octree, const ei::Vec3& currentPos, const ei::Vec3& normal) {
+float get_density(const std::unique_ptr<data_structs::DmOctree<>>& octree, const ei::Vec3& currentPos, const ei::Vec3& normal) {
 	float density = octree->get_density(currentPos, normal);
 //	density = ei::max(1.0f / (numStdPhotonPaths * (m_currentIteration+1)),
 //		m_density->get_density_interpolated(vertex.get_position(), vertex.get_geometric_normal()));
@@ -37,67 +37,50 @@ float get_density(const std::unique_ptr<data_structs::DmOctree>& octree, const e
 
 } // namespace ::
 
+CUDA_FUNCTION void NebVertexExt::init(const PathVertex<NebVertexExt>& /*thisVertex*/,
+									  const AreaPdf inAreaPdf,
+									  const AngularPdf inDirPdf,
+									  const float pChoice) {
+	this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+	this->throughput = Spectrum{ 1.0f };
+}
 
-struct NebVertexExt {
-	Spectrum throughput;
-	AngularPdf pdfBack;
-	AreaPdf incidentPdf { 0.0f };
-	union {
-		int pixelIndex;
-		float rnd;		// An additional input random value (first vertex of light paths only).
-	};
-	float density { -1.0f };
+CUDA_FUNCTION void NebVertexExt::update(const PathVertex<NebVertexExt>& prevVertex,
+										const PathVertex<NebVertexExt>& thisVertex,
+										const math::PdfPair pdf,
+										const Connection& incident,
+										const Spectrum& throughput,
+										const float /*continuationPropability*/,
+										const Spectrum& /*transmission*/) {
+	float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+	bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+	this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+	this->throughput = throughput;
+}
 
-	inline CUDA_FUNCTION void init(const PathVertex<NebVertexExt>& /*thisVertex*/,
-							const AreaPdf inAreaPdf,
-							const AngularPdf inDirPdf,
-							const float pChoice) {
-		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
-		this->throughput = Spectrum{1.0f};
-	}
+CUDA_FUNCTION void NebVertexExt::update(const PathVertex<NebVertexExt>& /*thisVertex*/,
+										const scene::Direction& /*excident*/,
+										const VertexSample& sample) {
+	pdfBack = sample.pdf.back;
+}
 
-	inline CUDA_FUNCTION void update(const PathVertex<NebVertexExt>& prevVertex,
-							  const PathVertex<NebVertexExt>& thisVertex,
-							  const math::PdfPair pdf,
-							  const Connection& incident,
-							  const Spectrum& throughput,
-							  const float /*continuationPropability*/,
-							  const Spectrum& /*transmission*/) {
-		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
-		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
-		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
-		this->throughput = throughput;
-	}
-
-	void update(const PathVertex<NebVertexExt>& /*thisVertex*/,
-				const scene::Direction& /*excident*/,
-				const VertexSample& sample) {
-		pdfBack = sample.pdf.back;
-	}
-};
-
-
-class NebPathVertex : public PathVertex<NebVertexExt> {
-public:
-	// Overload the vertex sample operator to have more RR control.
-	VertexSample sample(const ei::Box& sceneBounds,
-						const scene::materials::Medium* media,
-						const math::RndSet2_1& rndSet,
-						bool adjoint) const {
-		VertexSample s = PathVertex<NebVertexExt>::sample(sceneBounds, media, rndSet, adjoint);
-		// Conditionally kill the photon path tracing if we are on the
-		// NEE vertex. Goal: trace only photons which we cannot NEE.
-		if(adjoint && get_path_len() == 1) {
-			float keepChance = get_photon_path_chance(s.pdf.forw);
-			if(keepChance < ext().rnd) {
-				s.type = math::PathEventType::INVALID;
-			} else {
-				s.throughput /= keepChance;
-			}
+CUDA_FUNCTION VertexSample NebPathVertex::sample(const ei::Box& sceneBounds,
+												 const scene::materials::Medium* media,
+												 const math::RndSet2_1& rndSet,
+												 bool adjoint) const {
+	VertexSample s = PathVertex<NebVertexExt>::sample(sceneBounds, media, rndSet, adjoint);
+	// Conditionally kill the photon path tracing if we are on the
+	// NEE vertex. Goal: trace only photons which we cannot NEE.
+	if(adjoint && get_path_len() == 1) {
+		float keepChance = get_photon_path_chance(s.pdf.forw);
+		if(keepChance < ext().rnd) {
+			s.type = math::PathEventType::INVALID;
+		} else {
+			s.throughput /= keepChance;
 		}
-		return s;
 	}
-};
+	return s;
+}
 
 namespace {
 
@@ -201,7 +184,7 @@ void CpuNextEventBacktracking::sample_view_path(const Pixel coord, const int pix
 		math::RndSet2_1 rnd { m_rngs[pixelIdx].next(), m_rngs[pixelIdx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[pixelIdx].next()));
 		NebPathVertex& sourceVertex = previous ? *previous : vertex;	// Make sure the update function is called for the correct vertex.
-		if(walk(m_sceneDesc, sourceVertex, rnd, rndRoulette, false, throughput, vertex, sample) == WalkResult::CANCEL)
+		if(walk(m_sceneDesc, sourceVertex, rnd, rndRoulette, false, throughput, vertex, sample, nullptr) == WalkResult::CANCEL)
 			break;
 		++pathLen;
 		if(pathLen >= m_params.minPathLength) {
@@ -279,7 +262,7 @@ void CpuNextEventBacktracking::sample_photon_path(float photonMergeArea, math::R
 			math::RndSet2_1 rnd { rng.next(), rng.next() };
 			float rndRoulette = math::sample_uniform(u32(rng.next()));
 			VertexSample sample;
-			if(walk(m_sceneDesc, virtualLight, rnd, rndRoulette, true, lightThroughput, virtualLight, sample) != WalkResult::HIT)
+			if(walk(m_sceneDesc, virtualLight, rnd, rndRoulette, true, lightThroughput, virtualLight, sample, nullptr) != WalkResult::HIT)
 				break;
 			++lightPathLength;
 			virtualLight.set_path_len(lightPathLength);
@@ -319,7 +302,7 @@ void CpuNextEventBacktracking::sample_std_photon(int idx, int numPhotons, u64 se
 		math::RndSet2 rndRoulette { m_rngs[idx].next() };
 		vertex[currentV].ext().rnd = rndRoulette.u1;
 		VertexSample sample;
-		if(walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette.u0, true, throughput, vertex[1-currentV], sample) != WalkResult::HIT)
+		if(walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette.u0, true, throughput, vertex[1-currentV], sample, nullptr) != WalkResult::HIT)
 			break;
 		++lightPathLength;
 		currentV = 1-currentV;
@@ -486,9 +469,6 @@ Spectrum CpuNextEventBacktracking::finalize_emission(float photonMergeArea, cons
 		return emission.radiance;
 }
 
-CpuNextEventBacktracking::CpuNextEventBacktracking() {
-}
-
 static int pairing(int a, int b) {
 	return b + (a + b) * (a + b + 1) / 2;
 }
@@ -614,8 +594,8 @@ void CpuNextEventBacktracking::post_reset() {
 	m_density.reserve(countHeuristic);
 #else
 	if(resetFlags.geometry_changed())
-		m_density = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb,
-			1024 * 1024 * 8, 8.0f, true);
+		m_density = std::make_unique<data_structs::DmOctree<>>(m_sceneDesc.aabb,
+			1024 * 1024 * 8, 8.0f, 1.f);
 	m_density->clear();
 //	m_density.initialize(m_sceneDesc.aabb, m_outputBuffer.get_num_pixels() * m_params.maxPathLength * 2);
 #endif

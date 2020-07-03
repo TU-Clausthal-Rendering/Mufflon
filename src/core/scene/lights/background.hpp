@@ -97,6 +97,12 @@ public:
 	template< Device dev >
 	const BackgroundDesc<dev> acquire_const(const ei::Box& bounds);
 
+	std::size_t descriptor_size() const noexcept {
+		if(m_type == BackgroundType::ENVMAP)
+			return std::get<EnvmapParams>(m_params).envLight->get_size();
+		return 0u;
+	}
+
 	BackgroundType get_type() const noexcept {
 		return m_type;
 	}

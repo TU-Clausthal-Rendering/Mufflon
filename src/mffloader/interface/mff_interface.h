@@ -22,7 +22,10 @@ LOADER_API MufflonLoaderInstanceHdl CDECL loader_initialize(MufflonInstanceHdl);
 LOADER_API void CDECL loader_destroy(MufflonLoaderInstanceHdl);
 LOADER_API LoaderStatus CDECL loader_load_json(MufflonLoaderInstanceHdl, const char* path);
 LOADER_API LoaderStatus CDECL loader_save_scene(MufflonLoaderInstanceHdl, const char* path);
-LOADER_API Boolean CDECL loader_load_lod(MufflonLoaderInstanceHdl, void* obj, uint32_t lod);
+LOADER_API Boolean CDECL loader_load_lod(MufflonLoaderInstanceHdl, void* obj, uint32_t lod, Boolean asReduced);
+LOADER_API Boolean CDECL loader_load_object_material_indices(MufflonLoaderInstanceHdl, const uint32_t objId,
+															 uint16_t* indexBuffer, uint32_t* readIndices);
+LOADER_API Boolean CDECL loader_load_lod_metadatas(MufflonLoaderInstanceHdl hdl, LodMetadata* data, size_t* read);
 LOADER_API Boolean CDECL loader_abort(MufflonLoaderInstanceHdl);
 LOADER_API const char* CDECL loader_get_loading_status(MufflonLoaderInstanceHdl);
 LOADER_API void CDECL loader_profiling_enable();

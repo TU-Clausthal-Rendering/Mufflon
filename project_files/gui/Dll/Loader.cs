@@ -39,8 +39,8 @@ namespace gui.Dll
         private static extern LoaderStatus loader_save_scene_(IntPtr instHdl, IntPtr path);
         internal static LoaderStatus loader_save_scene(string path) { return loader_save_scene_(mffLoaderInstHdl, StringUtil.ToNativeUtf8(path)); }
         [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_load_lod")]
-        private static extern Boolean loader_load_lod_(IntPtr instHdl, IntPtr obj, UInt32 lod);
-        internal static Boolean loader_load_lod(IntPtr obj, UInt32 lod) { return loader_load_lod_(mffLoaderInstHdl, obj, lod); }
+        private static extern Boolean loader_load_lod_(IntPtr instHdl, IntPtr obj, UInt32 lod, UInt32 asReduced);
+        internal static Boolean loader_load_lod(IntPtr obj, UInt32 lod, UInt32 asReduced) { return loader_load_lod_(mffLoaderInstHdl, obj, lod, asReduced); }
         [DllImport("mffloader.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "loader_abort")]
         private static extern Boolean loader_abort_(IntPtr instHdl);
         internal static Boolean loader_abort() { return loader_abort_(mffLoaderInstHdl); }

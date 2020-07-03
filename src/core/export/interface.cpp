@@ -138,16 +138,16 @@ inline void init_renderers(MufflonInstance& instance) {
 				renderers = &instance.renderers.get(instance.renderers.insert(std::string(RendererType::get_name_static()), {}));
 			// Special case: GlForward renderer needs to add textures...
 			if constexpr(std::is_same_v<RendererType, renderer::GlForward>)
-				renderers->push_back(std::make_unique<RendererType>(&instance));
+				renderers->push_back(std::make_unique<RendererType>(instance.world, &instance));
 			else
-				renderers->push_back(std::make_unique<RendererType>());
+				renderers->push_back(std::make_unique<RendererType>(instance.world));
 		}
 	}
 	// Only initialize CUDA renderers if CUDA is enabled
 	else if(!initOpenGL && (s_cudaDevIndex >= 0 || !RendererType::may_use_device(Device::CUDA))) {
 		if(renderers == nullptr)
 			renderers = &instance.renderers.get(instance.renderers.insert(std::string(RendererType::get_name_static()), {}));
-		renderers->push_back(std::make_unique<RendererType>());
+		renderers->push_back(std::make_unique<RendererType>(instance.world));
 	}
 	if constexpr(I + 1u < renderer::Renderers::size)
 		init_renderers<initOpenGL, I + 1u>(instance);
@@ -225,12 +225,15 @@ Boolean core_set_log_level(LogLevel level) {
 	}
 }
 
-Boolean mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t), void* userParams) {
+Boolean mufflon_set_lod_loader(MufflonInstanceHdl instHdl, Boolean(*func)(void*, ObjectHdl, uint32_t, Boolean),
+							   Boolean(*objFunc)(void*, uint32_t, uint16_t*, uint32_t*),
+							   Boolean(*metaFunc)(void*, LodMetadata*, size_t*), void* userParams) {
 	TRY
 	CHECK_NULLPTR(instHdl, "mufflon instance", false);
 	MufflonInstance& instance = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(func, "LoD loader function", false);
-	instance.world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(void*, ObjectHandle, u32)>(func), userParams);
+	instance.world.set_lod_loader_function(reinterpret_cast<std::uint32_t(*)(void*, ObjectHandle, u32, u32)>(func), objFunc,
+										   reinterpret_cast<std::uint32_t(*)(void*, WorldContainer::LodMetadata*, std::size_t*)>(metaFunc), userParams);
 	return true;
 	CATCH_ALL(false)
 }
@@ -311,10 +314,10 @@ Boolean mufflon_get_pixel_info(MufflonInstanceHdl instHdl, uint32_t x, uint32_t 
 	CATCH_ALL(false)
 }
 
-Boolean polygon_reserve(LodHdl lvlDtl, size_t vertices, size_t edges, size_t tris, size_t quads) {
+Boolean polygon_reserve(LodHdl lvlDtl, size_t vertices, size_t tris, size_t quads) {
 	TRY
 	CHECK_NULLPTR(lvlDtl, "LoD handle", false);
-	static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().reserve(vertices, edges, tris, quads);
+	static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().reserve(vertices, tris, quads);
 	return true;
 	CATCH_ALL(false)
 }
@@ -347,11 +350,7 @@ VertexHdl polygon_add_vertex(LodHdl lvlDtl, Vec3 point, Vec3 normal, Vec2 uv) {
 	PolyVHdl hdl = static_cast<Lod*>(lvlDtl)->template get_geometry<Polygons>().add(
 		util::pun<ei::Vec3>(point), util::pun<ei::Vec3>(normal),
 		util::pun<ei::Vec2>(uv));
-	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding vertex to polygon");
-		return VertexHdl{ INVALID_INDEX };
-	}
-	return VertexHdl{ static_cast<IndexType>(hdl.idx()) };
+	return VertexHdl{ static_cast<IndexType>(hdl) };
 	CATCH_ALL(VertexHdl{ INVALID_INDEX })
 }
 
@@ -360,15 +359,10 @@ FaceHdl polygon_add_triangle(LodHdl lvlDtl, UVec3 vertices) {
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
-		PolyVHdl{ static_cast<int>(vertices.x) },
-		PolyVHdl{ static_cast<int>(vertices.y) },
-		PolyVHdl{ static_cast<int>(vertices.z) });
-	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon (object '",
-				 lod.get_parent()->get_name(), "')");
-		return FaceHdl{ INVALID_INDEX };
-	}
-	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
+		PolyVHdl{ vertices.x },
+		PolyVHdl{ vertices.y },
+		PolyVHdl{ vertices.z });
+	return FaceHdl{ static_cast<IndexType>(hdl) };
 	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
@@ -378,16 +372,11 @@ FaceHdl polygon_add_triangle_material(LodHdl lvlDtl, UVec3 vertices,
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
-		PolyVHdl{ static_cast<int>(vertices.x) },
-		PolyVHdl{ static_cast<int>(vertices.y) },
-		PolyVHdl{ static_cast<int>(vertices.z) },
+		PolyVHdl{ vertices.x },
+		PolyVHdl{ vertices.y },
+		PolyVHdl{ vertices.z },
 		MaterialIndex{ idx });
-	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding triangle to polygon (object '",
-				 lod.get_parent()->get_name(), "')");
-		return FaceHdl{ INVALID_INDEX };
-	}
-	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
+	return FaceHdl{ static_cast<IndexType>(hdl) };
 	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
@@ -396,16 +385,11 @@ FaceHdl polygon_add_quad(LodHdl lvlDtl, UVec4 vertices) {
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
-		PolyVHdl{ static_cast<int>(vertices.x) },
-		PolyVHdl{ static_cast<int>(vertices.y) },
-		PolyVHdl{ static_cast<int>(vertices.z) },
-		PolyVHdl{ static_cast<int>(vertices.w) });
-	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding quad to polygon (object '",
-				 lod.get_parent()->get_name(), "')");
-		return FaceHdl{ INVALID_INDEX };
-	}
-	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
+		PolyVHdl{ vertices.x },
+		PolyVHdl{ vertices.y },
+		PolyVHdl{ vertices.z },
+		PolyVHdl{ vertices.w });
+	return FaceHdl{ static_cast<IndexType>(hdl) };
 	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
@@ -415,17 +399,12 @@ FaceHdl polygon_add_quad_material(LodHdl lvlDtl, UVec4 vertices,
 	CHECK_NULLPTR(lvlDtl, "LoD handle", FaceHdl{ INVALID_INDEX });
 	Lod& lod = *static_cast<Lod*>(lvlDtl);
 	PolyFHdl hdl = lod.template get_geometry<Polygons>().add(
-		PolyVHdl{ static_cast<int>(vertices.x) },
-		PolyVHdl{ static_cast<int>(vertices.y) },
-		PolyVHdl{ static_cast<int>(vertices.z) },
-		PolyVHdl{ static_cast<int>(vertices.w) },
+		PolyVHdl{ vertices.x },
+		PolyVHdl{ vertices.y },
+		PolyVHdl{ vertices.z },
+		PolyVHdl{ vertices.w },
 		MaterialIndex{ idx });
-	if(!hdl.is_valid()) {
-		logError("[", FUNCTION_NAME, "] Error adding quad to polygon (object '",
-				 lod.get_parent()->get_name(), "')");
-		return FaceHdl{ INVALID_INDEX };
-	}
-	return FaceHdl{ static_cast<IndexType>(hdl.idx()) };
+	return FaceHdl{ static_cast<IndexType>(hdl) };
 	CATCH_ALL(FaceHdl{ INVALID_INDEX })
 }
 
@@ -491,7 +470,7 @@ VertexHdl polygon_add_vertex_bulk(LodHdl lvlDtl, size_t count, const BulkLoader*
 		*normalsRead = info.readNormals;
 	if(uvsRead != nullptr)
 		*uvsRead = info.readUvs;
-	return VertexHdl{ static_cast<IndexType>(info.handle.idx()) };
+	return VertexHdl{ static_cast<IndexType>(info.handle) };
 	CATCH_ALL(VertexHdl{ INVALID_INDEX })
 }
 
@@ -649,7 +628,7 @@ size_t polygon_set_vertex_attribute_bulk(LodHdl lvlDtl, const VertexAttributeHdl
 		logError("[", FUNCTION_NAME, "] Could not retrieve vertex attribute handle");
 		return false;
 	}
-	polys.add_bulk(hdl.value(), PolyVHdl{ static_cast<int>(startVertex) },
+	polys.add_bulk(hdl.value(), static_cast<PolyVHdl>(startVertex),
 				   count, *attrReader);
 	return true;
 	CATCH_ALL(INVALID_SIZE)
@@ -689,7 +668,7 @@ size_t polygon_set_face_attribute_bulk(LodHdl lvlDtl, const FaceAttributeHdl att
 		logError("[", FUNCTION_NAME, "] Could not retrieve vertex attribute handle");
 		return false;
 	}
-	polys.add_bulk(hdl.value(), PolyFHdl{ static_cast<int>(startFace) },
+	polys.add_bulk(hdl.value(), static_cast<PolyFHdl>(startFace),
 				   count, *attrReader);
 	return true;
 	CATCH_ALL(INVALID_SIZE)
@@ -722,7 +701,7 @@ size_t polygon_set_material_idx_bulk(LodHdl lvlDtl, FaceHdl startFace, size_t co
 	}
 
 	FaceAttributeHandle hdl = lod.template get_geometry<Polygons>().get_material_indices_hdl();
-	return lod.template get_geometry<Polygons>().add_bulk(hdl, PolyFHdl{ static_cast<int>(startFace) },
+	return lod.template get_geometry<Polygons>().add_bulk(hdl, static_cast<PolyFHdl>(startFace),
 															 count, *matReader);
 	CATCH_ALL(INVALID_SIZE)
 }
@@ -732,14 +711,6 @@ size_t polygon_get_vertex_count(LodHdl lvlDtl) {
 	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_SIZE);
 	const Lod& lod = *static_cast<const Lod*>(lvlDtl);
 	return lod.template get_geometry<Polygons>().get_vertex_count();
-	CATCH_ALL(INVALID_SIZE)
-}
-
-size_t polygon_get_edge_count(LodHdl lvlDtl) {
-	TRY
-	CHECK_NULLPTR(lvlDtl, "LoD handle", INVALID_SIZE);
-	const Lod& lod = *static_cast<const Lod*>(lvlDtl);
-	return lod.template get_geometry<Polygons>().get_edge_count();
 	CATCH_ALL(INVALID_SIZE)
 }
 
@@ -994,14 +965,25 @@ Boolean spheres_get_bounding_box(LodHdl lvlDtl, Vec3* min, Vec3* max) {
 Boolean object_has_lod(ConstObjectHdl obj, LodLevel level) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", false);
-	return static_cast<const Object*>(obj)->has_lod_available(level);
+	return static_cast<const Object*>(obj)->has_original_lod_available(level);
 	CATCH_ALL(false)
 }
 
-LodHdl object_add_lod(ObjectHdl obj, LodLevel level) {
+Boolean object_allocate_lod_slots(ObjectHdl obj, LodLevel slots) {
+	TRY
+	CHECK_NULLPTR(obj, "object handle", false);
+	Object& object = *static_cast<Object*>(obj);
+	object.allocate_lod_levels(slots);
+	return true;
+	CATCH_ALL(false)
+}
+
+LodHdl object_add_lod(ObjectHdl obj, LodLevel level, Boolean asReduced) {
 	TRY
 	CHECK_NULLPTR(obj, "object handle", nullptr);
 	Object& object = *static_cast<Object*>(obj);
+	if(asReduced)
+		return &object.add_reduced_lod(level);
 	return &object.add_lod(level);
 	CATCH_ALL(nullptr)
 }
@@ -1790,11 +1772,11 @@ SceneHdl world_get_current_scene(MufflonInstanceHdl instHdl) {
 	CATCH_ALL(nullptr)
 }
 
-Boolean world_finalize(MufflonInstanceHdl instHdl, const char** msg) {
+Boolean world_finalize(MufflonInstanceHdl instHdl, const Vec3 min, const Vec3 max, const char** msg) {
 	TRY
 	CHECK_NULLPTR(instHdl, "mufflon instance", false);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
-	switch(muffInst.world.finalize_world()) {
+	switch(muffInst.world.finalize_world(ei::Box{ util::pun<ei::Vec3>(min), util::pun<ei::Vec3>(max) })) {
 		case WorldContainer::Sanity::SANE: *msg = "";  return true;
 		case WorldContainer::Sanity::NO_CAMERA: *msg = "No camera"; return false;
 		case WorldContainer::Sanity::NO_INSTANCES: *msg = "No instances"; return false;
@@ -1836,19 +1818,19 @@ TextureHdl world_add_texture(MufflonInstanceHdl instHdl, const char* path, Textu
 	}
 
 	// Use the plugins to load the texture
-	fs::path filePath(path);
+	const auto filePath = fs::u8path(path);
 	TextureData texData{};
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
-			if(plugin.can_load_format(filePath.extension().string())) {
-				if(plugin.load(filePath.string(), &texData))
+			if(plugin.can_load_format(filePath.extension().u8string())) {
+				if(plugin.load(filePath.u8string(), &texData))
 					break;
 			}
 		}
 	}
 	if(texData.data == nullptr) {
 		logError("[", FUNCTION_NAME, "] No plugin could load texture '",
-				 filePath.string(), "'");
+				 filePath.u8string(), "'");
 		return nullptr;
 	}
 
@@ -1898,19 +1880,19 @@ TextureHdl world_add_texture_converted(MufflonInstanceHdl instHdl, const char* p
 	}
 
 	// Use the plugins to load the texture
-	fs::path filePath(path);
+	const auto filePath = fs::u8path(path);
 	TextureData texData{};
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
-			if(plugin.can_load_format(filePath.extension().string())) {
-				if(plugin.load(filePath.string(), &texData))
+			if(plugin.can_load_format(filePath.extension().u8string())) {
+				if(plugin.load(filePath.u8string(), &texData))
 					break;
 			}
 		}
 	}
 	if(texData.data == nullptr) {
 		logError("[", FUNCTION_NAME, "] No plugin could load texture '",
-				 filePath.string(), "'");
+				 filePath.u8string(), "'");
 		return nullptr;
 	}
 
@@ -2023,19 +2005,19 @@ Boolean world_add_displacement_map(MufflonInstanceHdl instHdl, const char* path,
 	}
 
 	// Use the plugins to load the texture
-	fs::path filePath(path);
+	const auto filePath = fs::u8path(path);
 	TextureData texData{};
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
-			if(plugin.can_load_format(filePath.extension().string())) {
-				if(plugin.load(filePath.string(), &texData))
+			if(plugin.can_load_format(filePath.extension().u8string())) {
+				if(plugin.load(filePath.u8string(), &texData))
 					break;
 			}
 		}
 	}
 	if(texData.data == nullptr) {
 		logError("[", FUNCTION_NAME, "] No plugin could load texture '",
-				 filePath.string(), "'");
+				 filePath.u8string(), "'");
 		return false;
 	}
 
@@ -2900,12 +2882,12 @@ Boolean scenario_assign_material(ScenarioHdl scenario, MatIdx index,
 	CATCH_ALL(false)
 }
 
-Boolean world_finalize_scenario(MufflonInstanceHdl instHdl, ConstScenarioHdl scenario, const char** msg) {
+Boolean world_finalize_scenario(MufflonInstanceHdl instHdl, ScenarioHdl scenario, const char** msg) {
 	TRY
 	CHECK_NULLPTR(instHdl, "mufflon instance", false);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK_NULLPTR(scenario, "scenario handle", false);
-	switch(muffInst.world.finalize_scenario(static_cast<ConstScenarioHandle>(scenario))) {
+	switch(muffInst.world.finalize_scenario(static_cast<ScenarioHandle>(scenario))) {
 		case WorldContainer::Sanity::SANE: *msg = "";  return true;
 		case WorldContainer::Sanity::NO_CAMERA: *msg = "No camera"; return false;
 		case WorldContainer::Sanity::NO_INSTANCES: *msg = "No instances"; return false;
@@ -3318,7 +3300,7 @@ Boolean world_set_dir_light_irradiance(MufflonInstanceHdl instHdl, LightHdl hdl,
 
 const char* world_get_env_light_map(MufflonInstanceHdl instHdl, ConstLightHdl hdl) {
 	TRY
-	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(hdl.type == LightType::LIGHT_ENVMAP, "light type must be envmap", nullptr);
 	const lights::Background* background = muffInst.world.get_background(hdl.index);
@@ -3573,7 +3555,7 @@ uint32_t render_get_renderer_variations(MufflonInstanceHdl instHdl, uint32_t ind
 
 const char* render_get_renderer_name(MufflonInstanceHdl instHdl, uint32_t index) {
 	TRY
-	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(index < muffInst.renderers.size(), "renderer index out of bounds", nullptr);
 	return &muffInst.renderers.get_key(index)[0u];
@@ -3582,7 +3564,7 @@ const char* render_get_renderer_name(MufflonInstanceHdl instHdl, uint32_t index)
 
 const char* render_get_renderer_short_name(MufflonInstanceHdl instHdl, uint32_t index) {
 	TRY
-	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	CHECK(index < muffInst.renderers.size(), "renderer index out of bounds", nullptr);
 	return &muffInst.renderers.get(index).front()->get_short_name()[0u];
@@ -3626,7 +3608,7 @@ Boolean render_enable_renderer(MufflonInstanceHdl instHdl, uint32_t index, uint3
 	CATCH_ALL(false)
 }
 
-Boolean render_iterate(MufflonInstanceHdl instHdl, ProcessTime* time) {
+Boolean render_iterate(MufflonInstanceHdl instHdl, ProcessTime* iterateTime, ProcessTime* preTime, ProcessTime* postTime) {
 	TRY
 	CHECK_NULLPTR(instHdl, "mufflon instance", false);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
@@ -3672,15 +3654,27 @@ Boolean render_iterate(MufflonInstanceHdl instHdl, ProcessTime* time) {
 		logError("[", FUNCTION_NAME, "] Scene not yet set for renderer");
 		return false;
 	}
+	if(preTime != nullptr) {
+		preTime->cycles = CpuProfileState::get_cpu_cycle();
+		preTime->microseconds = CpuProfileState::get_process_time().count();
+	}
 	muffInst.currentRenderer->pre_iteration(*muffInst.imageOutput);
-	if(time != nullptr) {
-		time->cycles = CpuProfileState::get_cpu_cycle();
-		time->microseconds = CpuProfileState::get_process_time().count();
+	if(preTime != nullptr) {
+		preTime->cycles = CpuProfileState::get_cpu_cycle() - preTime->cycles;
+		preTime->microseconds = CpuProfileState::get_process_time().count() - preTime->microseconds;
+	}
+	if(iterateTime != nullptr) {
+		iterateTime->cycles = CpuProfileState::get_cpu_cycle();
+		iterateTime->microseconds = CpuProfileState::get_process_time().count();
 	}
 	muffInst.currentRenderer->iterate();
-	if(time != nullptr) {
-		time->cycles = CpuProfileState::get_cpu_cycle() - time->cycles;
-		time->microseconds = CpuProfileState::get_process_time().count() - time->microseconds;
+	if(iterateTime != nullptr) {
+		iterateTime->cycles = CpuProfileState::get_cpu_cycle() - iterateTime->cycles;
+		iterateTime->microseconds = CpuProfileState::get_process_time().count() - iterateTime->microseconds;
+	}
+	if(postTime != nullptr) {
+		postTime->cycles = CpuProfileState::get_cpu_cycle();
+		postTime->microseconds = CpuProfileState::get_process_time().count();
 	}
 	muffInst.currentRenderer->post_iteration(*muffInst.imageOutput);
 	Profiler::core().create_snapshot_all();
@@ -3718,21 +3712,21 @@ Boolean render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename,
 	}
 
 	// Make the image a PFM by default
-	fs::path fileName = std::string(filename);
-	if(fileName.extension() != ".pfm")
-		fileName += ".pfm";
+	auto fileName = fs::u8path(filename);
+	if(fileName.extension() == "" || fileName.extension() == ".")
+		fileName.replace_extension(".pfm");
 	if(!fileName.is_absolute())
 		fileName = fs::absolute(fileName);
 
 	// Replace tags in the file name
-	const auto name = replace_screenshot_filename_tags(muffInst, fileName.stem().string(), targetName, variance);
-	fileName = fileName.parent_path() / fs::path(name + fileName.extension().string());
+	const auto name = replace_screenshot_filename_tags(muffInst, fileName.stem().u8string(), targetName, variance);
+	fileName = fileName.parent_path() / fs::u8path(name + fileName.extension().u8string());
 
 	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
 	fs::path directory = fileName.parent_path();
 	if(!fs::exists(directory))
 		if(!fs::create_directories(directory))
-			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
+			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.u8string(),
 					   "; the screenshot possibly may not be created");
 
 	auto data = muffInst.imageOutput->get_data(targetName, variance);
@@ -3742,7 +3736,8 @@ Boolean render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename,
 	TextureData texData{};
 	texData.data = reinterpret_cast<uint8_t*>(data.get());
 	texData.components = numChannels;
-	texData.format = numChannels == 1 ? FORMAT_R32F : FORMAT_RGB32F;
+	texData.format = numChannels == 1 ? FORMAT_R32F : (numChannels == 2 ? FORMAT_RG32F
+													   : (numChannels == 3 ? FORMAT_RGB32F : FORMAT_RGBA32F));
 	texData.width = res.x;
 	texData.height = res.y;
 	texData.sRgb = false;
@@ -3750,15 +3745,17 @@ Boolean render_save_screenshot(MufflonInstanceHdl instHdl, const char* filename,
 
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
-			if(plugin.can_store_format(fileName.extension().string())) {
-				if(plugin.store(fileName.string(), &texData))
-					break;
+			if(plugin.can_store_format(fileName.extension().u8string())) {
+				if(plugin.store(fileName.u8string(), &texData)) {
+					logInfo("[", FUNCTION_NAME, "] Saved screenshot '", fileName.u8string(), "'");
+					return true;
+				}
 			}
 		}
 	}
-	logInfo("[", FUNCTION_NAME, "] Saved screenshot '", fileName.string(), "'");
 
-	return true;
+	logError("[", FUNCTION_NAME, "] No exporter could save screenshot of file type '", fileName.extension().string(), "'");
+	return false;
 	CATCH_ALL(false)
 }
 
@@ -3815,20 +3812,20 @@ Boolean render_save_denoised_radiance(MufflonInstanceHdl instHdl, const char* fi
 	}
 
 	// Make the image a PFM by default
-	fs::path fileName = std::string(filename);
+	auto fileName = fs::u8path(filename);
 	if(fileName.extension() != ".pfm")
 		fileName += ".pfm";
 	if(!fileName.is_absolute())
 		fileName = fs::absolute(fileName);
 
-	const auto name = replace_screenshot_filename_tags(muffInst, fileName.stem().string(), "Radiance(denoised)", false);
-	fileName = fileName.parent_path() / fs::path(name + fileName.extension().string());
+	const auto name = replace_screenshot_filename_tags(muffInst, fileName.stem().u8string(), "Radiance(denoised)", false);
+	fileName = fileName.parent_path() / fs::u8path(name + fileName.extension().u8string());
 
 	// If necessary, create the directory we want to save our image in (alternative is to not save it at all)
 	fs::path directory = fileName.parent_path();
 	if(!fs::exists(directory))
 		if(!fs::create_directories(directory))
-			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.string(),
+			logWarning("[", FUNCTION_NAME, "] Could not create screenshot directory '", directory.u8string(),
 					   "; the screenshot possibly may not be created");
 
 	const int numChannels = muffInst.imageOutput->get_num_channels("Radiance");
@@ -3843,14 +3840,14 @@ Boolean render_save_denoised_radiance(MufflonInstanceHdl instHdl, const char* fi
 
 	for(auto& plugin : s_plugins) {
 		if(plugin.is_loaded()) {
-			if(plugin.can_store_format(fileName.extension().string())) {
-				if(plugin.store(fileName.string(), &texData))
+			if(plugin.can_store_format(fileName.extension().u8string())) {
+				if(plugin.store(fileName.u8string(), &texData))
 					break;
 			}
 		}
 	}
 
-	logInfo("[", FUNCTION_NAME, "] Finished denoising '", fileName.string(), "'");
+	logInfo("[", FUNCTION_NAME, "] Finished denoising '", fileName.u8string(), "'");
 
 	return true;
 	CATCH_ALL(false)
@@ -3869,7 +3866,7 @@ uint32_t render_get_render_target_count(MufflonInstanceHdl instHdl) {
 }
 
 const char* render_get_render_target_name(MufflonInstanceHdl instHdl, uint32_t index) {
-	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	if(muffInst.imageOutput == nullptr)
 		return "";
@@ -3940,7 +3937,7 @@ uint32_t renderer_get_num_parameters(MufflonInstanceHdl instHdl) {
 
 const char* renderer_get_parameter_desc(MufflonInstanceHdl instHdl, uint32_t idx, ParameterType* type) {
 	TRY
-	CHECK_NULLPTR(instHdl, "mufflon instance", false);
+	CHECK_NULLPTR(instHdl, "mufflon instance", nullptr);
 	MufflonInstance& muffInst = *static_cast<MufflonInstance*>(instHdl);
 	if(muffInst.currentRenderer == nullptr) {
 		logError("[", FUNCTION_NAME, "] Currently, no renderer is set.");
@@ -4266,14 +4263,13 @@ size_t profiling_get_used_gpu_memory() {
 Boolean core_set_logger(void(*logCallback)(const char*, int)) {
 	TRY
 	if(s_logCallback == nullptr) {
-		registerMessageHandler(delegateLog);
-		disableStdHandler();
+		setMessageHandler(delegateLog);
 
 		s_logCallback = logCallback;
 		// Give the new logger a status report and set the plugin loggers
 		for(auto& plugin : s_plugins) {
 			logInfo("[", FUNCTION_NAME, "] Loaded texture plugin '",
-					plugin.get_path().string(), "'");
+					plugin.get_path().u8string(), "'");
 		}
 		int count = 0;
 		cuda::check_error(cudaGetDeviceCount(&count));
@@ -4346,7 +4342,7 @@ MufflonInstanceHdl mufflon_initialize() {
 					// add it as a usable plugin
 					if(plugin.is_loaded()) {
 						logInfo("[", FUNCTION_NAME, "] Loaded texture plugin '",
-								plugin.get_path().string(), "'");
+								plugin.get_path().u8string(), "'");
 						s_plugins.push_back(std::move(plugin));
 					}
 				}

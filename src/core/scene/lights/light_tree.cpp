@@ -1,6 +1,7 @@
 #include "light_tree.hpp"
 #include "ei/3dtypes.hpp"
 #include "util/assert.hpp"
+#include "core/concepts.hpp"
 #include "core/memory/allocator.hpp"
 #include "core/cuda/error.hpp"
 #include "core/math/sfcurves.hpp"
@@ -449,6 +450,11 @@ void LightTreeBuilder::build(std::vector<PositionalLights>&& posLights,
 //__device__ GuideFunction cudaGuideFluxPos = guide_flux_pos;
 //__device__ float pi_gpu = 0;
 
+std::size_t LightTreeBuilder::descriptor_size() const noexcept {
+	return m_treeMemory.size() + m_primToNodePath.size()
+		+ (m_envLight != nullptr ? m_envLight->descriptor_size() : 0u);
+}
+
 template < Device dev >
 void LightTreeBuilder::synchronize(const ei::Box& sceneBounds) {
 	// Background is no longer outdated
@@ -670,6 +676,8 @@ void LightTreeBuilder::unload() {
 	}
 	// TODO: unload envmap handle
 }
+
+template struct DeviceManagerConcept<scene::lights::LightTreeBuilder>;
 
 template void LightTreeBuilder::synchronize<Device::CPU>(const ei::Box&);
 template void LightTreeBuilder::synchronize<Device::CUDA>(const ei::Box&);

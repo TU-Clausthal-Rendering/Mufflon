@@ -25,6 +25,8 @@ float DeviceSort(u32 numElements,
 	// Allocate temporary memory.
 	void* tempStorage = nullptr;
 	cuda::check_error(cudaMalloc(&tempStorage, storageSize));
+	// TODO: remove again
+	//cuda::check_error(cudaMemset(tempStorage, 0, storageSize));
 
 	float elapsedTime = 0.0f;
 #ifdef MEASURE_EXECUTION_TIMES

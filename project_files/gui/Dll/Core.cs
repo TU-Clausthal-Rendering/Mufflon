@@ -189,6 +189,17 @@ namespace gui.Dll
             IntPtr name;
         };
 
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct LodMetadata
+        {
+            UInt32 vertices;
+            UInt32 triangles;
+            UInt32 quads;
+            UInt32 edges;
+            UInt32 spheres;
+        };
+
         public enum CameraType
         {
             Pinhole,
@@ -304,6 +315,8 @@ namespace gui.Dll
 
         public delegate void LogCallback(string message, Severity severity);
         public delegate void LodLoaderFunc(IntPtr userParams, IntPtr objHdl, UInt32 UInt32);
+        public delegate void ObjMatIndicesFunc(IntPtr userParams, UInt32 objId, IntPtr indices, out UInt32 count);
+        public delegate void LodMetaDataFuncPtr(IntPtr userParams, out LodMetadata data, out UInt64 read);
         public delegate Vec4 TextureCallback(UInt32 x, UInt32 y, UInt32 layer, TextureFormat format, Vec4 value, IntPtr userParams);
 
 
@@ -331,8 +344,8 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "mufflon_is_cuda_available")]
         internal static extern Boolean mufflon_is_cuda_available();
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "mufflon_set_lod_loader")]
-        private static extern Boolean mufflon_set_lod_loader_(IntPtr instHdl, LodLoaderFunc loader, IntPtr userParams);
-        internal static Boolean mufflon_set_lod_loader(LodLoaderFunc loader, IntPtr userParams) { return mufflon_set_lod_loader_(muffInstHdl, loader, userParams); }
+        private static extern Boolean mufflon_set_lod_loader_(IntPtr instHdl, LodLoaderFunc loader, ObjMatIndicesFunc objFunc, LodMetaDataFuncPtr metaFunc, IntPtr userParams);
+        internal static Boolean mufflon_set_lod_loader(LodLoaderFunc loader, ObjMatIndicesFunc objFunc, LodMetaDataFuncPtr metaFunc, IntPtr userParams) { return mufflon_set_lod_loader_(muffInstHdl, loader, objFunc, metaFunc, userParams); }
 
         // Render image functions
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "mufflon_get_target_image")]
@@ -360,7 +373,7 @@ namespace gui.Dll
 
         // Polygon interface
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_reserve")]
-        internal static extern Boolean polygon_reserve(IntPtr lvlDtl, ulong vertices, ulong edges, ulong tris, ulong quads);
+        internal static extern Boolean polygon_reserve(IntPtr lvlDtl, ulong vertices, ulong tris, ulong quads);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_request_vertex_attribute")]
         internal static extern VertexAttributeHdl polygon_request_vertex_attribute(IntPtr lvlDtl, IntPtr name, GeomAttributeType type);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_request_face_attribute")]
@@ -394,8 +407,6 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_set_material_idx_bulk")]
         internal static extern ulong polygon_set_material_idx_bulk(IntPtr lvlDtl, IntPtr stream);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_get_vertex_count")]
-        internal static extern ulong polygon_get_vertex_count(IntPtr lvlDtl);
-        [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_get_edge_count")]
         internal static extern ulong polygon_get_edge_count(IntPtr lvlDtl);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "polygon_get_face_count")]
         internal static extern ulong polygon_get_face_count(IntPtr lvlDtl);
@@ -443,7 +454,7 @@ namespace gui.Dll
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "object_has_lod")]
         internal static extern Boolean object_has_lod(IntPtr obj, UInt32 level);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "object_add_lod")]
-        internal static extern IntPtr object_add_lod(IntPtr obj, UInt32 level);
+        internal static extern IntPtr object_add_lod(IntPtr obj, UInt32 level, UInt32 asReduced);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "object_get_id")]
         internal static extern Boolean object_get_id(IntPtr obj, IntPtr id);
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "world_reserve_objects_instances")]
@@ -919,8 +930,8 @@ namespace gui.Dll
         private static extern Boolean render_enable_renderer_(IntPtr instHdl, UInt32 index, UInt32 variation);
         internal static Boolean render_enable_renderer(UInt32 index, UInt32 variation) { return render_enable_renderer_(muffInstHdl, index, variation); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_iterate")]
-        private static extern Boolean render_iterate_(IntPtr instHdl, out ProcessTime time);
-        internal static Boolean render_iterate(out ProcessTime time) { return render_iterate_(muffInstHdl, out time); }
+        private static extern Boolean render_iterate_(IntPtr instHdl, out ProcessTime iterateTime, out ProcessTime preTime, out ProcessTime postTime);
+        internal static Boolean render_iterate(out ProcessTime iterateTime, out ProcessTime preTime, out ProcessTime postTime) { return render_iterate_(muffInstHdl, out iterateTime, out preTime, out postTime); }
         [DllImport("core.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "render_get_current_iteration")]
         private static extern UInt32 render_get_current_iteration_(IntPtr instHdl);
         internal static UInt32 render_get_current_iteration() { return render_get_current_iteration_(muffInstHdl); }

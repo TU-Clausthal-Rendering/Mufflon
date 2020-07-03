@@ -1,13 +1,11 @@
 #pragma once
 
-#include "core/scene/attributes/attribute.hpp"
 #include "core/scene/types.hpp"
+#include "core/scene/attributes/attribute.hpp"
 #include "core/scene/tessellation/tessellater.hpp"
 #include <ei/3dtypes.hpp>
 #include <ei/vector.hpp>
-#include <tuple>
 #include <vector>
-#include <unordered_set>
 
 namespace mufflon {
 enum class Device : unsigned char;
@@ -89,14 +87,6 @@ public:
 	void synchronize() {
 		m_attributes.synchronize<dev>();
 	}
-	/*template < Device dev >
-	void synchronize(StringView name) {
-		m_attributes.synchronize<dev>(name);
-	}
-	template < Device dev >
-	void synchronize(SphereAttributeHandle hdl) {
-		m_attributes.synchronize<dev>(hdl);
-	}*/
 
 	template < Device dev >
 	void unload() {
@@ -159,6 +149,10 @@ public:
 	// Gets the descriptor with only default attributes (position etc)
 	template < Device dev >
 	SpheresDescriptor<dev> get_descriptor();
+	// Gets the size of the final descriptor
+	std::size_t desciptor_size() const noexcept {
+		return this->get_sphere_count() * (sizeof(ei::Sphere) + sizeof(MaterialIndex));
+	}
 	// Updates the descriptor with the given set of attributes
 	template < Device dev >
 	void update_attribute_descriptor(SpheresDescriptor<dev>& descriptor,

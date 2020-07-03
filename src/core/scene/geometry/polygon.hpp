@@ -1,18 +1,19 @@
 #pragma once
 
 #include "polygon_mesh.hpp"
-#include "util/assert.hpp"
+#include "util/range.hpp"
+#include "util/string_view.hpp"
+#include "core/memory/unique_device_ptr.hpp"
+#include "core/scene/types.hpp"
 #include "core/scene/attributes/attribute.hpp"
 #include "core/scene/attributes/attribute_handles.hpp"
-#include "core/scene/types.hpp"
-#include "util/range.hpp"
 #include <ei/3dtypes.hpp>
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
+#include <atomic>
+#include <functional>
 #include <optional>
-#include "util/string_view.hpp"
 #include <tuple>
 #include <vector>
-#include <unordered_set>
 
 // Forward declarations
 namespace OpenMesh::Subdivider::Uniform {
@@ -27,6 +28,10 @@ namespace OpenMesh::Decimater {
 template < class Mesh >
 class DecimaterT;
 } // namespace OpenMesh::Decimater
+namespace OpenMesh::Geometry {
+template < class >
+class QuadricT;
+}
 
 namespace mufflon::util {
 class IByteReader;
@@ -61,12 +66,12 @@ public:
 	using Quad = std::array<Index, 4u>;
 	// OpenMesh types
 	// TODO: change attributelist
-	using VertexAttributePoolType = OpenMeshAttributePool<false>;
-	using FaceAttributePoolType = OpenMeshAttributePool<true>;
-	using VertexHandle = OpenMesh::VertexHandle;
-	using FaceHandle = OpenMesh::FaceHandle;
-	using TriangleHandle = OpenMesh::FaceHandle;
-	using QuadHandle = OpenMesh::FaceHandle;
+	using VertexAttributePoolType = AttributePool;
+	using FaceAttributePoolType = AttributePool;
+	using VertexHandle = u32;
+	using FaceHandle = u32;
+	using TriangleHandle = u32;
+	using QuadHandle = u32;
 
 	// Struct for communicating the number of bulk-read vertex attributes
 	struct VertexBulkReturn {
@@ -74,58 +79,6 @@ public:
 		std::size_t readPoints;
 		std::size_t readNormals;
 		std::size_t readUvs;
-	};
-
-	class FaceIterator {
-	public:
-		static FaceIterator cbegin(const PolygonMeshType& mesh) {
-			return FaceIterator(mesh, mesh.faces().begin());
-		}
-
-		static FaceIterator cend(const PolygonMeshType& mesh) {
-			return FaceIterator(mesh, mesh.faces().end());
-		}
-
-		FaceIterator& operator++() {
-			++m_faceIter;
-			return *this;
-		}
-
-		FaceIterator operator++(int) {
-			FaceIterator temp(*this);
-			++(*this);
-			return temp;
-		}
-
-		bool operator!=(const FaceIterator &other) {
-			return m_faceIter != other.m_faceIter;
-		}
-
-		std::size_t get_vertex_count() const {
-			mAssert(m_faceIter != m_mesh.faces().end());
-			mAssert(m_faceIter->is_valid());
-			mAssert(static_cast<std::size_t>(m_faceIter->idx()) < m_mesh.n_faces());
-			return std::distance(m_mesh.cfv_ccwbegin(*m_faceIter), m_mesh.cfv_ccwend(*m_faceIter));
-		}
-
-		OpenMesh::PolyConnectivity::ConstFaceVertexRange operator*() const {
-			mAssert(m_faceIter != m_mesh.faces().end());
-			mAssert(m_faceIter->is_valid());
-			mAssert(static_cast<std::size_t>(m_faceIter->idx()) < m_mesh.n_faces());
-			return m_mesh.fv_range(*m_faceIter);
-		}
-
-		const OpenMesh::PolyConnectivity::ConstFaceIter& operator->() const noexcept {
-			return m_faceIter;
-		}
-
-	private:
-		FaceIterator(const PolygonMeshType& mesh, OpenMesh::PolyConnectivity::ConstFaceIter iter) :
-			m_mesh(mesh),
-			m_faceIter(std::move(iter)) {}
-
-		const PolygonMeshType& m_mesh;
-		OpenMesh::PolyConnectivity::ConstFaceIter m_faceIter;
 	};
 
 	// Ensure matching data types
@@ -138,16 +91,68 @@ public:
 				  && alignof(OpenMesh::Vec3f) == alignof(Normal),
 				  "Normal type must be compatible to OpenMesh");
 
+	// Triangle/Quad iterators
+	class TriangleIter {
+	public:
+		ei::UVec3 operator*() const noexcept {
+			return ei::UVec3{ m_indices[m_currIndex], m_indices[m_currIndex + 1u], m_indices[m_currIndex + 2u] };
+		}
+		TriangleIter& operator++() noexcept { m_currIndex += 3u; return *this; }
+		TriangleIter operator++(int) noexcept { TriangleIter temp{ *this }; m_currIndex += 3u; return temp; }
+		bool operator==(const TriangleIter& rhs) const noexcept {
+			return (m_indices == rhs.m_indices) && (m_currIndex == rhs.m_currIndex);
+		}
+		bool operator!=(const TriangleIter& rhs) const noexcept { return !((*this) == rhs); }
+
+	private:
+		friend class Polygons;
+
+		TriangleIter(const u32* indices, std::size_t currIndex) :
+			m_indices{ indices },
+			m_currIndex{ currIndex }
+		{}
+
+		const u32* m_indices;
+		std::size_t m_currIndex;
+	};
+	class QuadIter {
+	public:
+		ei::UVec4 operator*() const noexcept {
+			return ei::UVec4{ m_indices[m_currIndex], m_indices[m_currIndex + 1u],
+							  m_indices[m_currIndex + 2u], m_indices[m_currIndex + 3u] };
+		}
+		QuadIter& operator++() noexcept { m_currIndex += 4u; return *this; }
+		QuadIter operator++(int) noexcept { QuadIter temp{ *this }; m_currIndex += 3u; return temp; }
+
+		bool operator==(const QuadIter& rhs) const noexcept {
+			return (m_indices == rhs.m_indices) && (m_currIndex == rhs.m_currIndex);
+		}
+		bool operator!=(const QuadIter& rhs) const noexcept { return !((*this) == rhs); }
+
+	private:
+		friend class Polygons;
+
+		QuadIter(const u32* indices, std::size_t currIndex) :
+			m_indices{ indices },
+			m_currIndex{ currIndex }
+		{}
+
+		const u32* m_indices;
+		std::size_t m_currIndex;
+	};
+
 	// Default construction, creates material-index attribute.
 	Polygons();
+	// Create a polygon from an existing mesh
+	Polygons(const PolygonMeshType& mesh, const OpenMesh::FPropHandleT<MaterialIndex> mats = OpenMesh::FPropHandleT<MaterialIndex>{});
 
 	Polygons(const Polygons&);
 	Polygons(Polygons&&);
 	Polygons& operator=(const Polygons&) = delete;
 	Polygons& operator=(Polygons&&) = delete;
-	~Polygons();
+	~Polygons() = default;
 
-	void reserve(std::size_t vertices, std::size_t edges, std::size_t tris, std::size_t quads);
+	void reserve(std::size_t vertices, std::size_t tris, std::size_t quads);
 
 	VertexAttributeHandle add_vertex_attribute(StringView name, AttributeType type) {
 		// Special casing to accelerate animation query
@@ -197,19 +202,6 @@ public:
 	template < Device dev >
 	void synchronize();
 
-	/*template < Device dev >
-	void synchronize(VertexAttributeHandle hdl) {
-		m_vertexAttributes.synchronize<dev>(hdl);
-	}
-	template < Device dev >
-	void synchronize(FaceAttributeHandle hdl) {
-		m_faceAttributes.synchronize<dev>(hdl);
-	}
-	template < Device dev, bool face >
-	void synchronize(StringView name) {
-		get_attributes<face>().synchronize<dev>(name);
-	}*/
-
 	template < Device dev >
 	void unload() {
 		m_vertexAttributes.unload<dev>();
@@ -226,6 +218,12 @@ public:
 	// Gets the descriptor with only default attributes (position etc)
 	template < Device dev >
 	PolygonsDescriptor<dev> get_descriptor();
+	// Gets the size of the final descriptor
+	std::size_t desciptor_size() const noexcept {
+		return this->get_vertex_count() * (2u * sizeof(ei::Vec3) +  sizeof(ei::Vec2))
+			+ this->get_triangle_count() * (3u * sizeof(u32) + sizeof(MaterialIndex))
+			+ this->get_quad_count() * (4u * sizeof(u32) + sizeof(MaterialIndex));
+	}
 	// Updates the descriptor with the given set of attributes
 	template < Device dev >
 	void update_attribute_descriptor(PolygonsDescriptor<dev>& descriptor,
@@ -237,20 +235,16 @@ public:
 	// Adds a new triangle.
 	TriangleHandle add(const Triangle& tri);
 	TriangleHandle add(const VertexHandle& v0, const VertexHandle& v1, const VertexHandle& v2);
-	TriangleHandle add(const std::array<VertexHandle, 3u>& vertices);
 	TriangleHandle add(const Triangle& tri, MaterialIndex idx);
 	TriangleHandle add(const VertexHandle& v0, const VertexHandle& v1, const VertexHandle& v2,
 					   MaterialIndex idx);
-	TriangleHandle add(const std::array<VertexHandle, 3u>& vertices, MaterialIndex idx);
 	// Adds a new quad.
 	QuadHandle add(const Quad& quad);
 	QuadHandle add(const VertexHandle& v0, const VertexHandle& v1, const VertexHandle& v2,
 				   const VertexHandle& v3);
-	QuadHandle add(const std::array<VertexHandle, 4u>& vertices);
 	QuadHandle add(const Quad& quad, MaterialIndex idx);
 	QuadHandle add(const VertexHandle& v0, const VertexHandle& v1, const VertexHandle& v2,
 				   const VertexHandle& v3, MaterialIndex idx);
-	QuadHandle add(const std::array<VertexHandle, 4u>& vertices, MaterialIndex idx);
 
 	/**
 	 * Adds a bulk of vertices.
@@ -276,6 +270,18 @@ public:
 	std::size_t add_bulk(const FaceAttributeHandle& hdl, const FaceHandle& startFace,
 						 std::size_t count, util::IByteReader& attrStream);
 
+	// TODO: add bulk triangle/quad
+
+	/**
+	 * To perform mesh operations that require neighborhood information, index buffers are not enough.
+	 * For that we (temporarily!) construct an OpenMesh mesh instance, which encapsulates a half-edge
+	 * data structure. To match the attributes etc. you can write it back into the polygon.
+	 */
+	PolygonMeshType create_halfedge_structure();
+	void create_halfedge_structure(PolygonMeshType& mesh);
+
+	void recompute_vertex_normals(std::vector<ei::Vec3>* normals);
+
 	// Implements tessellation for the mesh
 	void tessellate(tessellation::TessLevelOracle& oracle, const Scenario* scenario,
 					const bool usePhong);
@@ -290,44 +296,17 @@ public:
 	// Returns wether there was an animation or not (in which case nothing was done).
 	bool apply_animation(u32 frame, const Bone* bones);
 
-	// Creates a decimater 
-	OpenMesh::Decimater::DecimaterT<PolygonMeshType> create_decimater();
-	// Implements decimation.
-	std::size_t decimate(OpenMesh::Decimater::DecimaterT<PolygonMeshType>& decimater,
-						 std::size_t targetVertices, bool garbageCollect);
-
-	// Splits a vertex
-	std::pair<FaceHandle, FaceHandle> vertex_split(const VertexHandle v0, const VertexHandle v1,
-												   const VertexHandle vl, const VertexHandle vr);
-	// Garbage-collects the mesh and the index buffer
-	void garbage_collect();
-
 	// Transforms polygon data
 	void transform(const ei::Mat3x4& transMat);
+
+	float compute_surface_area();
 
 	// Computes the "mean_curvature" attribute for all vertices
 	void compute_curvature();
 
-	// Gets a constant handle to the underlying mesh data.
-	const PolygonMeshType& native() const {
-		mAssert(m_meshData != nullptr);
-		return *m_meshData;
-	}
-
-	// Get iterator over all faces (and vertices for the faces)
-	util::Range<FaceIterator> faces() const {
-		mAssert(m_meshData != nullptr);
-		return util::Range<FaceIterator>{
-			FaceIterator::cbegin(*m_meshData),
-				FaceIterator::cend(*m_meshData)
-		};
-	}
-
 	template < Device dev >
 	ConstArrayDevHandle_t<dev, u32> get_index_buffer() {
-		return ConstArrayDevHandle_t<dev, u32>{
-			m_indexBuffer.get<IndexBuffer<dev>>().indices
-		};
+		return ConstArrayDevHandle_t<dev, u32>{ m_indexBuffer.get<IndexBuffer<dev>>().indices.get() };
 	}
 
 	template < Device dev, class T >
@@ -349,13 +328,13 @@ public:
 	template < Device dev, class T >
 	ArrayDevHandle_t<dev, T> acquire_vertex(const AttributeIdentifier& ident) {
 		if(const auto handle = m_vertexAttributes.find_attribute(ident); handle.has_value())
-			return this->template acquire<dev, T>(handle.value());
+			return this->template acquire<dev, T>(VertexAttributeHandle{ handle.value() });
 		return {};
 	}
 	template < Device dev, class T >
 	ArrayDevHandle_t<dev, T> acquire_face(const AttributeIdentifier& ident) {
 		if(const auto handle = m_faceAttributes.find_attribute(ident); handle.has_value())
-			return this->template acquire<dev, T>(handle.value());
+			return this->template acquire<dev, T>(FaceAttributeHandle{ handle.value() });
 		return {};
 	}
 	template < Device dev, class T >
@@ -379,17 +358,16 @@ public:
 	const FaceAttributeHandle& get_material_indices_hdl() const noexcept {
 		return m_matIndicesHdl;
 	}
+	std::optional<VertexAttributeHandle> get_curvature_hdl() const noexcept {
+		return m_curvatureHdl;
+	}
 
 	const ei::Box& get_bounding_box() const noexcept {
 		return m_boundingBox;
 	}
 
 	std::size_t get_vertex_count() const noexcept {
-		return m_meshData->n_vertices();
-	}
-
-	std::size_t get_edge_count() const noexcept {
-		return m_meshData->n_edges();
+		return m_vertexAttributes.get_attribute_elem_count();
 	}
 
 	std::size_t get_triangle_count() const noexcept {
@@ -401,15 +379,16 @@ public:
 	}
 
 	std::size_t get_face_count() const noexcept {
-		return m_meshData->n_faces();
+		return get_triangle_count() + get_quad_count();
 	}
 
-	PolygonMeshType& get_mesh() noexcept {
-		return *m_meshData;
+	util::Range<TriangleIter> triangles() {
+		const auto indices = this->template get_index_buffer<Device::CPU>();
+		return util::Range{ TriangleIter{ indices, 0u }, TriangleIter{ indices, 3u * m_triangles } };
 	}
-
-	const PolygonMeshType& get_mesh() const noexcept {
-		return *m_meshData;
+	util::Range<QuadIter> quads() {
+		const auto indices = this->template get_index_buffer<Device::CPU>() + 3u * m_triangles;
+		return util::Range{ QuadIter{ indices, 0u }, QuadIter{ indices, 4u * m_quads} };
 	}
 
 	bool was_displacement_mapping_applied() const noexcept {
@@ -428,14 +407,14 @@ private:
 	template < Device dev >
 	struct IndexBuffer {
 		static constexpr Device DEVICE = dev;
-		ArrayDevHandle_t<dev, u32> indices;
+		unique_device_ptr<dev, u32[]> indices;
 		std::size_t reserved = 0u;
 	};
 	template < Device dev >
 	struct AttribBuffer {
 		static constexpr Device DEVICE = dev;
-		ArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>> vertex;
-		ArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>> face;
+		unique_device_ptr<dev, ArrayDevHandle_t<dev, void>[]> vertex;
+		unique_device_ptr<dev, ArrayDevHandle_t<dev, void>[]> face;
 		std::size_t vertSize = 0u;
 		std::size_t faceSize = 0u;
 	};
@@ -460,11 +439,13 @@ private:
 			return m_vertexAttributes;
 	}
 
+	// Step after tessellation/displacement which adds the new faces
+	void after_tessellation(const PolygonMeshType& mesh, const OpenMesh::FaceHandle tempHandle,
+							const OpenMesh::FPropHandleT<OpenMesh::FaceHandle>& oldFaceProp);
+	void rebuild_index_buffer(const PolygonMeshType& mesh, const OpenMesh::FaceHandle tempHandle);
 	// Reserves more space for the index buffer
 	template < Device dev, bool markChanged = true >
 	void reserve_index_buffer(std::size_t capacity);
-	// Rebuilds the index buffer from scratch
-	void rebuild_index_buffer();
 	// Synchronizes two device index buffers
 	template < Device changed, Device sync >
 	void synchronize_index_buffer();
@@ -474,14 +455,12 @@ private:
 	template < Device dev >
 	void resizeAttribBuffer(std::size_t v, std::size_t f);
 
-	// It's a unique pointer so we have one fixed address we can reference in OmAttributePool
-	// TODO: does that degrade performance? probably not, since attributes aren't aquired often
-	std::unique_ptr<PolygonMeshType> m_meshData;
 	VertexAttributePoolType m_vertexAttributes;
 	FaceAttributePoolType m_faceAttributes;
 	VertexAttributeHandle m_pointsHdl;
 	VertexAttributeHandle m_normalsHdl;
 	VertexAttributeHandle m_uvsHdl;
+	std::atomic_uint32_t m_curvRefCount;
 	std::optional<VertexAttributeHandle> m_curvatureHdl;
 	std::optional<VertexAttributeHandle> m_animationWeightHdl;
 	FaceAttributeHandle m_matIndicesHdl;
@@ -494,11 +473,11 @@ private:
 	util::TaggedTuple<DescFlags<Device::CPU>, DescFlags<Device::CUDA>> m_descFlags;
 
 	ei::Box m_boundingBox;
-	std::size_t m_triangles = 0u;
-	std::size_t m_quads = 0u;
+	std::size_t m_triangles;
+	std::size_t m_quads;
 
 	// Keeps track of whether displacement mapping was already applied or not
-	bool m_wasDisplaced = false;
+	bool m_wasDisplaced;
 };
 
 }}} // namespace mufflon::scene::geometry

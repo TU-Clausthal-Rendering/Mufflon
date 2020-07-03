@@ -104,6 +104,18 @@ struct LightSubTree {
 
 	CUDA_FUNCTION __forceinline__ Node* get_node(u32 offset) { return as<Node>(memory + offset); }
 	CUDA_FUNCTION __forceinline__ const Node* get_node(u32 offset) const { return as<Node>(memory + offset); }
+
+	CUDA_FUNCTION std::pair<const char*, LightType> get_light_info(const u32 index) const {
+		if(lightCount == 1u)
+			return { memory, static_cast<LightType>(root.type) };
+		const u32 nodeIndex = index + internalNodeCount;
+		const u32 parentIndex = (nodeIndex - 1u) >> 1u; // Account for root node
+		const Node& parent = *get_node(parentIndex * sizeof(Node));
+		if(nodeIndex & 1u) // Left/right are toggled due to root node
+			return { memory + parent.left.offset, static_cast<LightType>(parent.left.type) };
+		else
+			return { memory + parent.right.offset, static_cast<LightType>(parent.right.type) };
+	}
 };
 
 //using GuideFunction = float (*)(const scene::Point&, const scene::Point&, const scene::Point&, float, float);
@@ -213,6 +225,8 @@ public:
 		else return *m_treeCuda;
 	}
 
+	std::size_t descriptor_size() const noexcept;
+
 	template < Device dev >
 	void synchronize(const ei::Box& sceneBounds);
 
@@ -256,8 +270,6 @@ private:
 };
 
 }} // namespace scene::lights
-
-template struct DeviceManagerConcept<scene::lights::LightTreeBuilder>;
 
 namespace scene { namespace lights {
 

@@ -7,7 +7,7 @@
              xmlns:helper="clr-namespace:gui.View.Helper"
              mc:Ignorable="d"
              d:DesignStyle="{StaticResource DesignerStyle}"
-             d:DesignHeight="28" d:DesignWidth="250">
+             d:DesignHeight="28" d:DesignWidth="300">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>

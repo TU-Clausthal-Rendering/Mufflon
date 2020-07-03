@@ -7,7 +7,6 @@
 #include "lights/lights.hpp"
 #include "lights/background.hpp"
 #include "core/memory/hashmap.hpp"
-#include "core/renderer/renderer.hpp"
 #include "core/scene/materials/medium.hpp"
 #include "core/scene/textures/texture.hpp"
 #include "core/scene/textures/cputexture.hpp"
@@ -18,7 +17,13 @@
 #include <memory>
 #include <vector>
 
-namespace mufflon::scene {
+namespace mufflon {
+
+namespace renderer {
+class IRenderer;
+} // namespace renderer
+
+namespace scene {
 
 /**
  * Container for all things scene-related.
@@ -27,12 +32,22 @@ namespace mufflon::scene {
  */
 class WorldContainer {
 public:
+	struct LodMetadata {
+		u32 vertices;
+		u32 triangles;
+		u32 quads;
+		u32 edges;
+		u32 spheres;
+	};
+
 	using PointLightHandle = std::map<std::string, lights::PointLight, std::less<>>::iterator;
 	using SpotLightHandle = std::map<std::string, lights::SpotLight, std::less<>>::iterator;
 	using DirLightHandle = std::map<std::string, lights::DirectionalLight, std::less<>>::iterator;
 	using EnvLightHandle = std::map<std::string, TextureHandle, std::less<>>::iterator;
 
-	using LodLoadFuncPtr = std::uint32_t(CDECL*)(void* userParams, ObjectHandle obj, u32 lod);
+	using LodLoadFuncPtr = std::uint32_t(CDECL*)(void* userParams, ObjectHandle obj, u32 lod, u32);
+	using ObjMatIndicesFuncPtr = std::uint32_t(CDECL*)(void* userParams, uint32_t objId, uint16_t * matIndices, uint32_t * count);
+	using LodMetaDataFuncPtr = std::uint32_t(CDECL*)(void* userParams, LodMetadata* data, std::size_t* read);
 
 
 	enum class Sanity {
@@ -62,10 +77,10 @@ public:
 	// Reserves animation data. Must have no prior bones added.
 	void reserve_animation(const u32 numBones, const u32 frameCount);
 	// Performs sanity check and marks the end of a loading/modifying process
-	Sanity finalize_world() const;
+	Sanity finalize_world(const ei::Box& aabb);
 	// Performs a sanity check for a given scenario (respects object masking etc.)
 	// while also finalizing it (no more changes allowed)
-	Sanity finalize_scenario(ConstScenarioHandle hdl);
+	Sanity finalize_scenario(ScenarioHandle hdl);
 	// Loads the specified scenario.
 	// This destroys the currently loaded scene and overwrites it with a new one.
 	// Returns nullptr if something goes wrong.
@@ -73,9 +88,13 @@ public:
 	// Reloads the scene from the current scenario if necessary
 	void reload_scene(renderer::IRenderer* renderer);
 	// Loads a specific LoD from file, if not already present
-	bool load_lod(Object& obj, const u32 lodIndex);
+	bool load_lod(Object& obj, const u32 lodIndex, const bool asReduced = false);
 	// Ejects a specific LoD
 	bool unload_lod(Object& obj, const u32 lodIndex);
+	// Loads the material indices of an object
+	std::vector<MaterialIndex> load_object_material_indices(const u32 objectId) const;
+	std::size_t load_object_material_indices(const u32 objectId, MaterialIndex* buffer) const;
+	std::vector<WorldContainer::LodMetadata> load_lods_metadata() const;
 	// Discards any already applied tessellation/displacement for the current scene
 	// and re-tessellates/-displaces with the current max. tessellation level
 	void retessellate();
@@ -177,7 +196,7 @@ public:
 	// Set the new animation frame. Caution: this invalidates the currently loaded scene
 	// which must thus be set for any active renderer!
 	bool set_frame_current(const u32 frameCurrent);
-	void set_lod_loader_function(LodLoadFuncPtr func, void* userParams);
+	void set_lod_loader_function(LodLoadFuncPtr func, ObjMatIndicesFuncPtr matFunc, LodMetaDataFuncPtr metaFunc, void* userParams);
 	void set_tessellation_level(const float tessLevel) { m_tessLevel = tessLevel; }
 
 
@@ -199,6 +218,8 @@ private:
 
 	// Function pointer for loading a LoD from a scene
 	LodLoadFuncPtr m_loadLod = nullptr;
+	ObjMatIndicesFuncPtr m_objMatLoad = nullptr;
+	LodMetaDataFuncPtr m_lodMetaLoad = nullptr;
 	void* m_loadLodUserParams = nullptr;
 
 	// A pool for all object/instance names (keeps references valid until world clear)
@@ -213,6 +234,7 @@ private:
 	std::vector<ei::Mat3x4> m_worldToInstanceTrans;
 	// Stores the start/end instance indices for each frame
 	std::vector<std::pair<u32, u32>> m_frameInstanceIndices;
+	ei::Box m_aabb;
 
 	// TODO: for improved heap allocation, this should be a single vector/map
 	//std::vector<std::vector<std::unique_ptr<Instance>>> m_animatedInstances;
@@ -253,4 +275,4 @@ private:
 	float m_tessLevel = 0u;
 };
 
-} // namespace mufflon::scene
+}} // namespace mufflon::scene

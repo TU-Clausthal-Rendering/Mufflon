@@ -17,7 +17,23 @@ endif("${PROJECT_SOURCE_DIR}" STREQUAL "${PROJECT_BINARY_DIR}")
 
 # We need CUDA, OpenMP is optional; other dependencies are packaged as sub-repos or in binary form
 find_package(OpenMP)
-find_package(CUDA REQUIRED)
+find_package(CUDA 11 REQUIRED)
+# Find OpenMesh
+if(MSVC)
+	find_package(OpenMesh REQUIRED PATHS "${CMAKE_CURRENT_SOURCE_DIR}/external/OpenMesh-8.1/Windows")
+else(MSVC)
+	find_package(OpenMesh REQUIRED PATHS "${CMAKE_CURRENT_SOURCE_DIR}/external/OpenMesh-8.1/Linux")
+endif(MSVC)
+
+# OpenMesh doesn't provide RelWithDebInfo targets
+set_target_properties(OpenMeshCore PROPERTIES
+  MAP_IMPORTED_CONFIG_MINSIZEREL Release
+  MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+)
+set_target_properties(OpenMeshTools PROPERTIES
+  MAP_IMPORTED_CONFIG_MINSIZEREL Release
+  MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+)
 
 if(NOT OpenMP_CXX_FOUND)
 	message(WARNING "OpenMP is strongly recommended, as all CPU-side parallel code relies on it and will run serially without it")
@@ -41,6 +57,8 @@ if("${MUFFLON_CUDA_ARCH}" STREQUAL "Auto")
 endif()
 # For whatever reason the arch flags may be in the wrong format, so we gotta fix that
 string(REGEX REPLACE "gencode;" "gencode=" ARCH_FLAGS "${ARCH_FLAGS}")
+string(REGEX REPLACE ";code" ",code" ARCH_FLAGS "${ARCH_FLAGS}")
+string(REGEX REPLACE ";-gencode" " -gencode" ARCH_FLAGS "${ARCH_FLAGS}")
 # Since CMake's target_link_options does not pass options to nvlink yet, we have to set them globally to the NVCC flags...
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${ARCH_FLAGS}")
 
@@ -183,8 +201,6 @@ add_library(mffloader ${MUFFLON_MFFLOADER_SOURCE_LIST} ${CHINOISE_SOURCE_LIST} $
 add_library(pfmloader MODULE ${MUFFLON_PFMLOADER_SOURCE_LIST} ${EPSILON_SOURCE_LIST})
 add_library(stbiloader MODULE ${MUFFLON_STBILOADER_SOURCE_LIST} ${EPSILON_SOURCE_LIST} ${STBI_SOURCE_LIST})
 # Dependency library targets
-add_library(openmesh_core SHARED IMPORTED)
-add_library(openmesh_tools SHARED IMPORTED)
 if(MUFFLON_ENABLE_OPEN_DENOISE)
 	add_library(opendenoise SHARED IMPORTED)
 	add_library(tbb SHARED IMPORTED)
@@ -218,7 +234,8 @@ target_include_directories(core
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/cub
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/epsilon/include
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/glad
-		${CMAKE_CURRENT_SOURCE_DIR}/external/OpenMesh-8.0/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/include
+		${CMAKE_CURRENT_SOURCE_DIR}/deps/gli
+		${CMAKE_CURRENT_SOURCE_DIR}/deps/gli/external
 		${CMAKE_CURRENT_SOURCE_DIR}/external/oidn-0.9/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/include
 )
 target_include_directories(gliloader
@@ -254,10 +271,44 @@ target_include_directories(stbiloader
 		${CMAKE_CURRENT_SOURCE_DIR}/deps/epsilon/include
 )
 
+# Specify the precompiled headers
+if(${CMAKE_VERSION} VERSION_GREATER "3.16.0")
+	target_precompile_headers(core
+		PRIVATE
+			$<$<COMPILE_LANGUAGE:CXX>:<algorithm$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<array$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<atomic$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<iterator$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<limits$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<memory$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<string$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<type_traits$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<vector$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<ei/vector.hpp$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<ei/2dtypes.hpp$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<ei/3dtypes.hpp$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<ei/2dintersection.hpp$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:<ei/3dintersection.hpp$<ANGLE-R>>
+			$<$<COMPILE_LANGUAGE:CXX>:core/concepts.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/memory/allocator.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/memory/residency.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/memory/synchronize.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/memory/unique_device_ptr.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/renderer/parameter.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/renderer/path_util.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/renderer/random_walk.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/renderer/renderer.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/renderer/renderer_base.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/scene/geometry/polygon_mesh.hpp>
+			$<$<COMPILE_LANGUAGE:CXX>:core/scene/materials/material_definitions.hpp>
+	)
+endif()
+
 # Set the target definitions for DLL export
-target_compile_definitions(core PRIVATE _USE_MATH_DEFINES CORE_EXPORTS _CRT_SECURE_NO_WARNINGS)
+target_compile_definitions(core PRIVATE _USE_MATH_DEFINES CORE_EXPORTS _CRT_SECURE_NO_WARNINGS _ENABLE_ATOMIC_ALIGNMENT_FIX)
 target_compile_definitions(mffloader PRIVATE LOADER_EXPORTS _CRT_SECURE_NO_WARNINGS)
 target_compile_definitions(stbiloader PRIVATE _CRT_SECURE_NO_WARNINGS)
+target_compile_definitions(gliloader PRIVATE _CRT_SECURE_NO_WARNINGS)
 # Set the compile definition for min. CC requirement
 target_compile_definitions(core PRIVATE MUFFLON_CUDA_ARCHES="${MUFFLON_CUDA_ARCH}")
 
@@ -265,7 +316,7 @@ set(CXX_TARGETS core gliloader mffloader pfmloader stbiloader)
 
 # Set C++ standard and CUDA flags
 set_target_properties(core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-set_target_properties(core PROPERTIES CUDA_STANDARD 14)
+set_target_properties(core PROPERTIES CUDA_STANDARD 17)
 set_target_properties(core PROPERTIES CUDA_STANDARD_REQUIRED ON)
 target_compile_options(core PRIVATE
 	$<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
@@ -276,7 +327,7 @@ set_target_properties(${CXX_TARGETS}
 		CXX_STANDARD_REQUIRED ON
 		CXX_EXTENSIONS OFF
 		CUDA_SEPARABLE_COMPILATION ON
-		CUDA_STANDARD 14
+		CUDA_STANDARD 17
 		CUDA_STANDARD_REQUIRED ON
 )
 
@@ -331,32 +382,10 @@ if(NOT MSVC)
 endif()
 
 # Dependency library targets
-set(MUFFLON_OPENMESH_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/external/OpenMesh-8.0")
 set(MUFFLON_OPENDENOISE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/external/oidn-0.9")
 set(MUFFLON_TBB_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/external/tbb-2019.9")
-if(MSVC)
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/bin/OpenMeshCored.dll")
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshCore.dll")
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshCore.dll")
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshCore.dll")
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/OpenMeshCored.lib")
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshCore.lib")
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_IMPLIB_RELWITHDEBINFO "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshCore.lib")
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_IMPLIB_MINSIZEREL "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshCore.lib")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/bin/OpenMeshToolsd.dll")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshTools.dll")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshTools.dll")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_OPENMESH_DIRECTORY}/Release/bin/OpenMeshTools.dll")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/OpenMeshToolsd.lib")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshTools.lib")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_IMPLIB_RELWITHDEBINFO "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshTools.lib")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_IMPLIB_MINSIZEREL "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/OpenMeshTools.lib")
-	install(FILES
-			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenMeshCore$<$<CONFIG:Debug>:d>.dll"
-			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenMeshTools$<$<CONFIG:Debug>:d>.dll"
-		DESTINATION "."
-	)
-	if(MUFFLON_ENABLE_OPEN_DENOISE)
+if(MUFFLON_ENABLE_OPEN_DENOISE)
+	if(MSVC)
 		set_target_properties(opendenoise PROPERTIES IMPORTED_IMPLIB_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/lib/OpenImageDenoise.lib")
 		set_target_properties(opendenoise PROPERTIES IMPORTED_IMPLIB_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/OpenImageDenoise.lib")
 		set_target_properties(opendenoise PROPERTIES IMPORTED_IMPLIB_RELWITHDEBINFO "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/OpenImageDenoise.lib")
@@ -387,22 +416,7 @@ if(MSVC)
 				"${MUFFLON_TBB_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/tbbmalloc.dll"
 			DESTINATION "."
 		)
-	endif()
-else(MSVC)
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/libOpenMeshCored.so.8.0")
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshCore.so.8.0")
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshCore.so.8.0")
-	set_target_properties(openmesh_core PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshCore.so.8.0")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENMESH_DIRECTORY}/Debug/lib/libOpenMeshToolsd.so.8.0")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshTools.so.8.0")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshTools.so.8.0")
-	set_target_properties(openmesh_tools PROPERTIES IMPORTED_LOCATION_MINSIZEREL "${MUFFLON_OPENMESH_DIRECTORY}/Release/lib/libOpenMeshTools.so.8.0")
-	install(FILES
-			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libOpenMeshCore$<$<CONFIG:Debug>:d>.so.8.0"
-			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libOpenMeshTools$<$<CONFIG:Debug>:d>.so.8.0"
-		DESTINATION "."
-	)
-	if(MUFFLON_ENABLE_OPEN_DENOISE)
+	else(MSVC)
 		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_DEBUG "${MUFFLON_OPENDENOISE_DIRECTORY}/Debug/lib/libOpenImageDenoise.so.0")
 		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_RELEASE "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/libOpenImageDenoise.so.0")
 		set_target_properties(opendenoise PROPERTIES IMPORTED_LOCATION_RELWITHDEBINFO "${MUFFLON_OPENDENOISE_DIRECTORY}/Release/lib/libOpenImageDenoise.so.0")
@@ -421,8 +435,8 @@ else(MSVC)
 				"${MUFFLON_TBB_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libtbbmalloc.so.2"
 			DESTINATION "."
 		)
-	endif()
-endif()
+	endif(MSVC)
+endif(MUFFLON_ENABLE_OPEN_DENOISE)
 
 # GUI building
 if(MUFFLON_BUILD_GUI)
@@ -508,7 +522,7 @@ endif(MUFFLON_BUILD_GUI)
 
 # Inter-target dependencies
 target_link_libraries(mffloader PRIVATE ${CXX_FS_LIBRARY} core)
-target_link_libraries(core PRIVATE ${CXX_FS_LIBRARY} openmesh_core openmesh_tools)
+target_link_libraries(core PRIVATE ${CXX_FS_LIBRARY} OpenMeshCore OpenMeshTools)
 if(MUFFLON_ENABLE_OPEN_DENOISE)
 	target_link_libraries(core PRIVATE opendenoise tbb)
 	set_property(SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/core/export/interface.cpp"
@@ -555,15 +569,8 @@ foreach(shader ${MUFFLON_SHADER_SOURCE_LIST})
 	)
 endforeach()
 
-if(WIN32)
-	add_custom_command(TARGET core PRE_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenMeshCore$<$<CONFIG:Debug>:d>.dll"
-			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenMeshTools$<$<CONFIG:Debug>:d>.dll"
-			"${MUFFLON_OPENDENOISE_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenImageDenoise.dll"
-			"${CMAKE_BINARY_DIR}/build/$<CONFIG>"
-	)
-	if(MUFFLON_ENABLE_OPEN_DENOISE)
+if(MUFFLON_ENABLE_OPEN_DENOISE)
+	if(WIN32)
 		add_custom_command(TARGET core PRE_BUILD
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
 				"${MUFFLON_OPENDENOISE_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/OpenImageDenoise.dll"
@@ -571,15 +578,7 @@ if(WIN32)
 				"${MUFFLON_TBB_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/bin/tbbmalloc.dll"
 				"${CMAKE_BINARY_DIR}/build/$<CONFIG>"
 		)
-	endif()
-else()
-	add_custom_command(TARGET core PRE_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libOpenMeshCore$<$<CONFIG:Debug>:d>.so.8.0"
-			"${MUFFLON_OPENMESH_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libOpenMeshTools$<$<CONFIG:Debug>:d>.so.8.0"
-			"${CMAKE_BINARY_DIR}/build/$<CONFIG>"
-	)
-	if(MUFFLON_ENABLE_OPEN_DENOISE)
+	else(WIN32)
 		add_custom_command(TARGET core PRE_BUILD
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
 				"${MUFFLON_OPENDENOISE_DIRECTORY}/$<CONFIG>/lib/libOpenImageDenoise.so.0"
@@ -587,8 +586,8 @@ else()
 				"${MUFFLON_TBB_DIRECTORY}/$<$<CONFIG:Debug>:Debug>$<$<NOT:$<CONFIG:Debug>>:Release>/lib/libtbbmalloc.so.2"
 				"${CMAKE_BINARY_DIR}/build/$<CONFIG>"
 		)
-	endif()
-endif()
+	endif(WIN32)
+endif(MUFFLON_ENABLE_OPEN_DENOISE)
 
 # Install shared libraries, dependencies, and shaders
 install(TARGETS core mffloader

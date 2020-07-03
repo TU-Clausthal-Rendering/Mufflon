@@ -15,7 +15,8 @@ cudaError_t call_kernel(const dim3& gridDims, const dim3& blockDims,
 
 } // namespace gpuwireframe_detail
 
-GpuWireframe::GpuWireframe () :
+GpuWireframe::GpuWireframe (mufflon::scene::WorldContainer& world) :
+	RendererBase<Device::CUDA, WireframeTargets>{ world },
 	m_params{}
 	//m_rng{ static_cast<u32>(std::random_device{}()) }
 {}

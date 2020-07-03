@@ -1,6 +1,8 @@
 ﻿#include "world_container.hpp"
 #include "util/log.hpp"
+#include "util/range.hpp"
 #include "core/cameras/camera.hpp"
+#include "core/renderer/renderer.hpp"
 #include "core/scene/lod.hpp"
 #include "core/scene/materials/material.hpp"
 #include "core/scene/materials/medium.hpp"
@@ -26,7 +28,8 @@ bool WorldContainer::set_frame_current(const u32 frameCurrent) {
 	return false;
 }
 
-WorldContainer::Sanity WorldContainer::finalize_world() const {
+WorldContainer::Sanity WorldContainer::finalize_world(const ei::Box& aabb) {
+	m_aabb = aabb;
 	// Check for objects
 	if(m_instances.empty())
 		return Sanity::NO_INSTANCES;
@@ -53,52 +56,25 @@ WorldContainer::Sanity WorldContainer::finalize_world() const {
 }
 
 
-WorldContainer::Sanity WorldContainer::finalize_scenario(ConstScenarioHandle hdl) {
-	bool hasEmitters = false;
+WorldContainer::Sanity WorldContainer::finalize_scenario(ScenarioHandle hdl) {
+	hdl->finalize();
+
 	bool hasObjects = false;
-
-	// First update the flags for each LoD
-	std::unordered_set<MaterialIndex> uniqueMatIndices;
-	uniqueMatIndices.reserve(m_materials.size());
-
-	for(auto& obj : m_objects) {
-		for(u32 l = 0u; l < static_cast<u32>(obj.second.get_lod_slot_count()); ++l) {
-			if(!obj.second.has_lod_available(l))
-				continue;
-			auto& lod = obj.second.get_lod(l);
-			lod.update_flags(*hdl, uniqueMatIndices);
-		}
-	}
-
 	// Check for objects (and check for emitters as well)
-	// Gotta check both animated and stationary instances
+	// Gotta check both animated and stationary instances.
+	// We don't check for emitters anymore since it is
+	// impossible to do so without loading in at least
+	// all LoDs' material indices
 	for(const auto& instance : m_instances) {
 		if(hdl->is_masked(&instance))
 			continue;
 
 		hasObjects = true;
-		const Object& object = instance.get_object();
-		const u32 lodLevel = hdl->get_effective_lod(&instance);
-		if(object.has_lod_available(lodLevel)) {
-			const Lod& lod = object.get_lod(lodLevel);
-			if(lod.is_emissive(*hdl)) {
-				hasEmitters = true;
-				break;
-			}
-		} else {
-			// TODO: how could we possibly check this?
-			hasEmitters = true;
-			break;
-		}
+		break;
 	}
 
 	if(!hasObjects)
 		return Sanity::NO_OBJECTS;
-	// Check for lights
-	if(!hasEmitters && hdl->get_point_lights().empty() && hdl->get_spot_lights().empty()
-	   && hdl->get_dir_lights().empty() && (m_envLights.get(hdl->get_background()).get_type() == lights::BackgroundType::COLORED
-											&& ei::prod(m_envLights.get(hdl->get_background()).get_monochrom_color()) == 0))
-		return Sanity::NO_LIGHTS;
 	// Check for camera
 	if(hdl->get_camera() == nullptr)
 		return Sanity::NO_CAMERA;
@@ -146,6 +122,17 @@ ObjectHandle WorldContainer::create_object(const StringView name, ObjectFlags fl
 	return &hdl;
 }
 
+ObjectHandle WorldContainer::duplicate_object(ObjectHandle hdl, const StringView newName) {
+	const auto pooledName = m_namePool.insert(newName);
+	if(m_objects.find(pooledName) != m_objects.cend())
+		throw std::runtime_error("Object with the name already exists!");
+	auto& newHdl = m_objects.emplace(pooledName, Object{ hdl->get_object_id() });
+	newHdl.set_name(pooledName);
+	newHdl.set_flags(hdl->get_flags());
+	newHdl.copy_lods_from(*hdl);
+	return &newHdl;
+}
+
 void WorldContainer::set_bone(u32 boneIndex, u32 keyframe, const ei::DualQuaternion& transformation) {
 	if(boneIndex > m_numBones)
 		throw std::runtime_error(std::string("Cannot set bone ") + std::to_string(boneIndex) + ", only " + std::to_string(m_numBones) + " were reserved.");
@@ -161,13 +148,6 @@ ObjectHandle WorldContainer::get_object(const StringView name) {
 	return nullptr;
 }
 
-ObjectHandle WorldContainer::duplicate_object(ObjectHandle hdl, const StringView newName) {
-	const auto pooledName = m_namePool.insert(newName);
-	ObjectHandle newHdl = create_object(pooledName, hdl->get_flags());
-	newHdl->copy_lods_from(*hdl);
-	return newHdl;
-}
-
 void WorldContainer::apply_transformation(InstanceHandle hdl) {
 	const ei::Mat3x4 transMat = compute_instance_to_world_transformation(hdl);
 	ObjectHandle objectHandle = &hdl->get_object();
@@ -180,9 +160,10 @@ void WorldContainer::apply_transformation(InstanceHandle hdl) {
 		objectHandle = duplicate_object(objectHandle, newName);
 		hdl->set_object(*objectHandle);
 	}
+	// TODO: delayed LoD loading prevents this from working...
 	for(size_t i = 0; i < objectHandle->get_lod_slot_count(); i++) {
-		if(objectHandle->has_lod_available(u32(i))) {
-			Lod& lod = objectHandle->get_lod(u32(i));
+		if(objectHandle->has_original_lod_available(u32(i))) {
+			Lod& lod = objectHandle->get_original_lod(u32(i));
 			auto& polygons = lod.get_geometry<geometry::Polygons>();
 			polygons.transform(transMat);
 			auto& spheres = lod.get_geometry<geometry::Spheres>();
@@ -701,23 +682,50 @@ void WorldContainer::unref_texture(TextureHandle hdl) {
 	}
 }
 
-bool WorldContainer::load_lod(Object& obj, const u32 lodIndex) {
-	if(!obj.has_lod_available(lodIndex)) {
-		if(!m_loadLod(m_loadLodUserParams, &obj, lodIndex))
+bool WorldContainer::load_lod(Object& obj, const u32 lodIndex, const bool asReduced) {
+	obj.remove_reduced_lod(lodIndex);
+	if(asReduced || !obj.has_original_lod_available(lodIndex)) {
+		if(!m_loadLod(m_loadLodUserParams, &obj, lodIndex, asReduced))
 			return false;
-		// Update the flags for this LoD
-		std::unordered_set<MaterialIndex> uniqueMatIndices;
-		uniqueMatIndices.reserve(m_materials.size());
-		for(const auto& scenario : m_scenarios)
-			obj.get_lod(lodIndex).update_flags(scenario.second, uniqueMatIndices);
+		obj.get_lod(lodIndex).update_material_indices();
 	}
 	return true;
 }
 
 bool WorldContainer::unload_lod(Object& obj, const u32 lodIndex) {
-	if(obj.has_lod_available(lodIndex))
-		obj.remove_lod(lodIndex);
+	//if(obj.has_lod_available(lodIndex))
+	//	obj.remove_lod(lodIndex);
+	throw std::runtime_error("Unsupported operation");
 	return true;
+}
+
+std::vector<MaterialIndex> WorldContainer::load_object_material_indices(const u32 objectId) const {
+	std::vector<MaterialIndex> indices;
+	indices.resize(m_scenario->get_num_material_slots());
+	const auto count = this->load_object_material_indices(objectId, indices.data());
+	indices.resize(count);
+	return indices;
+}
+
+std::size_t WorldContainer::load_object_material_indices(const u32 objectId, MaterialIndex* buffer) const {
+	u32 numIndices = 0u;
+	if(m_objMatLoad(m_loadLodUserParams, objectId, buffer, &numIndices) == 0)
+		throw std::runtime_error("Failed to load unique material indices for object '"
+								 + std::string((m_objects.cbegin() + objectId)->first) + "'");
+	return numIndices;
+}
+
+std::vector<WorldContainer::LodMetadata> WorldContainer::load_lods_metadata() const {
+	// First count how many LoDs there are
+	std::size_t lodCount = 0u;
+	for(const auto& obj : m_objects)
+		lodCount += obj.second.get_lod_slot_count();
+	std::vector<LodMetadata> data(lodCount);
+
+	if(!m_lodMetaLoad(m_loadLodUserParams, data.data(), &lodCount))
+		throw std::runtime_error("Failed to load metadata for LoDs");
+	data.resize(lodCount);
+	return data;
 }
 
 SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* renderer) {
@@ -791,8 +799,6 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		instanceHandles[index] = &inst;
 		++iter->second.count;
 		const auto lod = m_scenario->get_effective_lod(&inst);
-		if(!load_lod(*iter->first, lod))
-			throw std::runtime_error("Failed to load LoD from disk while loading scene");
 	}
 	for(std::size_t i = 0u; i < animatedInstCount; ++i) {
 		const auto instanceIndex = animatedInstOffset + i;
@@ -809,11 +815,9 @@ SceneHandle WorldContainer::load_scene(Scenario& scenario, renderer::IRenderer* 
 		instanceHandles[index] = &inst;
 		++iter->second.count;
 		const auto lod = m_scenario->get_effective_lod(&inst);
-		if(!load_lod(*iter->first, lod))
-			throw std::runtime_error("Failed to load LoD from disk while loading scene");
 	}
 
-	m_scene = std::make_unique<Scene>(*this, scenario, m_frameCurrent,
+	m_scene = std::make_unique<Scene>(*this, scenario, m_frameCurrent, m_aabb,
 									  std::move(objInstRef), std::move(instanceHandles),
 									  m_worldToInstanceTrans, get_current_keyframe());
 
@@ -886,51 +890,69 @@ bool WorldContainer::load_scene_lights() {
 		reloaded = true;
 		std::vector<lights::PositionalLights> posLights;
 		std::vector<lights::DirectionalLight> dirLights;
-		for(auto& obj : m_scene->get_objects()) {
-			// Object contains area lights.
-			// Create one light source per polygone and instance
-			const auto& instances = m_scene->get_instances();
-			const auto endIndex = obj.second.offset + obj.second.count;
-			for(std::size_t idx = obj.second.offset; idx < endIndex; ++idx) {
-				InstanceHandle inst = instances[idx];
-				mAssertMsg(obj.first->has_lod_available(m_scenario->get_effective_lod(inst)), "Instance references LoD that doesn't exist");
-				Lod& lod = obj.first->get_lod(m_scenario->get_effective_lod(inst));
-				if(!lod.is_emissive(*m_scenario))
+		const auto emissiveMatIndices = m_scenario->get_emissive_mat_indices();
+		// Check if we have emissive materials
+		if(!emissiveMatIndices.empty()) {
+			auto uniqueIndices = std::make_unique<MaterialIndex[]>(m_scenario->get_num_material_slots());
+			for(auto& obj : m_scene->get_objects()) {
+				// Check if the object has emissive materials. We ideally do that by loading
+				// only the unique material indices from file
+				const auto numIndices = load_object_material_indices(obj.first->get_object_id(), uniqueIndices.get());
+				// Check if none of them is emissive
+				if(numIndices > 0u && !util::share_elements_sorted(emissiveMatIndices.cbegin(), emissiveMatIndices.cend(),
+																   uniqueIndices.get(), uniqueIndices.get() + m_scenario->get_num_material_slots()))
 					continue;
 
-				i32 primIdx = 0;
-				// First search in polygons (PrimitiveHandle expects poly before sphere)
-				auto& polygons = lod.get_geometry<geometry::Polygons>();
-				const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex>(polygons.get_material_indices_hdl());
-				const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point>(polygons.get_points_hdl());
-				const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
-				const ei::Mat3x4 instToWorld = compute_instance_to_world_transformation(inst);
-				bool isMirroring = determinant(ei::Mat3x3{ instToWorld }) < 0.0f;
-				for(const auto& face : polygons.faces()) {
-					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
-					if(mat->get_properties().is_emissive()) {
-						if(std::distance(face.begin(), face.end()) == 3) {
+				// Object contains area lights.
+				// Create one light source per polygone and instance
+				const auto& instances = m_scene->get_instances();
+				const auto endIndex = obj.second.offset + obj.second.count;
+				for(std::size_t idx = obj.second.offset; idx < endIndex; ++idx) {
+					InstanceHandle inst = instances[idx];
+					const auto lodIndex = m_scenario->get_effective_lod(inst);
+
+					// We fetch emissive LoDs here because we need the primitive information for the light tree.
+					// Ideally, we'd be able to reduce emissive meshes as well, but for now that's not possible.
+					load_lod(*obj.first, lodIndex);
+					mAssertMsg(obj.first->has_lod(lodIndex), "Instance references LoD that doesn't exist");
+					Lod& lod = obj.first->get_lod(lodIndex);
+					if(!lod.is_emissive(m_scenario->get_emissive_mat_indices()))
+						continue;
+
+					i32 primIdx = 0;
+					// First search in polygons (PrimitiveHandle expects poly before sphere)
+					auto& polygons = lod.get_geometry<geometry::Polygons>();
+					const MaterialIndex* materials = polygons.acquire_const<Device::CPU, MaterialIndex>(polygons.get_material_indices_hdl());
+					const scene::Point* positions = polygons.acquire_const<Device::CPU, scene::Point>(polygons.get_points_hdl());
+					const scene::UvCoordinate* uvs = polygons.acquire_const<Device::CPU, scene::UvCoordinate>(polygons.get_uvs_hdl());
+					const ei::Mat3x4 instToWorld = compute_instance_to_world_transformation(inst);
+					bool isMirroring = determinant(ei::Mat3x3{ instToWorld }) < 0.0f;
+					for(const auto tri : polygons.triangles()) {
+						ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
+						if(mat->get_properties().is_emissive()) {
 							lights::AreaLightTriangleDesc al;
 							al.material = materials[primIdx];
 							int i = 0;
-							for(auto vHdl : face) {
-								al.points[i] = ei::transform(positions[vHdl.idx()], instToWorld);
-								al.uv[i] = uvs[vHdl.idx()];
-								++i;
+							for(u32 i = 0u; i < 3u; ++i) {
+								al.points[i] = ei::transform(positions[tri[i]], instToWorld);
+								al.uv[i] = uvs[tri[i]];
 							}
 							if(isMirroring) {
 								std::swap(al.points[1], al.points[2]);
 								std::swap(al.uv[1], al.uv[2]);
 							}
 							posLights.push_back(lights::PositionalLights{ al, { (i32)inst->get_index(), primIdx } });
-						} else {
+						}
+						++primIdx;
+					}
+					for(const auto quad : polygons.quads()) {
+						ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[primIdx]);
+						if(mat->get_properties().is_emissive()) {
 							lights::AreaLightQuadDesc al;
 							al.material = materials[primIdx];
-							int i = 0;
-							for(auto vHdl : face) {
-								al.points[i] = ei::transform(positions[vHdl.idx()], instToWorld);
-								al.uv[i] = uvs[vHdl.idx()];
-								++i;
+							for(u32 i = 0u; i < 4u; ++i) {
+								al.points[i] = ei::transform(positions[quad[i]], instToWorld);
+								al.uv[i] = uvs[quad[i]];
 							}
 							if(isMirroring) {
 								std::swap(al.points[1], al.points[3]);
@@ -938,28 +960,28 @@ bool WorldContainer::load_scene_lights() {
 							}
 							posLights.push_back(lights::PositionalLights{ al, { (i32)inst->get_index(), primIdx } });
 						}
+						++primIdx;
 					}
-					++primIdx;
-				}
 
-				// Then get the sphere lights
-				primIdx = (u32)lod.get_geometry<geometry::Polygons>().get_face_count();
-				auto& spheres = lod.get_geometry<geometry::Spheres>();
-				materials = spheres.acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
-				const ei::Sphere* spheresData = spheres.acquire_const<Device::CPU, ei::Sphere>(spheres.get_spheres_hdl());
-				for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
-					ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[i]);
-					if(mat->get_properties().is_emissive()) {
-						const auto scale = Instance::extract_scale(instToWorld);
-						mAssert(ei::approx(scale.x, scale.y) && ei::approx(scale.x, scale.z));
-						lights::AreaLightSphereDesc al{
-							transform(spheresData[i].center, instToWorld),
-							scale.x * spheresData[i].radius,
-							materials[i]
-						};
-						posLights.push_back({ al, PrimitiveHandle{ (i32)inst->get_index(), primIdx } });
+					// Then get the sphere lights
+					primIdx = (u32)lod.get_geometry<geometry::Polygons>().get_face_count();
+					auto& spheres = lod.get_geometry<geometry::Spheres>();
+					materials = spheres.acquire_const<Device::CPU, MaterialIndex>(spheres.get_material_indices_hdl());
+					const ei::Sphere* spheresData = spheres.acquire_const<Device::CPU, ei::Sphere>(spheres.get_spheres_hdl());
+					for(std::size_t i = 0; i < spheres.get_sphere_count(); ++i) {
+						ConstMaterialHandle mat = m_scenario->get_assigned_material(materials[i]);
+						if(mat->get_properties().is_emissive()) {
+							const auto scale = Instance::extract_scale(instToWorld);
+							mAssert(ei::approx(scale.x, scale.y) && ei::approx(scale.x, scale.z));
+							lights::AreaLightSphereDesc al{
+								transform(spheresData[i].center, instToWorld),
+								scale.x * spheresData[i].radius,
+								materials[i]
+							};
+							posLights.push_back({ al, PrimitiveHandle{ (i32)inst->get_index(), primIdx } });
+						}
+						++primIdx;
 					}
-					++primIdx;
 				}
 			}
 		}
@@ -999,8 +1021,11 @@ bool WorldContainer::load_scene_lights() {
 	return reloaded;
 }
 
-void WorldContainer::set_lod_loader_function(LodLoadFuncPtr func, void* userParams) {
+void WorldContainer::set_lod_loader_function(LodLoadFuncPtr func, ObjMatIndicesFuncPtr matFunc,
+											 LodMetaDataFuncPtr metaFunc, void* userParams) {
 	m_loadLod = func;
+	m_objMatLoad = matFunc;
+	m_lodMetaLoad = metaFunc;
 	m_loadLodUserParams = userParams;
 }
 

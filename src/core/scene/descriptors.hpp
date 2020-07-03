@@ -46,6 +46,14 @@ struct PolygonsDescriptor {
 	// Access to these must be followed by a mark_dirty/aquire after
 	ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>> vertexAttributes;
 	ConstArrayDevHandle_t<dev, ArrayDevHandle_t<dev, void>> faceAttributes;
+
+	u32 get_triangle_quad_count() const noexcept { return numTriangles + numQuads; }
+
+	bool is_triangle(const u32 primId) const noexcept { return primId < numTriangles; }
+	bool is_triangle(const PrimitiveHandle& handle) const noexcept {
+		mAssert(handle.is_valid());
+		return is_triangle(static_cast<u32>(handle.primId));
+	}
 };
 
 template < Device dev >
@@ -69,6 +77,12 @@ struct LodDescriptor {
 	// but rather by the scene upon descriptor creation
 	u32 previous = std::numeric_limits<u32>::max();
 	u32 next = std::numeric_limits<u32>::max();
+
+	bool is_polygon(const u32 primId) const noexcept { return primId < polygon.get_triangle_quad_count(); }
+	bool is_polygon(const PrimitiveHandle handle) const noexcept {
+		mAssert(handle.is_valid());
+		return is_polygon(static_cast<u32>(handle.primId));
+	}
 };
 
 struct CameraDescriptor {
@@ -131,6 +145,7 @@ struct SceneDescriptor : public InstanceData<dev> {
 	CameraDescriptor camera;
 	u32 numLods;
 	i32 numInstances;
+	i32 activeInstances;
 	u32 validInstanceIndex;	// An index of a valid instance which should be used for eg. medium checks
 	float diagSize;	// len(aabb.max - aabb.min)
 	ei::Box aabb;	// Scene-wide bounding box
@@ -148,6 +163,30 @@ struct SceneDescriptor : public InstanceData<dev> {
 
 	static constexpr CUDA_FUNCTION bool is_instance_present(const u32 lodIndex) noexcept {
 		return lodIndex != std::numeric_limits<u32>::max();
+	}
+
+	LodDescriptor<dev>& get_lod(const u32 instanceId) noexcept {
+		mAssert(instanceId < numInstances);
+		mAssert(is_instance_present(lodIndices[instanceId]));
+		return lods[lodIndices[instanceId]];
+	}
+	const LodDescriptor<dev>& get_lod(const u32 instanceId) const noexcept {
+		mAssert(instanceId < static_cast<u32>(numInstances));
+		mAssert(is_instance_present(lodIndices[instanceId]));
+		return lods[lodIndices[instanceId]];
+	}
+	LodDescriptor<dev>& get_lod(const PrimitiveHandle handle) noexcept {
+		mAssert(handle.is_valid());
+		return get_lod(static_cast<u32>(handle.instanceId));
+	}
+	const LodDescriptor<dev>& get_lod(const PrimitiveHandle handle) const noexcept {
+		mAssert(handle.is_valid());
+		return get_lod(static_cast<u32>(handle.instanceId));
+	}
+
+	bool is_polygon(const PrimitiveHandle handle) const noexcept {
+		mAssert(handle.is_valid());
+		return get_lod(handle).is_polygon(handle);
 	}
 
 	inline CUDA_FUNCTION MaterialIndex get_material_index(PrimitiveHandle primitive) const {

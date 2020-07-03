@@ -7,6 +7,8 @@
 #include "geometry/sphere.hpp"
 #include "util/assert.hpp"
 #include "util/tagged_tuple.hpp"
+#include <memory>
+#include <unordered_set>
 
 namespace mufflon {
 
@@ -33,14 +35,14 @@ public:
 		m_geometry{},
 		m_accelStruct{},
 		m_parent{ parent },
-		m_flags{ 0 },
+		m_uniqueMatIndices{ 0 },
 		m_appliedFrame{ ~0u }
 	{}
 	// Warning: implicit sync!
 	Lod(Lod&) = default;
-	Lod(Lod&& obj) = delete;
+	Lod(Lod&& obj) = default;
 	Lod& operator=(const Lod&) = delete;
-	Lod& operator=(Lod&&) = delete;
+	Lod& operator=(Lod&&) = default;
 	~Lod() = default;
 
 	// Grants direct access to the mesh data (const only).
@@ -54,18 +56,13 @@ public:
 		return m_geometry.template get<Geom>();
 	}
 
-	// Updates the LoD's flags according to the given scenarios
-	// Takes an unordered_set so the scratch memmory can be shared between LoDs
-	void update_flags(const Scenario& scenario, std::unordered_set<MaterialIndex>& uniqueMatCache);
+	// After changing material indices, this must be called
+	void update_material_indices() noexcept;
 
 	// Is there any emissive polygon/sphere in this object
-	bool is_emissive(const Scenario& scenario) const noexcept {
-		return m_flags & (1llu << static_cast<u64>(2u * scenario.get_index()));
-	}
+	bool is_emissive(const std::vector<MaterialIndex>& emissiveMatIndices) const noexcept;
 	// Is there any displaced polygon in this object
-	bool is_displaced(const Scenario& scenario) const noexcept {
-		return m_flags & (1llu << static_cast<u64>(2u * scenario.get_index() + 1u));
-	}
+	bool is_displaced(const std::vector<MaterialIndex>& displacedMatIndices) const noexcept;
 
 	// Get the descriptor of the object (including all geometry, but without attributes)
 	// Synchronizes implicitly
@@ -77,6 +74,14 @@ public:
 									 const std::vector<AttributeIdentifier>& vertexAttribs,
 									 const std::vector<AttributeIdentifier>& faceAttribs,
 									 const std::vector<AttributeIdentifier>& sphereAttribs);
+	// Gets the size of the final descriptor (without attributes)
+	std::size_t desciptor_size() const noexcept {
+		return m_geometry.template get<geometry::Polygons>().desciptor_size()
+			+ m_geometry.template get<geometry::Spheres>().desciptor_size();
+	}
+	std::size_t accel_descriptor_size() const noexcept {
+		return m_accelStruct.desciptor_size();
+	}
 
 	// Clears the BVH of this object.
 	void clear_accel_structure();
@@ -146,7 +151,8 @@ private:
 	// Acceleration structure of the geometry
 	accel_struct::LBVHBuilder m_accelStruct;
 	const Object* m_parent;
-	u64 m_flags;	// Stores flags (2 bits per-scenario)
+	std::vector<MaterialIndex> m_uniqueMatIndices;
+	// Stores the frame the LoD was animated for
 	u32 m_appliedFrame;
 };
 

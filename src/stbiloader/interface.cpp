@@ -1,6 +1,9 @@
 #include "plugin/texture_plugin_interface.h"
 #include "util/log.hpp"
+#include "util/pixel_conversion.hpp"
+#include <ei/conversions.hpp>
 #include <cstring>
+#include <filesystem>
 #include <mutex>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -53,6 +56,7 @@ Boolean can_load_texture_format(const char* ext) {
 	return std::strncmp(ext, ".hdr", 4u) == 0
 		|| std::strncmp(ext, ".bmp", 4u) == 0
 		|| std::strncmp(ext, ".tga", 4u) == 0
+		|| std::strncmp(ext, ".tif", 4u) == 0
 		|| std::strncmp(ext, ".jpg", 4u) == 0
 		|| std::strncmp(ext, ".jpeg", 5u) == 0
 		|| std::strncmp(ext, ".png", 4u) == 0;
@@ -60,10 +64,12 @@ Boolean can_load_texture_format(const char* ext) {
 
 Boolean can_store_texture_format(const char* ext) {
 	return std::strncmp(ext, ".hdr", 4u) == 0
-		/*|| std::strncmp(ext, ".bmp", 4u) == 0
+		|| std::strncmp(ext, ".bmp", 4u) == 0
 		|| std::strncmp(ext, ".tga", 4u) == 0
+		|| std::strncmp(ext, ".tif", 4u) == 0
+		|| std::strncmp(ext, ".jpg", 5u) == 0
 		|| std::strncmp(ext, ".jpeg", 5u) == 0
-		|| std::strncmp(ext, ".png", 4u) == 0*/;
+		|| std::strncmp(ext, ".png", 4u) == 0;
 }
 
 Boolean load_texture(const char* path, TextureData* texData) {
@@ -142,14 +148,54 @@ Boolean store_texture(const char* path, const TextureData* texData) {
 		CHECK_NULLPTR(path, "texture path", false);
 		CHECK_NULLPTR(path, "texture return data", false);
 
-		if(texData->format == TextureFormat::FORMAT_R32F || texData->format == TextureFormat::FORMAT_RG32F
-			|| texData->format == TextureFormat::FORMAT_RGBA32F) {
-			const float* data = reinterpret_cast<const float*>(texData->data);
-			stbi_flip_vertically_on_write(true);
-			stbi_write_hdr(path, texData->width, texData->height, texData->components, data);
+		const auto filePath = std::filesystem::u8path(path);
+		stbi_flip_vertically_on_write(true);
+		if(filePath.extension() == ".hdr") {
+			if(util::get_channel_size(texData->format) == 4u) {
+				const float* data = reinterpret_cast<const float*>(texData->data);
+				stbi_write_hdr(path, texData->width, texData->height, texData->components, data);
+			} else {
+				// Convert possibly LDR data to HDR
+				auto hdrData = std::make_unique<float[]>(texData->components * texData->width * texData->height);
+				const auto pixelSize = util::get_format_size(texData->format);
+				for(std::uint32_t y = 0u; y < texData->height; ++y) {
+					for(std::uint32_t x = 0u; x < texData->width; ++x) {
+						const auto index = x + y * static_cast<std::size_t>(texData->width);
+						const auto byteOffset = pixelSize * index;
+						const auto value = util::read_pixel(reinterpret_cast<const char*>(texData->data) + byteOffset,
+															TextureFormat::FORMAT_RGBA32F);
+						for(unsigned c = 0u; c < texData->components; ++c)
+							hdrData[texData->components * index + c] = value[c];
+					}
+				}
+				stbi_write_hdr(path, texData->width, texData->height, texData->components, hdrData.get());
+			}
 		} else {
-			throw std::runtime_error("Non-float formats are not supported yet");
+			if(util::get_channel_size(texData->format) == 1u) {
+				stbi_write_png(path, texData->width, texData->height,
+							   texData->components, texData->data, 0);
+			} else {
+				// Convert possibly HDR data to LDR
+				auto ldrData = std::make_unique<unsigned char[]>(texData->components * texData->width * texData->height);
+				const auto pixelSize = util::get_format_size(texData->format);
+				for(std::uint32_t y = 0u; y < texData->height; ++y) {
+					for(std::uint32_t x = 0u; x < texData->width; ++x) {
+						const auto index = x + y * static_cast<std::size_t>(texData->width);
+						const auto byteOffset = pixelSize * index;
+						const auto value = util::read_pixel(reinterpret_cast<const char*>(texData->data) + byteOffset,
+															TextureFormat::FORMAT_RGBA32F);
+						for(unsigned c = 0u; c < texData->components; ++c) {
+							// Bring value to sRGB
+							const auto sRgb = ei::rgbToSRgb(std::min(1.f, std::max(0.f, value[c])));
+							ldrData[texData->components * index + c] = static_cast<unsigned char>(sRgb * 255u);
+						}
+					}
+				}
+				stbi_write_png(path, texData->width, texData->height,
+							   texData->components, ldrData.get(), 0);
+			}
 		}
+
 		return true;
 	} catch(const std::exception& e) {
 		logError("[", FUNCTION_NAME, "] Texture store for '",

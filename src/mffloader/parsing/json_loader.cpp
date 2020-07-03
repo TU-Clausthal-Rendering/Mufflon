@@ -21,7 +21,7 @@ namespace {
 // Reads a file completely and returns the string containing all bytes
 std::string read_file(fs::path path) {
 	auto scope = Profiler::loader().start<CpuProfileState>("JSON read_file", ProfileLevel::HIGH);
-	logPedantic("[read_file] Loading JSON file '", path.string(), "' into RAM");
+	logPedantic("[read_file] Loading JSON file '", path.u8string(), "' into RAM");
 	const std::uintmax_t fileSize = fs::file_size(path);
 	std::string fileString;
 	fileString.resize(fileSize);
@@ -29,7 +29,7 @@ std::string read_file(fs::path path) {
 	std::ifstream file(path, std::ios::binary);
 	file.read(&fileString[0u], fileSize);
 	if(file.gcount() != static_cast<std::streamsize>(fileSize))
-		logWarning("[read_file] File '", path.string(), "'not read completely");
+		logWarning("[read_file] File '", path.u8string(), "'not read completely");
 	// Finalize the string
 	fileString[file.gcount()] = '\0';
 	return fileString;
@@ -87,6 +87,50 @@ std::enable_if_t<!is_array<T>(), std::vector<T>> read_opt_array(ParserState& sta
 	return vec;
 }
 
+void parse_object_instance_properties(ParserState& state, const rapidjson::Value& scenario,
+									  util::FixedHashMap<StringView, u32>& objProps,
+									  util::FixedHashMap<StringView, binary::InstanceMapping>& instProps,
+									  const u32 defaultGlobalLod) {
+	using namespace rapidjson;
+	if(const auto objPropsIter = get(state, scenario, "objectProperties", false);
+	   objPropsIter != scenario.MemberEnd()) {
+		for(auto propIter = objPropsIter->value.MemberBegin(); propIter != objPropsIter->value.MemberEnd(); ++propIter) {
+			// Read the object name
+			StringView objectName = propIter->name.GetString();
+			if(objProps.find(objectName) != objProps.cend())
+				continue;
+			state.objectNames.push_back(&objectName[0u]);
+			const Value& object = propIter->value;
+			assertObject(state, object);
+			if(auto lodIter = get(state, object, "lod", false); lodIter != object.MemberEnd()) {
+				const u32 localLod = read<u32>(state, lodIter);
+				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod, "' for object '", objectName, "'");
+				objProps.insert(objectName, localLod);
+			}
+			state.objectNames.pop_back();
+		}
+	}
+	if(const auto instPropsIter = get(state, scenario, "instanceProperties", false);
+	   instPropsIter != scenario.MemberEnd()) {
+		for(auto propIter = instPropsIter->value.MemberBegin(); propIter != instPropsIter->value.MemberEnd(); ++propIter) {
+			// Read the instance name
+			StringView instanceName = propIter->name.GetString();
+			if(instProps.find(instanceName) != instProps.cend())
+				continue;
+			state.objectNames.push_back(&instanceName[0u]);
+			const Value& instance = propIter->value;
+			assertObject(state, instance);
+			const u32 localLod = read_opt<u32>(state, instance, "lod", defaultGlobalLod);
+			instProps.insert(instanceName, { localLod, nullptr });
+
+			if(localLod != defaultGlobalLod)
+				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod,
+							"' for object '", instanceName, "'");
+			state.objectNames.pop_back();
+		}
+	}
+}
+
 } // namespace
 
 JsonException::JsonException(const std::string& str, rapidjson::ParseResult res) :
@@ -123,17 +167,17 @@ TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, 
 	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_texture", ProfileLevel::HIGH);
 	logPedantic("[JsonLoader::load_texture] Loading texture '", name, "'");
 	// Make the path relative to the file
-	fs::path path(name);
+	auto path = fs::u8path(name);
 	if (!path.is_absolute())
 		path = m_filePath.parent_path() / name;
 	if (!fs::exists(path))
-		throw std::runtime_error("Cannot find texture file '" + path.string() + "'");
+		throw std::runtime_error("Cannot find texture file '" + path.u8string() + "'");
 	path = fs::canonical(path);
 	TextureHdl tex;
 	if(targetFormat.has_value())
-		tex = world_add_texture_converted(m_mffInstHdl, path.string().c_str(), sampling, targetFormat.value(), mipmapType, callback, userParams);
+		tex = world_add_texture_converted(m_mffInstHdl, path.u8string().c_str(), sampling, targetFormat.value(), mipmapType, callback, userParams);
 	else
-		tex = world_add_texture(m_mffInstHdl, path.string().c_str(), sampling, mipmapType, callback, userParams);
+		tex = world_add_texture(m_mffInstHdl, path.u8string().c_str(), sampling, mipmapType, callback, userParams);
 	if(tex == nullptr)
 		throw std::runtime_error("Failed to load texture '" + std::string(name) + "'");
 	return tex;
@@ -142,15 +186,15 @@ TextureHdl JsonLoader::load_texture(const char* name, TextureSampling sampling, 
 std::pair<TextureHdl, TextureHdl> JsonLoader::load_displacement_map(const char* name) {
 	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_displacement_map", ProfileLevel::HIGH);
 	// Make the path relative to the file
-	fs::path path(name);
+	auto path = fs::u8path(name);
 	if(!path.is_absolute())
 		path = m_filePath.parent_path() / name;
 	if(!fs::exists(path))
-		throw std::runtime_error("Cannot find texture file '" + path.string() + "'");
+		throw std::runtime_error("Cannot find texture file '" + path.u8string() + "'");
 	path = fs::canonical(path);
 	TextureHdl tex = nullptr;
 	TextureHdl texMips = nullptr;
-	if(!world_add_displacement_map(m_mffInstHdl, path.string().c_str(), &tex, &texMips) || tex == nullptr || texMips == nullptr)
+	if(!world_add_displacement_map(m_mffInstHdl, path.u8string().c_str(), &tex, &texMips) || tex == nullptr || texMips == nullptr)
 		throw std::runtime_error("Failed to add displacement map '" + std::string(name) + "'");
 	return { tex, texMips };
 }
@@ -883,9 +927,19 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 				world_get_frame_count(m_mffInstHdl, &frameCount);
 				if(const auto instIter = instances.find(&instName[0u]); instIter != instances.end()) {
 					InstanceHdl instHdl = instIter->second.handle;
-					if(instHdl == nullptr)
-						throw std::runtime_error("Error retrieving instance handle from name");
-					for(u32 frame = 0; frame < frameCount; ++frame) {
+					if(instHdl != nullptr) {
+						for(u32 frame = 0; frame < frameCount; ++frame) {
+							// Read LoD
+							if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
+								if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
+									throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
+							// Read masking information
+							if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
+							   && read<bool>(m_state, maskIter))
+								if(!scenario_mask_instance(scenarioHdl, instHdl))
+									throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
+						}
+
 						// Read LoD
 						if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
 							if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
@@ -896,16 +950,6 @@ bool JsonLoader::load_scenarios(const std::vector<std::string>& binMatNames,
 							if(!scenario_mask_instance(scenarioHdl, instHdl))
 								throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
 					}
-
-					// Read LoD
-					if(auto lodIter = get(m_state, instance, "lod", false); lodIter != instance.MemberEnd())
-						if(!scenario_set_instance_lod(scenarioHdl, instHdl, read<u32>(m_state, lodIter)))
-							throw std::runtime_error("Failed to set LoD level of instance '" + std::string(instName) + "'");
-					// Read masking information
-					if(auto maskIter = get(m_state, instance, "mask", false); maskIter != instance.MemberEnd()
-						&& read<bool>(m_state, maskIter))
-						if(!scenario_mask_instance(scenarioHdl, instHdl))
-							throw std::runtime_error("Failed to set mask of instance '" + std::string(instName) + "'");
 				}
 				m_state.objectNames.pop_back();
 			}
@@ -990,12 +1034,12 @@ void JsonLoader::selective_replace_keys(const rapidjson::Value& objectToCopy, ra
 }
 
 
-bool JsonLoader::load_file(fs::path& binaryFile) {
+bool JsonLoader::load_file(fs::path& binaryFile, FileVersion* version) {
 	using namespace rapidjson;
 	auto scope = Profiler::loader().start<CpuProfileState>("JsonLoader::load_file");
 
 	this->clear_state();
-	logInfo("[JsonLoader::load_file] Parsing scene file '", m_filePath.string(), "'");
+	logInfo("[JsonLoader::load_file] Parsing scene file '", m_filePath.u8string(), "'");
 
 	sprintf(m_loadingStage.data(), "Loading JSON%c", '\0');
 	// JSON text
@@ -1014,6 +1058,7 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 	auto versionIter = get(m_state, document, "version", false);
 	if(versionIter == document.MemberEnd()) {
 		logWarning("[JsonLoader::load_file] Scene file: no version specified (current one assumed)");
+		m_version = CURRENT_FILE_VERSION;
 	} else {
 		m_version = FileVersion{ read<const char*>(m_state, versionIter) };
 		if(m_version > CURRENT_FILE_VERSION)
@@ -1023,18 +1068,20 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 		m_absoluteCamNearFar = m_version >= ABSOLUTE_CAM_NEAR_FAR_FILE_VERSION;
 		logInfo("[JsonLoader::load_file] Detected file version '", m_version, "'");
 	}
+	if(version != nullptr)
+		*version = m_version;
 	// Binary file path
 	binaryFile = read<const char*>(m_state, get(m_state, document, "binary"));
 	if(binaryFile.empty())
 		throw std::runtime_error("Scene file has an empty binary file path");
-	logInfo("[JsonLoader::load_file] Detected binary file path '", binaryFile.string(), "'");
+	logInfo("[JsonLoader::load_file] Detected binary file path '", binaryFile.u8string(), "'");
 	// Make the file path absolute
 	if(binaryFile.is_relative())
 		binaryFile = fs::canonical(m_filePath.parent_path() / binaryFile);
 	if(!fs::exists(binaryFile)) {
 		logError("[JsonLoader::load_file] Scene file: specifies a binary file that doesn't exist ('",
-				 binaryFile.string(), "'");
-		throw std::runtime_error("Binary file '" + binaryFile.string() + "' does not exist");
+				 binaryFile.u8string(), "'");
+		throw std::runtime_error("Binary file '" + binaryFile.u8string() + "' does not exist");
 	}
 	// Tessellation level
 	const float initTessLevel = read_opt<float>(m_state, document, "initTessellationLevel", 0u);
@@ -1058,56 +1105,37 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 	logInfo("[JsonLoader::load_file] Detected global LoD '", defaultGlobalLod, "'");
 
 	sprintf(m_loadingStage.data(), "Parsing object properties%c", '\0');
-	// First parse binary file
-	util::FixedHashMap<StringView, u32> defaultObjectLods;
-	util::FixedHashMap<StringView, binary::InstanceMapping> defaultInstanceLods;
-	auto objPropsIter = get(m_state, defScen, "objectProperties", false);
-	if(objPropsIter != defScen.MemberEnd()) {
-		m_state.objectNames.push_back(&m_defaultScenario[0u]);
-		m_state.objectNames.push_back("objectProperties");
-		defaultObjectLods = util::FixedHashMap<StringView, u32>{ objPropsIter->value.MemberCount() };
-		for(auto propIter = objPropsIter->value.MemberBegin(); propIter != objPropsIter->value.MemberEnd(); ++propIter) {
-			// Read the object name
-			StringView objectName = propIter->name.GetString();
-			m_state.objectNames.push_back(&objectName[0u]);
-			const Value& object = propIter->value;
-			assertObject(m_state, object);
-			if(auto lodIter = get(m_state, object, "lod", false); lodIter != object.MemberEnd()) {
-				const u32 localLod = read<u32>(m_state, lodIter);
-				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod, "' for object '", objectName, "'");
-				defaultObjectLods.insert(objectName, localLod);
-			}
-		}
-		m_state.objectNames.pop_back();
-		m_state.objectNames.pop_back();
+	
+	// First we have to parse how many object/instance properties there are
+	std::size_t objPropCount = 0u;
+	std::size_t instPropCount = 0u;
+	for(auto scenIter = m_scenarios->value.MemberBegin(); scenIter != m_scenarios->value.MemberEnd(); ++scenIter) {
+		const auto& scenario = scenIter->value;
+		if(const auto objPropsIter = get(m_state, scenario, "objectProperties", false);
+		   objPropsIter != scenario.MemberEnd())
+			objPropCount += objPropsIter->value.MemberCount();
+		if(const auto instPropsIter = get(m_state, scenario, "instanceProperties", false);
+		   instPropsIter != scenario.MemberEnd())
+			instPropCount += instPropsIter->value.MemberCount();
 	}
-	sprintf(m_loadingStage.data(), "Parsing instance properties%c", '\0');
-	auto instPropsIter = get(m_state, defScen, "instanceProperties", false);
-	if(instPropsIter != defScen.MemberEnd()) {
-		m_state.objectNames.push_back(&m_defaultScenario[0u]);
-		m_state.objectNames.push_back("instanceProperties");
-		defaultInstanceLods = util::FixedHashMap<StringView, binary::InstanceMapping>{ instPropsIter->value.MemberCount() };
-		for(auto propIter = instPropsIter->value.MemberBegin(); propIter != instPropsIter->value.MemberEnd(); ++propIter) {
-			// Read the instance name
-			StringView instanceName = propIter->name.GetString();
-			m_state.objectNames.push_back(&instanceName[0u]);
-			const Value& instance = propIter->value;
-			assertObject(m_state, instance);
-			const u32 localLod = read_opt<u32>(m_state, instance, "lod", defaultGlobalLod);
-			defaultInstanceLods.insert(instanceName, {  localLod, nullptr });
-
-			if(localLod != defaultGlobalLod)
-				logPedantic("[JsonLoader::load_file] Custom LoD '", localLod,
-							"' for object '", instanceName, "'");
-		}
-		m_state.objectNames.pop_back();
+	util::FixedHashMap<StringView, u32> defaultObjectLods{ objPropCount };
+	util::FixedHashMap<StringView, binary::InstanceMapping> defaultInstanceLods{ instPropCount };
+	// Now we can parse the properties themselves
+	// We have to start with the default scenario, since it defines the LoD level in case of ambiguity
+	m_state.objectNames.push_back(m_defaultScenario.data());
+	parse_object_instance_properties(m_state, defScen, defaultObjectLods, defaultInstanceLods, defaultGlobalLod);
+	m_state.objectNames.pop_back();
+	// Now the rest of the scenarios
+	for(auto scenIter = m_scenarios->value.MemberBegin(); scenIter != m_scenarios->value.MemberEnd(); ++scenIter) {
+		m_state.objectNames.push_back(scenIter->name.GetString());
+		parse_object_instance_properties(m_state, scenIter->value, defaultObjectLods, defaultInstanceLods, defaultGlobalLod);
 		m_state.objectNames.pop_back();
 	}
 	const bool deinstance = read_opt<bool>(m_state, document, "deinstance", false);
 	const bool noDefaultInstances = read_opt<bool>(m_state, document, "noDefaultInstances", false);
 	// Load the binary file before we load the rest of the JSON
 	if(!m_binLoader.load_file(binaryFile, defaultGlobalLod, defaultObjectLods, defaultInstanceLods,
-							  deinstance, hasWorldToInstTrans, !m_absoluteCamNearFar, noDefaultInstances))
+							  deinstance, hasWorldToInstTrans, noDefaultInstances))
 		return false;
 
 	try {
@@ -1126,7 +1154,8 @@ bool JsonLoader::load_file(fs::path& binaryFile) {
 		// Before we load scenarios, perform a sanity check for the currently loaded world
 		const char* sanityMsg = "";
 		sprintf(m_loadingStage.data(), "Checking world sanity%c", '\0');
-		if(!world_finalize(m_mffInstHdl, &sanityMsg))
+		if(!world_finalize(m_mffInstHdl, util::pun<Vec3>(m_binLoader.get_bounding_box().min),
+						   util::pun<Vec3>(m_binLoader.get_bounding_box().max), &sanityMsg))
 			throw std::runtime_error("World did not pass sanity check: " + std::string(sanityMsg));
 		// Scenarios
 		m_state.current = ParserState::Level::ROOT;

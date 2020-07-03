@@ -4,8 +4,8 @@
 #include "core/opengl/program_builder.hpp"
 #include <stack>
 
-mufflon::renderer::DebugBvhRenderer::DebugBvhRenderer()
-	: GlRendererBase(true, false)
+mufflon::renderer::DebugBvhRenderer::DebugBvhRenderer(mufflon::scene::WorldContainer& world)
+	: GlRendererBase(world, true, false)
 {
 
 }

@@ -179,8 +179,6 @@ class DllHolder:
             dir = binary_path
         else:
             dir = os.path.dirname(os.path.realpath(__file__))
-        self.openmeshcore = ctypes.CDLL(dir + "/OpenMeshCore.dll",mode=ctypes.RTLD_GLOBAL)
-        self.openmeshtools = ctypes.CDLL(dir + "/OpenMeshTools.dll",mode=ctypes.RTLD_GLOBAL)
         self.tbb = ctypes.CDLL(dir + "/tbb.dll",mode=ctypes.RTLD_GLOBAL)
         self.openimagedenoise = ctypes.CDLL(dir + "/OpenImageDenoise.dll",mode=ctypes.RTLD_GLOBAL)
         self.core = ctypes.CDLL(dir + "/core.dll",mode=ctypes.RTLD_GLOBAL)
@@ -220,13 +218,16 @@ class DllHolder:
         self.core.render_disable_render_target.argtypes = [c_void_p, c_char_p, c_bool]
         self.core.render_disable_render_target.argtypes = [c_void_p, c_char_p, c_bool]
         self.core.render_is_render_target_enabled.argtypes = [c_void_p, c_char_p, c_bool]
-        self.core.render_iterate.argtypes = [c_void_p, POINTER(ProcessTime)]
+        self.core.render_iterate.argtypes = [c_void_p, POINTER(ProcessTime), POINTER(ProcessTime), POINTER(ProcessTime)]
         self.core.render_get_current_iteration.restype = c_uint32
         self.core.render_get_current_iteration.argtypes = [c_void_p]
         self.core.scenario_get_name.restype = c_char_p
         self.core.scenario_get_name.argtypes = [c_void_p]
         self.core.world_set_frame_current.argtypes = [c_void_p, c_uint]
+        self.core.world_get_camera.restype = c_void_p
+        self.core.world_get_camera.argtypes = [c_void_p, c_char_p]
         self.core.world_get_current_scenario.restype = c_void_p
+        self.core.world_get_current_scenario.argtypes = [c_void_p]
         self.core.world_find_scenario.restype = c_void_p
         self.core.world_find_scenario.argtypes = [c_void_p, c_char_p]
         self.core.world_load_scenario.restype = c_void_p
@@ -251,7 +252,7 @@ class DllHolder:
         self.core.world_create_object.argtypes = [c_void_p, c_char_p, c_int]
         self.core.object_add_lod.restype = c_void_p
         self.core.object_add_lod.argtypes = [c_void_p, c_uint]
-        self.core.polygon_reserve.argtypes = [c_void_p, c_size_t, c_size_t, c_size_t, c_size_t]
+        self.core.polygon_reserve.argtypes = [c_void_p, c_size_t, c_size_t, c_size_t]
         self.core.polygon_add_vertex.restype = c_int
         self.core.polygon_add_vertex.argtypes = [c_void_p, Vec3, Vec3, Vec2]
         self.core.polygon_add_triangle_material.restype = c_int
@@ -373,7 +374,7 @@ class DllInterface:
         iterateTime = ProcessTime(0,0)
         preTime = ProcessTime(0,0)
         postTime = ProcessTime(0,0)
-        self.dllHolder.core.render_iterate(self.muffInst, byref(iterateTime))
+        self.dllHolder.core.render_iterate(self.muffInst, byref(iterateTime), byref(postTime), byref(postTime))
         return iterateTime, preTime, postTime
 
     def render_reset(self):
@@ -423,6 +424,9 @@ class DllInterface:
 
     def render_get_active_scenario_name(self):
         return self.dllHolder.core.scenario_get_name(self.dllHolder.core.world_get_current_scenario()).decode()
+        
+    def world_get_camera(self, name):
+        return self.dllHolder.core.world_get_camera(self.muffInst, c_char_p(name.encode('utf-8')))
 
     def world_set_frame_current(self, frame):
         return self.dllHolder.core.world_set_frame_current(self.muffInst, c_uint(frame))
@@ -583,6 +587,16 @@ class RenderActions:
             raise Exception("Failed to find scenario '" + scenarioName + "'")
         if not self.dllInterface.world_load_scenario(hdl):
             raise Exception("Failed to load scenario '" + scenarioName + "'")
+
+    def set_camera_for_current_scenario(self, cameraName):
+        scenario = self.dllInterface.world_get_current_scenario()
+        cam = self.dllInterface.world_get_camera(cameraName)
+        if not scenario:
+            raise Exception("Failed to retrieve current scenario")
+        if not cam:
+            raise Exception("Could not find camera '" + cameraName + "'")
+        if not self.dllInterface.scenario_set_camera(scenario, cam):
+            raise Exception("Failed to set camera '" + cameraName + "' for current scenario'")
 
     def set_current_animation_frame(self, frame):
         if not self.dllInterface.world_set_frame_current(frame):

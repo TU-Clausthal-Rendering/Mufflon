@@ -21,7 +21,7 @@ bool operator!=(const Vec3& a, const Vec3& b) {
 // Reads a file completely and returns the string containing all bytes
 std::string read_file(fs::path path) {
 	auto scope = mufflon::Profiler::loader().start<mufflon::CpuProfileState>("JSON read_file", mufflon::ProfileLevel::HIGH);
-	mufflon::logPedantic("[read_file] Loading JSON file '", path.string(), "' into RAM");
+	mufflon::logPedantic("[read_file] Loading JSON file '", path.u8string(), "' into RAM");
 	const std::uintmax_t fileSize = fs::file_size(path);
 	std::string fileString;
 	fileString.resize(fileSize);
@@ -29,7 +29,7 @@ std::string read_file(fs::path path) {
 	std::ifstream file(path, std::ios::binary);
 	file.read(&fileString[0u], fileSize);
 	if(file.gcount() != static_cast<std::streamsize>(fileSize))
-		mufflon::logWarning("[read_file] File '", path.string(), "'not read completely");
+		mufflon::logWarning("[read_file] File '", path.u8string(), "'not read completely");
 	// Finalize the string
 	fileString[file.gcount()] = '\0';
 	return fileString;
@@ -325,7 +325,7 @@ bool SceneExporter::save_lights(rapidjson::Document& document) const {
 
 		light.AddMember("type", "envmap", document.GetAllocator());
 
-		fs::path mapPath(world_get_env_light_map(m_mffInstHdl, lightHandle));
+		auto mapPath = fs::path(world_get_env_light_map(m_mffInstHdl, lightHandle));
 
 		light.AddMember("map", store_in_string_relative_to_destination_path(mapPath, document), document.GetAllocator());
 
@@ -607,7 +607,7 @@ rapidjson::Value SceneExporter::store_in_array_from_float_string(std::string flo
 	rapidjson::Value SceneExporter::store_in_string_relative_to_destination_path(const fs::path& path, rapidjson::Document& document) const {
 	fs::path copy = m_fileDestinationPath;
 	rapidjson::Value out;
-	std::string s = fs::relative(path, copy.remove_filename()).string();
+	std::string s = fs::relative(path, copy.remove_filename()).u8string();
 	out.SetString(s.c_str(), rapidjson::SizeType(s.length()), document.GetAllocator());
 	return out;
 }

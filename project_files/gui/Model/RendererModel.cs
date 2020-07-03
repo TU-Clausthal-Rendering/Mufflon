@@ -267,7 +267,9 @@ namespace gui.Model
         public void Iterate()
         {
             Core.ProcessTime time;
-            if (!Core.render_iterate(out time))
+            Core.ProcessTime preTime;
+            Core.ProcessTime postTime;
+            if (!Core.render_iterate(out time, out preTime, out postTime))
                 throw new Exception(Core.core_get_dll_error());
 
             CurrentIterationTime = time;

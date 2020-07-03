@@ -16,64 +16,6 @@ namespace mufflon::renderer {
 
 namespace {
 
-float prev_rel_sum(const VcmPathVertex& vertex, AngularPdf pdfBack, int numPhotons, float area);
-
-}
-
-// Extension which stores a partial result of the MIS-weight computation for speed-up.
-struct VcmVertexExt {
-	AreaPdf incidentPdf;
-	Spectrum throughput;
-	// A cache to shorten the recursive evaluation of MIS (relative to connections).
-	// It is only possible to store the previous sum, as the current sum
-	// depends on the backward-pdf of the next vertex, which is only given in
-	// the moment of the full connection.
-	// Only valid after update().
-	float prevRelativeProbabilitySum{ 0.0f };
-	// Store 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
-	float prevConversionFactor { 0.0f };
-
-	inline CUDA_FUNCTION void init(const VcmPathVertex& /*thisVertex*/,
-							const AreaPdf inAreaPdf,
-							const AngularPdf inDirPdf,
-							const float pChoice) {
-		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
-		this->throughput = Spectrum{1.0f};
-	}
-
-	inline CUDA_FUNCTION void update(const VcmPathVertex& prevVertex,
-							  const VcmPathVertex& thisVertex,
-							  const math::PdfPair pdf,
-							  const Connection& incident,
-							  const Spectrum& throughput,
-							  const float/* continuationPropability*/,
-							  const Spectrum& /*transmission*/,
-							  int /*numPhotons*/, float /*area*/) {
-		float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
-		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
-		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
-		this->throughput = throughput;
-		if(prevVertex.is_hitable()) {
-			// Compute as much as possible from the conversion factor.
-			// At this point we do not know n and A for the photons. This quantities
-			// are added in the kernel after the walk.
-			float outCosAbs = ei::abs(prevVertex.get_geometric_factor(incident.dir));
-			this->prevConversionFactor = orthoConnection ? outCosAbs : outCosAbs / incident.distanceSq;
-		}
-	}
-
-	inline CUDA_FUNCTION void update(const VcmPathVertex& thisVertex,
-							  const scene::Direction& /*excident*/,
-							  const VertexSample& sample,
-							  int numPhotons, float area) {
-		// Sum up all previous relative probability (cached recursion).
-		// Also see PBRT p.1015.
-		prevRelativeProbabilitySum = prev_rel_sum(thisVertex, sample.pdf.back, numPhotons, area);
-	}
-};
-
-namespace {
-
 // Compute the previous relative event sum in relation to a connection
 // between the previous and the current vertex.
 float prev_rel_sum(const VcmPathVertex& vertex, AngularPdf pdfBack,
@@ -88,7 +30,6 @@ float prev_rel_sum(const VcmPathVertex& vertex, AngularPdf pdfBack,
 	}
 	return 0.0f;
 }
-
 
 // MIS weight for merges
 float get_mis_weight(const VcmPathVertex& viewVertex, const math::PdfPair pdf,
@@ -166,9 +107,43 @@ ConnectionValue connect(const VcmPathVertex& path0, const VcmPathVertex& path1,
 
 } // namespace ::
 
+CUDA_FUNCTION void VcmVertexExt::init(const VcmPathVertex& /*thisVertex*/,
+									  const AreaPdf inAreaPdf,
+									  const AngularPdf inDirPdf,
+									  const float pChoice) {
+	this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+	this->throughput = Spectrum{ 1.0f };
+}
 
-CpuVcm::CpuVcm() {}
-CpuVcm::~CpuVcm() {}
+CUDA_FUNCTION void VcmVertexExt::update(const VcmPathVertex& prevVertex,
+										const VcmPathVertex& thisVertex,
+										const math::PdfPair pdf,
+										const Connection& incident,
+										const Spectrum& throughput,
+										const float/* continuationPropability*/,
+										const Spectrum& /*transmission*/,
+										int /*numPhotons*/, float /*area*/) {
+	float inCosAbs = ei::abs(thisVertex.get_geometric_factor(incident.dir));
+	bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+	this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, inCosAbs);
+	this->throughput = throughput;
+	if(prevVertex.is_hitable()) {
+		// Compute as much as possible from the conversion factor.
+		// At this point we do not know n and A for the photons. This quantities
+		// are added in the kernel after the walk.
+		float outCosAbs = ei::abs(prevVertex.get_geometric_factor(incident.dir));
+		this->prevConversionFactor = orthoConnection ? outCosAbs : outCosAbs / incident.distanceSq;
+	}
+}
+
+CUDA_FUNCTION void VcmVertexExt::update(const VcmPathVertex& thisVertex,
+										const scene::Direction& /*excident*/,
+										const VertexSample& sample,
+										int numPhotons, float area) {
+	// Sum up all previous relative probability (cached recursion).
+	// Also see PBRT p.1015.
+	prevRelativeProbabilitySum = prev_rel_sum(thisVertex, sample.pdf.back, numPhotons, area);
+}
 
 void CpuVcm::iterate() {
 	auto scope = Profiler::core().start<CpuProfileState>("CPU VCM iteration", ProfileLevel::LOW);
@@ -222,7 +197,7 @@ void CpuVcm::trace_photon(int idx, int numPhotons, u64 seed, float currentMergeR
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
 		if(walk(m_sceneDesc, *previous, rnd, rndRoulette, true, throughput, vertex, sample,
-				numPhotons, mergeArea) != WalkResult::HIT)
+				nullptr, numPhotons, mergeArea) != WalkResult::HIT)
 			break;
 		++pathLen;
 
@@ -267,7 +242,7 @@ void CpuVcm::sample(const Pixel coord, int idx, int numPhotons, float currentMer
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
 		if(walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, false, throughput, vertex[otherV],
-				sample, numPhotons, mergeArea) == WalkResult::CANCEL)
+				sample, nullptr, numPhotons, mergeArea) == WalkResult::CANCEL)
 			break;
 		++viewPathLen;
 		currentV = otherV;

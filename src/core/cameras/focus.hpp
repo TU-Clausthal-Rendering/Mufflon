@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "camera.hpp"
 #include "core/export/core_api.h"

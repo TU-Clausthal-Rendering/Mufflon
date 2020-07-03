@@ -8,7 +8,7 @@
 namespace mufflon::renderer {
 	class DebugBvhRenderer final : public GlRendererBase<DebugBvhTargets> {
 	public:
-		DebugBvhRenderer();
+		DebugBvhRenderer(mufflon::scene::WorldContainer& world);
 		~DebugBvhRenderer() override = default;
 
 		void iterate() final;

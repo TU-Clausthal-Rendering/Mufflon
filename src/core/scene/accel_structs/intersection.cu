@@ -133,6 +133,7 @@ inline CUDA_FUNCTION bool intersectQuad(const ei::Vec3& p00, const ei::Vec3& p10
 		float u0 = 0.0f, u1 = 0.0f;
 		float t0 = -1.f;
 		float t1 = -1.f;
+		// Use the component with largest ray direction component to avoid singularities
 		if(v0 >= 0.f && v0 <= 1.f) {
 			u0 = computeU(v0, A1, A2, B1, B2, C1, C2, D1, D2);
 			if(u0 >= 0.f && u0 <= 1.f) {
@@ -393,12 +394,13 @@ RayIntersectionResult first_intersection(
 	i32 primOffset = 0;//TODO: can be removed by simply increasing nodeAddr
 
 	// No Scene-BVH => got to object-space directly
-	if(scene.numInstances == 1) {
-		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, hitT, obj, currentBvh))
+	if(scene.activeInstances == 1) {
+		if(!world_to_object_space(scene, scene.validInstanceIndex, fray, currentRay, currentTScale, hitT, obj, currentBvh))
 			primCount = 0; // No hit of the entire scene, skip the upcoming loop
-		currentInstanceId = 0;
-		if(obj && obj->numPrimitives == 1)
+		currentInstanceId = scene.validInstanceIndex;
+		if(obj && obj->numPrimitives == 1) {
 			primCount = 1;
+		}
 	}
 
 	// Traversal loop.
@@ -496,7 +498,7 @@ RayIntersectionResult first_intersection(
 	mAssert((hitInstanceId != IGNORE_ID && hitPrimId != IGNORE_ID) || ei::approx(hitT, tmax));
 
 	/* TEST CODE WHICH MAKES A LINEAR TEST (without the BVH)
-	for(int i = 0; i < scene.numInstances; ++i) {
+	for(int i = 0; i < scene.activeInstances; ++i) {
 		auto& obj = scene.lods[ scene.lodIndices[i] ];
 		ei::Ray transRay = { transform(ray.origin, scene.worldToInstance[i]),
 							 normalize(transformDir(ray.direction, scene.worldToInstance[i])) };
@@ -561,7 +563,7 @@ RayIntersectionResult first_intersection(
 				// Don't use the UV tangents to compute the normal, since they may be reversed
 				geoNormal = cross(dx0, dx1);
 
-				mAssert(dot(geoNormal, obj.polygon.normals[ids.x]) > 0.f);
+				//mAssert(dot(geoNormal, obj.polygon.normals[ids.x]) > 0.f);
 
 				uv = uvV[0] * surfParams.barycentric.x + uvV[1] * surfParams.barycentric.y +
 					uvV[2] * (1.f - surfParams.barycentric.x - surfParams.barycentric.y);
@@ -652,8 +654,8 @@ bool any_intersection(
 	i32 primOffset = 0;//TODO: can be removed by simply increasing nodeAddr
 
 	// No Scene-BVH => got to object-space directly
-	if(scene.numInstances == 1) {
-		if(!world_to_object_space(scene, 0, fray, currentRay, currentTScale, tmax, obj, currentBvh))
+	if(scene.activeInstances == 1) {
+		if(!world_to_object_space(scene, scene.validInstanceIndex, fray, currentRay, currentTScale, tmax, obj, currentBvh))
 			return false; // No hit of the entire scene
 		currentInstanceId = 0;
 		if(obj != nullptr && obj->numPrimitives == 1)

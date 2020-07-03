@@ -71,9 +71,10 @@ class JsonLoader {
 public:
 
 	static constexpr ei::Mat2x2 TEST{ 0.f, 0.f, 0.f, 0.f };
-	static constexpr FileVersion CURRENT_FILE_VERSION{ 1u, 6u };
+	static constexpr FileVersion CURRENT_FILE_VERSION{ 1u, 7u };
 	static constexpr FileVersion INVERTEX_TRANSMAT_FILE_VERSION{ 1u, 4u };
 	static constexpr FileVersion ABSOLUTE_CAM_NEAR_FAR_FILE_VERSION{ 1u, 5u };
+	static constexpr FileVersion PER_OBJECT_UNIQUE_MAT_INDICES{ 1u, 7u };
 
 	static constexpr float DEFAULT_NEAR_PLANE_FACTOR = 1.e-4f;
 	static constexpr float DEFAULT_FAR_PLANE_FACTOR = 2.f;
@@ -86,7 +87,7 @@ public:
 		m_binLoader{ m_mffInstHdl, m_loadingStage }
 	{
 		if(!fs::exists(m_filePath))
-			throw std::runtime_error("JSON file '" + m_filePath.string() + "' doesn't exist");
+			throw std::runtime_error("JSON file '" + m_filePath.u8string() + "' doesn't exist");
 		m_loadingStage.resize(1024);
 	}
 
@@ -96,7 +97,8 @@ public:
 
 	const std::string& get_loading_stage() const noexcept { return m_loadingStage; }
 
-	bool load_file(fs::path& binaryFile);
+	bool load_file(fs::path& binaryFile, FileVersion* version = nullptr);
+	FileVersion get_version() const noexcept { return m_version; }
 	void clear_state();
 
 private:

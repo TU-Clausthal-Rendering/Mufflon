@@ -151,11 +151,6 @@ ConnectionValue connect(const BptPathVertex& path0, const BptPathVertex& path1,
 
 } // namespace ::
 
-
-CpuBidirPathTracer::CpuBidirPathTracer() {
-	// The BPT does not need additional memory resources like photon maps.
-}
-
 void CpuBidirPathTracer::iterate() {
 	auto scope = Profiler::core().start<CpuProfileState>("CPU BPT iteration", ProfileLevel::HIGH);
 
@@ -191,7 +186,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		// Walk
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
-		if(walk(m_sceneDesc, path[lightPathLen], rnd, rndRoulette, true, throughput, path[lightPathLen+1], sample) != WalkResult::HIT)
+		if(walk(m_sceneDesc, path[lightPathLen], rnd, rndRoulette, true, throughput, path[lightPathLen+1], sample, nullptr) != WalkResult::HIT)
 			break;
 		++lightPathLen;
 	} while(lightPathLen < m_params.maxPathLength-1); // -1 because there is at least one segment on the view path
@@ -221,7 +216,7 @@ void CpuBidirPathTracer::sample(const Pixel coord, int idx,
 		int otherV = 1 - currentV;
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
-		if(walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, false, throughput, vertex[otherV], sample) == WalkResult::CANCEL)
+		if(walk(m_sceneDesc, vertex[currentV], rnd, rndRoulette, false, throughput, vertex[otherV], sample, nullptr) == WalkResult::CANCEL)
 			break;
 		++viewPathLen;
 		currentV = otherV;

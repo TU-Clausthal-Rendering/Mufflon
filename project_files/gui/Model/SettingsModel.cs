@@ -227,7 +227,7 @@ namespace gui.Model
             }
         }
 
-        private string m_screenshotNamePattern = "#scene-#scenario-#renderer-#iteration-#target";
+        private string m_screenshotNamePattern = "#scene-#scenario-#renderer-#iteration-#target-#frame.pfm";
         public string ScreenshotNamePattern
         {
             get => m_screenshotNamePattern;

@@ -21,10 +21,21 @@ OpenMesh::FaceHandle create_dummy_face(geometry::PolygonMeshType& mesh) {
 
 } // namespace
 
-void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
+OpenMesh::FaceHandle Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 	auto profilerTimer = Profiler::core().start<CpuProfileState>("Tessellater::tessellate", ProfileLevel::HIGH);
+	bool releaseVertexStatus = false;
+	bool releaseFaceStatus = false;
+	if(!mesh.has_vertex_status()) {
+		mesh.request_vertex_status();
+		releaseVertexStatus = true;
+	}
+	if(!mesh.has_face_status()) {
+		mesh.request_face_status();
+		releaseFaceStatus = true;
+	}
 
 	// Setup
+	std::vector<std::pair<u32, u32>> newFaceIndices;
 	m_mesh = &mesh;
 	m_tessLevelOracle.set_mesh(&mesh);
 	m_tessLevelOracle.set_phong_tessellation(m_usePhongTessellation);
@@ -32,11 +43,12 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 	m_innerVertices.clear();
 	this->pre_tessellate();
 	// We need to be able to delete faces and vertices
-	m_mesh->request_face_status();
-	m_mesh->request_vertex_status();
-	m_mesh->add_property(m_addedVertexProp);
-	if(!m_addedVertexProp.is_valid())
+	if(m_mesh->add_property(m_addedVertexProp); !m_addedVertexProp.is_valid())
 		throw std::runtime_error("Failed to add edge vertex property to mesh");
+	if(m_mesh->add_property(m_oldFace); !m_oldFace.is_valid())
+		throw std::runtime_error("Failed to add old face property to mesh");
+	for(const auto face : m_mesh->faces())
+		m_mesh->property(m_oldFace, face) = OpenMesh::FaceHandle{};
 	// TODO: reserve proper amount for new faces
 
 	// Spawn edge (outer) vertices and store necessary information
@@ -87,6 +99,7 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 			// We gotta remove the face here already since non-tessellated edges make problems otherwise
 			// Copy over the properties and remove the face
 			m_mesh->copy_all_properties(face, tempFace, false);
+			m_mesh->property(m_oldFace, tempFace) = face;
 			m_mesh->delete_face(face, false);
 
 			this->tessellate_triangle(vertices, tempFace, innerLevel);
@@ -106,6 +119,7 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 			// We gotta remove the face here already since non-tessellated edges make problems otherwise
 			// Copy over the properties and remove the face
 			m_mesh->copy_all_properties(face, tempFace, false);
+			m_mesh->property(m_oldFace, tempFace) = face;
 			m_mesh->delete_face(face, false);
 
 			this->tessellate_quad(vertices, tempFace, innerLevelX, innerLevelY);
@@ -115,11 +129,13 @@ void Tessellater::tessellate(geometry::PolygonMeshType& mesh) {
 	// Clean up
 	m_mesh->remove_property(m_addedVertexProp);
 	m_mesh->delete_face(tempFace, true);
-	m_mesh->garbage_collection();
-	m_mesh->release_face_status();
-	m_mesh->release_vertex_status();
+	if(releaseVertexStatus)
+		m_mesh->release_vertex_status();
+	if(releaseFaceStatus)
+		m_mesh->release_face_status();
 
 	this->post_tessellate();
+	return tempFace;
 }
 
 void Tessellater::tessellate_edges() {
@@ -458,7 +474,6 @@ void Tessellater::set_quad_face_inner(const OpenMesh::FaceHandle original,
 void Tessellater::set_quad_face_outer(const OpenMesh::FaceHandle original,
 									  const OpenMesh::FaceHandle newOuter) {
 	m_mesh->copy_all_properties(original, newOuter);
-
 }
 
 void Tessellater::set_triangle_face_inner(const OpenMesh::FaceHandle original,

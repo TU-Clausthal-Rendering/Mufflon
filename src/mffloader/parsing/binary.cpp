@@ -13,11 +13,16 @@ namespace mff_loader::binary {
 
 using namespace mufflon;
 
-BinaryLoader::FileDescriptor::FileDescriptor(fs::path file, const char* mode) :
-	m_desc(std::fopen(file.string().c_str(), mode)) {
+BinaryLoader::FileDescriptor::FileDescriptor(fs::path file) :
+#ifdef _WIN32
+	m_desc(_wfopen(file.wstring().c_str(), L"rb"))
+#else // _WIN32
+	m_desc(std::fopen(file.u8string().c_str(), "rb"))
+#endif // _WIN32
+{
 	if(m_desc == nullptr)
-		throw std::ios_base::failure("Failed to open file '" + file.string()
-									 + "' with mode '" + mode + "'");
+		throw std::ios_base::failure("Failed to open file '" + file.u8string()
+									 + "' with mode 'rb'");
 }
 
 BinaryLoader::FileDescriptor::FileDescriptor(FileDescriptor&& other) :
@@ -62,6 +67,18 @@ BinaryLoader::FileDescriptor& BinaryLoader::FileDescriptor::seek(u64 offset, std
 	return *this;
 }
 
+struct ObjectInfoNoName {
+	u32 flags;
+	u32 keyframe;
+	u32 prevAnimObjId;
+	ei::Box aabb;
+};
+struct InstanceInfoNoName {
+	u32 objId;
+	u32 keyframe;
+	u32 prevAnimInstId;
+	Mat3x4 transMat;
+};
 
 
 // Read a string as specified by the file format
@@ -101,16 +118,20 @@ ei::UVec4 BinaryLoader::read<ei::UVec4>() {
 // Read a 3x4 matrix as specified by the file format
 template <>
 Mat3x4 BinaryLoader::read<Mat3x4>() {
-	return Mat3x4{ {
-		read<float>(), read<float>(), read<float>(), read<float>(),
-		read<float>(), read<float>(), read<float>(), read<float>(),
-		read<float>(), read<float>(), read<float>(), read<float>()
-	} };
+	// TODO: ensure this is packed!
+	// TODO: ensure that we only read it at once if endianness matches!
+	Mat3x4 mat;
+	m_fileStream.read(reinterpret_cast<char*>(&mat), sizeof(mat));
+	return mat;
 }
 // Read a AABB as specified by the file format
 template <>
 ei::Box BinaryLoader::read<ei::Box>() {
-	return ei::Box{ read<ei::Vec3>(), read<ei::Vec3>() };
+	// TODO: ensure this is packed!
+	// TODO: ensure that we only read it at once if endianness matches!
+	ei::Box box;
+	m_fileStream.read(reinterpret_cast<char*>(&box), sizeof(box));
+	return box;
 }
 
 template <>
@@ -121,6 +142,23 @@ std::string BinaryLoader::read<std::string>(const unsigned char*& data) {
 	for(u32 i = 0u; i < size; ++i)
 		str[i] = read<char>(data);
 	return str;
+}
+// Read the entire struct at once
+template <>
+ObjectInfoNoName BinaryLoader::read<ObjectInfoNoName>() {
+	// TODO: ensure this is packed!
+	// TODO: ensure that we only read it at once if endianness matches!
+	ObjectInfoNoName info;
+	m_fileStream.read(reinterpret_cast<char*>(&info), sizeof(info));
+	return info;
+}
+template <>
+InstanceInfoNoName BinaryLoader::read<InstanceInfoNoName>() {
+	// TODO: ensure this is packed!
+	// TODO: ensure that we only read it at once if endianness matches!
+	InstanceInfoNoName info;
+	m_fileStream.read(reinterpret_cast<char*>(&info), sizeof(info));
+	return info;
 }
 
 // Clears the loader state
@@ -631,7 +669,7 @@ void BinaryLoader::read_compressed_sphere_attributes(const ObjectState& object, 
 				lod.numSpheres, " deflated sphere material indices");
 }
 
-u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
+u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod, bool asReduced) {
 	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_lod");
 
 	// Remember where we were in the file
@@ -660,14 +698,13 @@ u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 	lodState.numVertAttribs = read<u32>();
 	lodState.numFaceAttribs = read<u32>();
 	lodState.numSphereAttribs = read<u32>();
-	lodState.lodHdl = object_add_lod(object.objHdl, actualLod);
+	lodState.lodHdl = object_add_lod(object.objHdl, actualLod, asReduced);
 
 	logPedantic("[BinaryLoader::read_lod] Loading LoD ", actualLod, " for object '", object.name, "'...");
 
 	// Reserve memory for the current LOD
 	if(!polygon_reserve(lodState.lodHdl, lodState.numVertices,
-					   lodState.numEdges, lodState.numTriangles,
-					   lodState.numQuads))
+						lodState.numTriangles, lodState.numQuads))
 		throw std::runtime_error("Failed to reserve LoD polygon memory");
 	if (!spheres_reserve(lodState.lodHdl, lodState.numSpheres))
 		throw std::runtime_error("Failed to reserve LoD sphere memory");
@@ -709,10 +746,11 @@ u32 BinaryLoader::read_lod(const ObjectState& object, u32 lod) {
 void BinaryLoader::read_object() {
 	m_objects.back().name = m_namePool.insert(read<StringView>());
 	logPedantic("[BinaryLoader::read_object] Loading object '", m_objects.back().name, "'");
-	m_objects.back().flags = static_cast<ObjectFlags>( read<u32>() );
-	m_objects.back().keyframe = read<u32>();
-	m_objects.back().animObjId = read<u32>();
-	m_objects.back().aabb = read<ei::Box>();
+	const auto objInfo = read<ObjectInfoNoName>();
+	m_objects.back().flags = static_cast<ObjectFlags>(objInfo.flags);
+	m_objects.back().keyframe = objInfo.keyframe;
+	m_objects.back().animObjId = objInfo.prevAnimObjId;
+	m_objects.back().aabb = objInfo.aabb;
 
 	logPedantic("[BinaryLoader::read_object] Read object '", m_objects.back().name,
 				"' with key frame ", m_objects.back().keyframe, " and animation object ID ",
@@ -722,6 +760,10 @@ void BinaryLoader::read_object() {
 	m_objects.back().objHdl = world_create_object(m_mffInstHdl, m_objects.back().name.data(), m_objects.back().flags);
 	if(m_objects.back().objHdl == nullptr)
 		throw std::runtime_error("Failed to create object '" + std::string(m_objects.back().name));
+
+	// Reserve space for the LoDs
+	const auto lodCount = read<u32>();
+	object_allocate_lod_slots(m_objects.back().objHdl, lodCount);
 }
 
 void BinaryLoader::read_bone_animation_data() {
@@ -752,48 +794,45 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 			sprintf(m_loadingStage.data(), "Loading instance %u / %u%c",
 					i, numInstances, '\0');
 		const auto name = read<StringView>();
-		const u32 objId = read<u32>();
-		const u32 keyframe = read<u32>();
-		const u32 animInstId = read<u32>();
-		const Mat3x4 transMat = read<Mat3x4>();
+		const auto info = read<InstanceInfoNoName>();
 		// Determine what level-of-detail should be applied for this instance
 		u32 lod = globalLod;
-		if(auto iter = objectLods.find(m_objects[objId].name); iter != objectLods.end())
+		if(auto iter = objectLods.find(m_objects[info.objId].name); iter != objectLods.end())
 			lod = iter->second;
+		// TODO: this is actually a significant cost, even if few instances are in the list
 		const auto instIter = instanceLods.find(name);
 		if(instIter != instanceLods.end())
 			lod = instIter->second.customLod;
 
 		// Only log below a certain threshold
-		logPedantic("[BinaryLoader::read_instances] Creating given instance (keyframe ", keyframe,
-					", animInstId ", animInstId, ") for object '", name, "\'");
-		InstanceHdl instHdl = world_create_instance(m_mffInstHdl, m_objects[objId].objHdl, keyframe);
+		logPedantic("[BinaryLoader::read_instances] Creating given instance (keyframe ", info.keyframe,
+					", animInstId ", info.prevAnimInstId, ") for object '", name, "\'");
+		InstanceHdl instHdl = world_create_instance(m_mffInstHdl, m_objects[info.objId].objHdl, info.keyframe);
 		if(instHdl == nullptr)
 			throw std::runtime_error("Failed to create instance for object ID "
-									 + std::to_string(objId));
+									 + std::to_string(info.objId));
 		if(instIter != instanceLods.end())
 			instIter->second.handle = instHdl;
 
-		// We now have a valid instance: time to check if we have the required LoD
-		// Only do so for non-animated instances though to avoid loading all LoDs into memory
-		if((m_keepTrackOfAabb || keyframe == 0xFFFFFFFF) && !object_has_lod(m_objects[objId].objHdl, lod)) {
-			// We don't -> gotta load it
-			lod = read_lod(m_objects[objId], lod);
-		}
+		// Here was the point where we previously would have loaded in the referenced LoD
+		// However, since initial reduction may be needed to load in large scenes,
+		// it is non-sensical to not fetch them on demand (except for negligibly small
+		// scenes, where it doesn't matter anyway).
 
-		if(!instance_set_transformation_matrix(m_mffInstHdl, instHdl, &transMat, m_loadWorldToInstTrans))
+
+		if(!instance_set_transformation_matrix(m_mffInstHdl, instHdl, &info.transMat, m_loadWorldToInstTrans))
 			throw std::runtime_error("Failed to set transformation matrix for instance of object ID "
-									 + std::to_string(objId));
+									 + std::to_string(info.objId));
+		// We manually calculate the bounding box so that we don't have to actually
+		// load in the LoD, which we would if we'd use the regular interface
+		Mat3x4 instToWorld;
+		if(!instance_get_transformation_matrix(m_mffInstHdl, instHdl, &instToWorld))
+			throw std::runtime_error("Failed to read back instance-to-world transformation matrix for instance of object ID "
+									 + std::to_string(info.objId));
+		const auto instanceAabb = ei::transform(m_objects[info.objId].aabb, util::pun<ei::Mat3x4>(instToWorld));
+		m_aabb = ei::Box(m_aabb, instanceAabb);
 
-		if(m_keepTrackOfAabb) {
-			ei::Box instanceAabb;
-			if(!instance_get_bounding_box(m_mffInstHdl, instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
-				throw std::runtime_error("Failed to get bounding box for instance of object ID "
-										 + std::to_string(objId));
-			m_aabb = ei::Box(m_aabb, instanceAabb);
-		}
-
-		hasInstance[objId] = true;
+		hasInstance[info.objId] = true;
 	}
 
 	logInfo("[BinaryLoader::read_instances] Loaded ", numInstances, " instances");
@@ -832,13 +871,7 @@ bool BinaryLoader::read_instances(const u32 globalLod,
 					read_lod(m_objects[i], lod);
 				}
 
-				if(m_keepTrackOfAabb) {
-					ei::Box instanceAabb;
-					if(!instance_get_bounding_box(m_mffInstHdl, instHdl, reinterpret_cast<Vec3*>(&instanceAabb.min), reinterpret_cast<Vec3*>(&instanceAabb.max), lod))
-						throw std::runtime_error("Failed to get bounding box for instance of object ID "
-												 + std::to_string(i));
-					m_aabb = ei::Box(m_aabb, instanceAabb);
-				}
+				m_aabb = ei::Box(m_aabb, m_objects[i].aabb);
 				++defaultCreatedInstances;
 			}
 		}
@@ -865,24 +898,25 @@ void BinaryLoader::deinstance() {
 		applyTranformation(frames);
 }
 
-void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod) {
+void BinaryLoader::load_lod(const fs::path& file, ObjectHdl obj, mufflon::u32 objId, mufflon::u32 lod,
+							const bool asReduced) {
 	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::load_lod");
 	m_filePath = file;
 
 	for(u32 i = 0u; i < 3u; ++i)
-		m_fileDescs[i] = FileDescriptor{ m_filePath, "rb" };
+		m_fileDescs[i] = FileDescriptor{ m_filePath };
 
 	if(!fs::exists(m_filePath))
-		throw std::runtime_error("Binary file '" + m_filePath.string() + "' doesn't exist");
+		throw std::runtime_error("Binary file '" + m_filePath.u8string() + "' doesn't exist");
 
 	logPedantic("[BinaryLoader::load_lod] Loading LoD ", lod, " for object ID ", objId,
-			" from file '", m_filePath.string(), "'");
+			" from file '", m_filePath.u8string(), "'");
 
 	try {
 		// Open the binary file and enable exception management
 		m_fileStream = std::ifstream(m_filePath, std::ios_base::binary);
 		if(m_fileStream.bad() || m_fileStream.fail())
-			throw std::runtime_error("Failed to open binary file '" + m_filePath.string() + "\'");
+			throw std::runtime_error("Failed to open binary file '" + m_filePath.u8string() + "\'");
 		m_fileStream.exceptions(std::ifstream::failbit);
 		m_fileStart = m_fileStream.tellg();
 
@@ -925,14 +959,163 @@ void BinaryLoader::load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u
 		object.keyframe = read<u32>();
 		object.animObjId = read<u32>();
 		object.aabb = read<ei::Box>();
-		object.objHdl = world_get_object(m_mffInstHdl, object.name.data());
+		if(obj == nullptr)
+			object.objHdl = world_get_object(m_mffInstHdl, object.name.data());
+		else
+			object.objHdl = obj;
 		if(object.objHdl == nullptr)
 			throw std::runtime_error("Unknown object '" + std::string(object.name) + ")");
 		// Read the LoD
 		if(!object_has_lod(object.objHdl, lod))
-			read_lod(object, lod);
+			read_lod(object, lod, asReduced);
 
 		this->clear_state();
+	} catch(const std::exception&) {
+		// Clean up before leaving throwing
+		this->clear_state();
+		throw;
+	}
+}
+
+u32 BinaryLoader::read_unique_object_material_indices(const fs::path& file, const u32 objId, u16* indices) {
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_unique_object_material_indices");
+	m_filePath = file;
+
+	for(u32 i = 0u; i < 3u; ++i)
+		m_fileDescs[i] = FileDescriptor{ m_filePath };
+
+	if(!fs::exists(m_filePath))
+		throw std::runtime_error("Binary file '" + m_filePath.u8string() + "' doesn't exist");
+
+	try {
+		// Open the binary file and enable exception management
+		m_fileStream = std::ifstream(m_filePath, std::ios_base::binary);
+		if(m_fileStream.bad() || m_fileStream.fail())
+			throw std::runtime_error("Failed to open binary file '" + m_filePath.u8string() + "\'");
+		m_fileStream.exceptions(std::ifstream::failbit);
+		m_fileStart = m_fileStream.tellg();
+
+		// Skip over the materials header
+		if(read<u32>() != MATERIALS_HEADER_MAGIC)
+			throw std::runtime_error("Invalid materials header magic constant");
+		const u64 objectStart = read<u64>();
+		m_fileStream.seekg(objectStart, std::ifstream::beg);
+
+		// Skip over animations header (if existing)
+		u32 headerMagic = read<u32>();
+		if(headerMagic == BONE_ANIMATION_MAGIC) {
+			const u64 objectStart = read<u64>();
+			m_fileStream.seekg(objectStart, std::ifstream::beg);
+			headerMagic = read<u32>();
+		}
+
+		// Parse the object header
+		if(headerMagic != OBJECTS_HEADER_MAGIC)
+			throw std::runtime_error("Invalid objects header magic constant");
+		(void)read<u64>(); // Instance start
+		GlobalFlag compressionFlags = GlobalFlag{ { read<u32>() } };
+
+		// Jump to the desired object
+		const u32 jumpCount = read<u32>();
+		if(objId >= jumpCount)
+			throw std::runtime_error("Object index out of bounds (" + std::to_string(objId)
+									 + " >= " + std::to_string(jumpCount) + ")");
+		m_fileStream.seekg(sizeof(u64) * objId, std::ifstream::cur);
+
+		const auto offset = read<u64>();
+		// Jump to the object
+		m_fileStream.seekg(offset + sizeof(u32), std::ifstream::beg);
+		// Skip the object name and properties
+		m_fileStream.seekg(read<u32>() + sizeof(u32) * 9u, std::ifstream::cur);
+		// Skip the LoD jump table
+		m_fileStream.seekg(read<u32>() * sizeof(u64), std::ifstream::cur);
+
+		// Read the material indices
+		const auto numIndices = read<u32>();
+		for(u32 i = 0u; i < numIndices; ++i)
+			indices[i] = read<u16>();
+		this->clear_state();
+		return numIndices;
+	} catch(const std::exception&) {
+		// Clean up before leaving throwing
+		this->clear_state();
+		throw;
+	}
+	return 0u;
+}
+
+std::size_t BinaryLoader::read_lods_metadata(const fs::path& file, LodMetadata* buffer) {
+	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::read_unique_object_material_indices");
+	m_filePath = file;
+
+	for(u32 i = 0u; i < 3u; ++i)
+		m_fileDescs[i] = FileDescriptor{ m_filePath };
+
+	if(!fs::exists(m_filePath))
+		throw std::runtime_error("Binary file '" + m_filePath.u8string() + "' doesn't exist");
+
+	try {
+		// Open the binary file and enable exception management
+		m_fileStream = std::ifstream(m_filePath, std::ios_base::binary);
+		if(m_fileStream.bad() || m_fileStream.fail())
+			throw std::runtime_error("Failed to open binary file '" + m_filePath.u8string() + "\'");
+		m_fileStream.exceptions(std::ifstream::failbit);
+		m_fileStart = m_fileStream.tellg();
+
+		// Skip over the materials header
+		if(read<u32>() != MATERIALS_HEADER_MAGIC)
+			throw std::runtime_error("Invalid materials header magic constant");
+		const u64 objectStart = read<u64>();
+		m_fileStream.seekg(objectStart, std::ifstream::beg);
+
+		// Skip over animations header (if existing)
+		u32 headerMagic = read<u32>();
+		if(headerMagic == BONE_ANIMATION_MAGIC) {
+			const u64 objectStart = read<u64>();
+			m_fileStream.seekg(objectStart, std::ifstream::beg);
+			headerMagic = read<u32>();
+		}
+
+		// Parse the object header
+		if(headerMagic != OBJECTS_HEADER_MAGIC)
+			throw std::runtime_error("Invalid objects header magic constant");
+		(void)read<u64>(); // Instance start
+		GlobalFlag compressionFlags = GlobalFlag{ { read<u32>() } };
+
+		// Jump to the desired object
+		std::vector<u64> objJumpTable(read<u32>());
+		for(std::size_t i = 0u; i < objJumpTable.size(); ++i)
+			objJumpTable[i] = read<u64>();
+
+		// For every object and every LoD, we read the metadata
+		std::vector<u64> lodJumpTable;
+		std::size_t currIndex = 0u;
+		for(const auto objOffset : objJumpTable) {
+			m_fileStream.seekg(objOffset, std::ifstream::beg);
+			if(read<u32>() != OBJECT_MAGIC)
+				throw std::runtime_error("Invalid object magic constant");
+			// Skip the object name and properties
+			m_fileStream.seekg(read<u32>() + sizeof(u32) * 9u, std::ifstream::cur);
+			// Read the LoD jump table
+			lodJumpTable.resize(read<u32>());
+			for(std::size_t i = 0u; i < lodJumpTable.size(); ++i)
+				lodJumpTable[i] = read<u64>();
+
+			// Iterate every LoD
+			for(const auto lodOffset : lodJumpTable) {
+				m_fileStream.seekg(lodOffset, std::ifstream::beg);
+				if(read<u32>() != LOD_MAGIC)
+					throw std::runtime_error("Invalid LoD magic constant");
+				// Read the LoD information
+				LodMetadata& data = buffer[currIndex++];
+				data.triangles = read<u32>();
+				data.quads = read<u32>();
+				data.spheres = read<u32>();
+				data.vertices = read<u32>();
+				data.edges = read<u32>();
+			}
+		}
+		return currIndex;
 	} catch(const std::exception&) {
 		// Clean up before leaving throwing
 		this->clear_state();
@@ -944,27 +1127,26 @@ bool BinaryLoader::load_file(fs::path file, const u32 globalLod,
 							 const util::FixedHashMap<StringView, mufflon::u32>& objectLods,
 							 util::FixedHashMap<StringView, InstanceMapping>& instanceLods,
 							 const bool deinstance, const bool loadWorldToInstTrans,
-							 const bool keepTrackOfAabb, const bool noDefaultInstances) {
+							 const bool noDefaultInstances) {
 	auto scope = Profiler::loader().start<CpuProfileState>("BinaryLoader::load_file");
 	m_loadWorldToInstTrans = loadWorldToInstTrans;
-	m_keepTrackOfAabb = keepTrackOfAabb;
 	m_filePath = std::move(file);
 	if(!fs::exists(m_filePath))
-		throw std::runtime_error("Binary file '" + m_filePath.string() + "' doesn't exist");
+		throw std::runtime_error("Binary file '" + m_filePath.u8string() + "' doesn't exist");
 	m_aabb.min = ei::Vec3{ 1e30f };
 	m_aabb.max = ei::Vec3{ -1e30f };
 	sprintf(m_loadingStage.data(), "Loading binary file%c", '\0');
-	logInfo("[BinaryLoader::load_file] Loading binary file '", m_filePath.string(), "'");
+	logInfo("[BinaryLoader::load_file] Loading binary file '", m_filePath.u8string(), "'");
 	try {
 		// Open the binary file and enable exception management
 		m_fileStream = std::ifstream(m_filePath, std::ios_base::binary);
 		if(m_fileStream.bad() || m_fileStream.fail())
-			throw std::runtime_error("Failed to open binary file '" + m_filePath.string() + "\'");
+			throw std::runtime_error("Failed to open binary file '" + m_filePath.u8string() + "\'");
 		m_fileStream.exceptions(std::ifstream::failbit);
 		// Needed to get a C file descriptor offset
 		m_fileStart = m_fileStream.tellg();
 		for(u32 i = 0u; i < 3u; ++i)
-			m_fileDescs[i] = FileDescriptor{ m_filePath, "rb" };
+			m_fileDescs[i] = FileDescriptor{ m_filePath };
 
 		if(m_abort)
 			return false;

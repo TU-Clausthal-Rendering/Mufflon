@@ -16,8 +16,8 @@ void init_rngs(u32 num, int seed, math::Rng* rngs);
 
 } // namespace gpupt_detail
 
-GpuPathTracer::GpuPathTracer() :
-	RendererBase<Device::CUDA, PtTargets>{},
+GpuPathTracer::GpuPathTracer(mufflon::scene::WorldContainer& world) :
+	RendererBase<Device::CUDA, PtTargets>{ world },
 	m_params{}
 	//m_rng{ static_cast<u32>(std::random_device{}()) }
 {}

@@ -18,7 +18,7 @@ In the case of multiple type choices, details on further mandatory properties wi
 Note that the number of scenarios is limited to 32.
 
     {
-        "version": "1.6",
+        "version": "1.7",
         "binary": "<file name relative to this json>",
         "defaultScenario": "<scenario name (from json.scenarios)>"  // OPTIONAL the scenario to load on startup.
                                                    // If none is given, the chosen scenario is unspecified
@@ -334,6 +334,8 @@ Since the same pattern is used for LOD inside objects, their is a generic specif
                3*f32            // Bounding box min for the object (in object space)
                3*f32            // Bounding box max for the object (in object space)
                <JUMP_TABLE>     // Jump table over LODs (number = D)
+			   u32				// Number of unique material indices [VERSION 1.7]
+			   N * u16			// Sorted unique material indices, with N being the count
                D*<LOD>          // LODs sorted after detail (0 has the highest detail)
 
     <OFLAGS> = // Currently none

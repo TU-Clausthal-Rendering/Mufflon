@@ -46,6 +46,7 @@ public:
 	virtual std::size_t get_descriptor_size(Device /*device*/) const {
 		return sizeof(MaterialDescriptorBase);
 	}
+	virtual std::size_t get_material_texture_size() const noexcept = 0u;
 
 	/*
 	 * Size of a fetched parameter instanciation from this material.
@@ -159,6 +160,16 @@ public:
 		return (device == Device::CPU) ? get_material_descriptor_size<Device::CPU, M>()
 									   : get_material_descriptor_size<Device::CUDA, M>();
 	}
+	// Get the size of the material textures
+	std::size_t get_material_texture_size() const noexcept final {
+		std::size_t size = 0u;
+		for(std::size_t i = 0u; i < SubMaterial::Textures::TEX_COUNT; ++i) {
+			if(m_textures[i] != nullptr)
+				size += m_textures[i]->get_size();
+		}
+		return size;
+	}
+	
 	std::size_t get_parameter_pack_size() const final;
 	char* get_descriptor(Device device, char* outBuffer) const final;
 	Medium compute_medium(const Medium& outerMedium) const final;

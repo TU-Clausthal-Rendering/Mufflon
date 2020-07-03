@@ -14,7 +14,7 @@ namespace renderer {
 
 class GpuLightTracer final : public RendererBase<Device::CUDA, LtTargets> {
 public:
-	GpuLightTracer();
+	GpuLightTracer(mufflon::scene::WorldContainer& world);
 	~GpuLightTracer() = default;
 
 	// This is just a test method, don't use this as an actual interface

@@ -19,76 +19,63 @@ namespace {
 static float s_curvScale;
 static int s_numPhotons;
 
+} // namespace
+
+CUDA_FUNCTION void IvcmVertexExt::init(const IvcmPathVertex& /*thisVertex*/,
+									   const AreaPdf inAreaPdf,
+									   const AngularPdf inDirPdf,
+									   const float pChoice) {
+	this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
+	this->throughput = Spectrum{ 1.0f };
+	float sourceCount = 1.0f;//pChoice * 800 * 600;
+	this->footprint.init(1.0f / (float(inAreaPdf) * sourceCount), 1.0f / (float(inDirPdf) * sourceCount), pChoice);
 }
 
-// Extension which stores a partial result of the MIS-weight computation for speed-up.
-struct IvcmVertexExt {
-	AreaPdf incidentPdf;
-	Spectrum throughput;
-	AngularPdf pdfBack;
-	// Store 'cosθ / d²' for the previous vertex OR 'cosθ / (d² samplePdf n A)' for hitable light sources
-	float prevConversionFactor { 0.0f };
-	float density;
-	float curvature;
-	Footprint2D footprint;
 
-
-	inline CUDA_FUNCTION void init(const IvcmPathVertex& /*thisVertex*/,
-							const AreaPdf inAreaPdf,
-							const AngularPdf inDirPdf,
-							const float pChoice) {
-		this->incidentPdf = VertexExtension::mis_start_pdf(inAreaPdf, inDirPdf, pChoice);
-		this->throughput = Spectrum{1.0f};
-		float sourceCount = 1.0f;//pChoice * 800 * 600;
-		this->footprint.init(1.0f / (float(inAreaPdf) * sourceCount), 1.0f / (float(inDirPdf) * sourceCount), pChoice);
+CUDA_FUNCTION void IvcmVertexExt::update(const IvcmPathVertex& prevVertex,
+										 const IvcmPathVertex& thisVertex,
+										 const math::PdfPair pdf,
+										 const Connection& incident,
+										 const Spectrum& throughput,
+										 const float /*continuationPropability*/,
+										 const Spectrum& /*transmission*/,
+										 const scene::SceneDescriptor<Device::CPU>& scene,
+										 int numPhotons) {
+	float inCos = thisVertex.get_geometric_factor(incident.dir);
+	float outCos = prevVertex.get_geometric_factor(incident.dir);
+	bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
+	this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, ei::abs(inCos));
+	this->throughput = throughput;
+	if(prevVertex.is_hitable()) {
+		// Compute as much as possible from the conversion factor.
+		// At this point we do not know n and A for the photons. This quantities
+		// are added in the kernel after the walk.
+		this->prevConversionFactor = ei::abs(orthoConnection ? outCos : outCos / incident.distanceSq);
 	}
-
-	
-	inline CUDA_FUNCTION void update(const IvcmPathVertex& prevVertex,
-									 const IvcmPathVertex& thisVertex,
-									 const math::PdfPair pdf,
-									 const Connection& incident,
-									 const Spectrum& throughput,
-									 const float /*continuationPropability*/,
-									 const Spectrum& /*transmission*/,
-									 const scene::SceneDescriptor<Device::CPU>& scene,
-									 int numPhotons) {
-		float inCos = thisVertex.get_geometric_factor(incident.dir);
-		float outCos = prevVertex.get_geometric_factor(incident.dir);
-		bool orthoConnection = prevVertex.is_orthographic() || thisVertex.is_orthographic();
-		this->incidentPdf = VertexExtension::mis_pdf(pdf.forw, orthoConnection, incident.distance, ei::abs(inCos));
-		this->throughput = throughput;
-		if(prevVertex.is_hitable()) {
-			// Compute as much as possible from the conversion factor.
-			// At this point we do not know n and A for the photons. This quantities
-			// are added in the kernel after the walk.
-			this->prevConversionFactor = ei::abs(orthoConnection ? outCos : outCos / incident.distanceSq);
-		}
-		this->curvature = 0.0f; // Mean curvature for the footprint
-		if(prevVertex.get_primitive_id().is_valid()) {
-			this->curvature = scene::accel_struct::fetch_curvature(scene,
-				prevVertex.get_primitive_id(),
-				prevVertex.get_surface_params(),
-				prevVertex.get_geometric_normal())
-				* s_curvScale;
-		}
-		float pdfForw = float(pdf.forw);
-		if(prevVertex.is_camera())
-			pdfForw *= numPhotons; // == numPixels
-		auto prevEta = prevVertex.get_eta(scene.media);
-		this->footprint = prevVertex.ext().footprint.add_segment(
-			pdfForw, prevVertex.is_orthographic(), this->curvature, prevEta.inCos, outCos,
-			prevEta.eta, incident.distance, inCos, 1.0f);
+	this->curvature = 0.0f; // Mean curvature for the footprint
+	if(prevVertex.get_primitive_id().is_valid()) {
+		this->curvature = scene::accel_struct::fetch_curvature(scene,
+															   prevVertex.get_primitive_id(),
+															   prevVertex.get_surface_params(),
+															   prevVertex.get_geometric_normal())
+			* s_curvScale;
 	}
+	float pdfForw = float(pdf.forw);
+	if(prevVertex.is_camera())
+		pdfForw *= numPhotons; // == numPixels
+	auto prevEta = prevVertex.get_eta(scene.media);
+	this->footprint = prevVertex.ext().footprint.add_segment(
+		pdfForw, prevVertex.is_orthographic(), this->curvature, prevEta.inCos, outCos,
+		prevEta.eta, incident.distance, inCos, 1.0f);
+}
 
-	inline CUDA_FUNCTION void update(const IvcmPathVertex& /*thisVertex*/,
-							  const scene::Direction& /*excident*/,
-							  const VertexSample& sample,
-							  const scene::SceneDescriptor<Device::CPU>& /*scene*/,
-							  int /*numPhotons*/) {
-		pdfBack = sample.pdf.back;
-	}
-};
+CUDA_FUNCTION void IvcmVertexExt::update(const IvcmPathVertex& /*thisVertex*/,
+										 const scene::Direction& /*excident*/,
+										 const VertexSample& sample,
+										 const scene::SceneDescriptor<Device::CPU>& /*scene*/,
+										 int /*numPhotons*/) {
+	pdfBack = sample.pdf.back;
+}
 
 // A wrapper to provide the vertex's current pdf without changing the original vertex.
 class VertexWrapper {
@@ -299,8 +286,8 @@ Spectrum CpuIvcm::merge(const IvcmPathVertex& viewPath, const IvcmPathVertex& ph
 
 
 
-CpuIvcm::CpuIvcm() :
-	RendererBase<Device::CPU, IvcmTargets>({
+CpuIvcm::CpuIvcm(mufflon::scene::WorldContainer& world) :
+	RendererBase<Device::CPU, IvcmTargets>(world, std::nullopt, {
 		scene::AttributeIdentifier{scene::AttributeType::FLOAT, "mean_curvature"}
 	}, {}, {})
 {}
@@ -330,7 +317,7 @@ void CpuIvcm::post_reset() {
 	}
 	// TODO: reasonable density structure capacities
 	if(resetFlags.geometry_changed())
-		m_density = std::make_unique<data_structs::DmOctree>(m_sceneDesc.aabb,
+		m_density = std::make_unique<data_structs::DmOctree<>>(m_sceneDesc.aabb,
 			1024 * 1024 * 4, 8.0f, true);//*/
 	/*if(resetFlags.is_set(ResetEvent::RENDERER_ENABLE))
 		m_density = std::make_unique<data_structs::DmHashGrid>(1024 * 1024);
@@ -433,7 +420,7 @@ void CpuIvcm::trace_photon(int idx, int numPhotons, u64 /*seed*/, float /*curren
 		math::RndSet2_1 rnd { m_rngs[idx].next(), m_rngs[idx].next() };
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
-		if(walk(m_sceneDesc, *previous, rnd, rndRoulette, true, throughput, vertex, sample, m_sceneDesc, numPhotons) != WalkResult::HIT)
+		if(walk(m_sceneDesc, *previous, rnd, rndRoulette, true, throughput, vertex, sample, nullptr, m_sceneDesc, numPhotons) != WalkResult::HIT)
 			break;
 		++pathLen;
 
@@ -485,7 +472,7 @@ void CpuIvcm::sample(const Pixel coord, int idx, int numPhotons, float currentMe
 		float rndRoulette = math::sample_uniform(u32(m_rngs[idx].next()));
 		VertexSample sample;
 		const WalkResult walkRes = walk(m_sceneDesc, *currentVertex, rnd, rndRoulette, false, throughput,
-										*(currentVertex + 1), sample, m_sceneDesc, numPhotons);
+										*(currentVertex + 1), sample, nullptr, m_sceneDesc, numPhotons);
 		if(walkRes == WalkResult::CANCEL)
 			break;
 		++viewPathLen;

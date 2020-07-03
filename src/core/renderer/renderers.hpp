@@ -17,6 +17,7 @@
 #include "core/renderer/wireframe/gl_wireframe.h"
 #include "core/renderer/debug/debug_bvh_renderer.hpp"
 
+
 namespace mufflon::renderer {
 
 using Renderers = util::TaggedTuple<
@@ -27,8 +28,7 @@ using Renderers = util::TaggedTuple<
 	CpuBidirPhotonMapper,
 	CpuNextEventBacktracking,
 	CpuVcm, CpuIvcm,
-	GlForward, 
-	DebugBvhRenderer
+	GlForward, DebugBvhRenderer
 >;
 
 } // namespace mufflon::renderer

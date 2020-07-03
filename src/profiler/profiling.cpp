@@ -177,11 +177,11 @@ void Profiler::create_snapshot_all() {
 }
 
 void Profiler::save_current_state(StringView path) const {
-	fs::path file = std::string(path);
+	const auto file = fs::u8path(path.cbegin(), path.cend());
 	std::ofstream fileStream(file);
 	if(fileStream.bad()) {
 		logError("[Profiler::save_current_state] could not open output file '",
-				 file.string(), "'");
+				 file.u8string(), "'");
 		return;
 	}
 	fileStream.exceptions(std::ios::failbit);
@@ -198,11 +198,11 @@ void Profiler::save_current_state(StringView path) const {
 }
 
 void Profiler::save_snapshots(StringView path) const {
-	fs::path file = std::string(path);
+	const auto file = fs::u8path(path.cbegin(), path.cend());
 	std::ofstream fileStream(file);
 	if(fileStream.bad()) {
 		logError("[Profiler::save_snapshots] could not open output file '",
-				 file.string(), "'");
+				 file.u8string(), "'");
 		return;
 	}
 	fileStream.exceptions(std::ios::failbit);
@@ -219,11 +219,11 @@ void Profiler::save_snapshots(StringView path) const {
 }
 
 void Profiler::save_total_and_snapshots(StringView path) const {
-	fs::path file = std::string(path);
+	const auto file = fs::u8path(path.cbegin(), path.cend());
 	std::ofstream fileStream(file);
 	if(fileStream.bad()) {
 		logError("[Profiler::save_snapshots] could not open output file '",
-				 file.string(), "'");
+				 file.u8string(), "'");
 		return;
 	}
 	fileStream.exceptions(std::ios::failbit);

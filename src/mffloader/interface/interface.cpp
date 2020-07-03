@@ -39,6 +39,7 @@ using namespace mff_loader;
 struct MufflonLoaderInstance {
 	MufflonInstanceHdl mffInst;
 	std::atomic<json::JsonLoader*> jsonLoader = nullptr;
+	json::FileVersion fileVersion;
 	fs::path binPath{};
 };
 
@@ -47,6 +48,29 @@ namespace {
 std::string s_lastError;
 
 } // namespace
+
+Boolean loader_set_log_level(LogLevel level) {
+	switch(level) {
+		case LogLevel::LOG_PEDANTIC:
+			mufflon::s_logLevel = LogSeverity::PEDANTIC;
+			return true;
+		case LogLevel::LOG_INFO:
+			mufflon::s_logLevel = LogSeverity::INFO;
+			return true;
+		case LogLevel::LOG_WARNING:
+			mufflon::s_logLevel = LogSeverity::WARNING;
+			return true;
+		case LogLevel::LOG_ERROR:
+			mufflon::s_logLevel = LogSeverity::ERROR;
+			return true;
+		case LogLevel::LOG_FATAL_ERROR:
+			mufflon::s_logLevel = LogSeverity::FATAL_ERROR;
+			return true;
+		default:
+			logError("[", FUNCTION_NAME, "] Invalid log level");
+			return false;
+	}
+}
 
 const char* loader_get_dll_error() {
 	TRY
@@ -67,7 +91,7 @@ const char* loader_get_dll_error() {
 }
 
 MufflonLoaderInstanceHdl loader_initialize(MufflonInstanceHdl mffInstHdl) {
-	return new MufflonLoaderInstance{ mffInstHdl, nullptr, fs::path{} };
+	return new MufflonLoaderInstance{ mffInstHdl, nullptr, {}, fs::path{} };
 }
 
 void loader_destroy(MufflonLoaderInstanceHdl mffLoaderInstHdl) {
@@ -79,15 +103,15 @@ LoaderStatus loader_load_json(MufflonLoaderInstanceHdl hdl, const char* path) {
 	TRY
 	CHECK_NULLPTR(hdl, "loader instance handle", LoaderStatus::LOADER_ERROR);
 	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
-	fs::path filePath(path);
+	const auto filePath = fs::u8path(path);
 
 	// Perform some error checking
 	if (!fs::exists(filePath)) {
-		logError("[", FUNCTION_NAME, "] File '", fs::canonical(filePath).string(), "' does not exist");
+		logError("[", FUNCTION_NAME, "] File '", fs::canonical(filePath).u8string(), "' does not exist");
 		return LoaderStatus::LOADER_ERROR;
 	}
 	if (fs::is_directory(filePath)) {
-		logError("[", FUNCTION_NAME, "] Path '", fs::canonical(filePath).string(), "' is a directory, not a file");
+		logError("[", FUNCTION_NAME, "] Path '", fs::canonical(filePath).u8string(), "' is a directory, not a file");
 		return LoaderStatus::LOADER_ERROR;
 	}
 	if (filePath.extension() != ".json")
@@ -97,16 +121,15 @@ LoaderStatus loader_load_json(MufflonLoaderInstanceHdl hdl, const char* path) {
 		// Clear the world
 		world_clear_all(mffLoaderInst.mffInst);
 		json::JsonLoader loader{ mffLoaderInst.mffInst, filePath };
-		mufflon_set_lod_loader(mffLoaderInst.mffInst, loader_load_lod, hdl);
+		mufflon_set_lod_loader(mffLoaderInst.mffInst, loader_load_lod, loader_load_object_material_indices, loader_load_lod_metadatas, hdl);
 		mffLoaderInst.jsonLoader.store(&loader);
-		if(!loader.load_file(mffLoaderInst.binPath))
+		if(!loader.load_file(mffLoaderInst.binPath, &mffLoaderInst.fileVersion))
 			return LoaderStatus::LOADER_ABORT;
 	} catch(const std::exception& e) {
 		logError("[", FUNCTION_NAME, "] ", e.what());
 		mffLoaderInst.jsonLoader.store(nullptr);
 		return LoaderStatus::LOADER_ERROR;
 	}
-
 	mffLoaderInst.jsonLoader.store(nullptr);
 	return LoaderStatus::LOADER_SUCCESS;
 	CATCH_ALL(LoaderStatus::LOADER_ERROR)
@@ -116,18 +139,18 @@ LoaderStatus loader_save_scene(MufflonLoaderInstanceHdl hdl, const char* path) {
 	TRY
 	CHECK_NULLPTR(hdl, "loader instance handle", LoaderStatus::LOADER_ERROR);
 	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
-	fs::path filePath(path);
+	auto filePath = fs::u8path(path);
 
 	// Perform some error checking
 	if (fs::exists(filePath)) {
 		filePath.replace_extension(".mff");
 		if (fs::is_directory(filePath)) {
-			logError("[", FUNCTION_NAME, "] Path '", filePath.string(), "' is already a directory");
+			logError("[", FUNCTION_NAME, "] Path '", filePath.u8string(), "' is already a directory");
 			return LoaderStatus::LOADER_ERROR;
 		}
 		filePath.replace_extension(".json");
 		if (fs::is_directory(filePath)) {
-			logError("[", FUNCTION_NAME, "] Path '", filePath.string(), "' is already a directory");
+			logError("[", FUNCTION_NAME, "] Path '", filePath.u8string(), "' is already a directory");
 			return LoaderStatus::LOADER_ERROR;
 		}
 	}
@@ -145,7 +168,7 @@ LoaderStatus loader_save_scene(MufflonLoaderInstanceHdl hdl, const char* path) {
 	CATCH_ALL(LoaderStatus::LOADER_ERROR)
 }
 
-Boolean loader_load_lod(MufflonLoaderInstanceHdl hdl, ObjectHdl obj, u32 lod) {
+Boolean loader_load_lod(MufflonLoaderInstanceHdl hdl, ObjectHdl obj, u32 lod, Boolean asReduced) {
 	TRY
 	CHECK_NULLPTR(hdl, "loader instance handle", false);
 	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
@@ -158,7 +181,44 @@ Boolean loader_load_lod(MufflonLoaderInstanceHdl hdl, ObjectHdl obj, u32 lod) {
 		return false;
 	std::string status;
 	binary::BinaryLoader loader{ mffLoaderInst.mffInst, status };
-	loader.load_lod(mffLoaderInst.binPath, objId, lod);
+	loader.load_lod(mffLoaderInst.binPath, obj, objId, lod, asReduced != 0u);
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean loader_load_object_material_indices(MufflonLoaderInstanceHdl hdl, const uint32_t objId,
+											uint16_t* indexBuffer, uint32_t* readIndices) {
+	TRY
+	CHECK_NULLPTR(hdl, "loader instance handle", false);
+	CHECK_NULLPTR(indexBuffer, "material index buffer", false);
+	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
+	if(mffLoaderInst.fileVersion < json::JsonLoader::PER_OBJECT_UNIQUE_MAT_INDICES) {
+		if(readIndices != nullptr)
+			*readIndices = 0u;
+		return true;
+	}
+	std::string status;
+	binary::BinaryLoader loader{ mffLoaderInst.mffInst, status };
+	const auto count = loader.read_unique_object_material_indices(mffLoaderInst.binPath, objId, indexBuffer);
+	if(readIndices != nullptr)
+		*readIndices = count;
+	return true;
+	CATCH_ALL(false)
+}
+
+Boolean loader_load_lod_metadatas(MufflonLoaderInstanceHdl hdl, LodMetadata* data, size_t* read) {
+	TRY
+	CHECK_NULLPTR(hdl, "loader instance handle", false);
+	CHECK_NULLPTR(data, "LoD metadata buffer", false);
+	auto& mffLoaderInst = *static_cast<MufflonLoaderInstance*>(hdl);
+	if(data == nullptr)
+		return true;
+
+	std::string status;
+	binary::BinaryLoader loader{ mffLoaderInst.mffInst, status };
+	const auto count = loader.read_lods_metadata(mffLoaderInst.binPath, data);
+	if(read != nullptr)
+		*read = count;
 	return true;
 	CATCH_ALL(false)
 }

@@ -37,9 +37,12 @@ public:
 				   const mufflon::util::FixedHashMap<mufflon::StringView, mufflon::u32>& objectLods,
 				   mufflon::util::FixedHashMap<mufflon::StringView, InstanceMapping>& instanceLods,
 				   const bool deinstance, const bool loadWorldToInstTrans,
-				   const bool keepTrackOfAabb, const bool noDefaultInstances);
+				   const bool noDefaultInstances);
 
-	void load_lod(const fs::path& file, mufflon::u32 objId, mufflon::u32 lod);
+	std::size_t read_lods_metadata(const fs::path& file, LodMetadata* buffer);
+	mufflon::u32 read_unique_object_material_indices(const fs::path& file, const mufflon::u32 objId, mufflon::u16* indices);
+	void load_lod(const fs::path& file, ObjectHdl obj, mufflon::u32 objId,
+				  mufflon::u32 lod, const bool asReduced);
 
 	const std::vector<std::string>& get_material_names() const noexcept {
 		return m_materialNames;
@@ -66,7 +69,7 @@ private:
 	class FileDescriptor {
 	public:
 		FileDescriptor() = default;
-		FileDescriptor(fs::path file, const char* mode);
+		FileDescriptor(fs::path file);
 		FileDescriptor(const FileDescriptor&) = delete;
 		FileDescriptor(FileDescriptor&&);
 		FileDescriptor& operator=(const FileDescriptor&) = delete;
@@ -208,7 +211,7 @@ private:
 						const bool noDefaultInstances);
 	void deinstance();
 	void read_object();
-	mufflon::u32 read_lod(const ObjectState& object, mufflon::u32 lod);
+	mufflon::u32 read_lod(const ObjectState& object, mufflon::u32 lod, bool asReduced = false);
 	void read_bone_animation_data();
 
 	MufflonInstanceHdl m_mffInstHdl;
@@ -230,7 +233,6 @@ private:
 
 	// These are for aborting a load and keeping track of progress
 	bool m_loadWorldToInstTrans = false;
-	bool m_keepTrackOfAabb = true;
 	std::atomic_bool m_abort = false;
 	std::string& m_loadingStage;
 };

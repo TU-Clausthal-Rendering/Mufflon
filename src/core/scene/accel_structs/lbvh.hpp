@@ -106,6 +106,12 @@ public:
 		unload<Device::CPU>();
 		unload<Device::CUDA>();
 	}
+
+	// Gets the size of the final descriptor
+	std::size_t desciptor_size() const noexcept {
+		return m_primIds.size() + m_bvhNodes.size();
+	}
+
 private:
 	GenericResource m_primIds;
 	GenericResource m_bvhNodes;

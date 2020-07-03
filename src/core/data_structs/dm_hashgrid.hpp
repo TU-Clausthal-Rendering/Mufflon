@@ -1,33 +1,34 @@
 #pragma once
 
 #include "core/math/intersection_areas.hpp"
+#include "util/types.hpp"
 #include <ei/vector.hpp>
 #include <ei/prime.hpp>
 #include <atomic>
+#include <memory>
 #include <vector>
 
 namespace mufflon { namespace data_structs {
 
 // A lock-free atomic counter hash grid for fast density estimates.
+template < class T = u32 >
 class DmHashGrid {
 public:
 	// Create a hash grid with a fixed memory footprint. This hash grid does not
 	// implement a resizing mechanism, so if you try to add more elements than
 	// the expected number data is lost.
-	DmHashGrid(u32 numExpectedEntries) {
-		m_cellSize = ei::Vec3 { 1.0f };
-		m_mapSize = ei::nextPrime(u32(numExpectedEntries * 1.15f));
-		m_maxProbes = ei::min(int(m_mapSize)-1, 16);
-		m_data.reset(new Entry[m_mapSize]);
-		m_dataCount.store(0);
-		m_densityScale = 1.0f;
-	}
+	DmHashGrid(const u32 numExpectedEntries);
+	DmHashGrid(const DmHashGrid&) = delete;
+	DmHashGrid(DmHashGrid&& grid);
+	DmHashGrid& operator=(const DmHashGrid&) = delete;
+	DmHashGrid& operator=(DmHashGrid&&) = delete;
+	~DmHashGrid() = default;
 
 	ei::UVec3 get_grid_cell(const ei::Vec3& position) const {
 		return ei::UVec3(ei::floor(position / m_cellSize));
 	}
 
-	static u32 get_cell_hash(const ei::UVec3& cell) {
+	static constexpr u32 get_cell_hash(const ei::UVec3& cell) {
 		// See core/renderer/photon_map.hpp for details
 		constexpr ei::UVec3 MAGIC {0xb286aff7, 0x35e4a487, 0x75a9c18f};
 		return dot(cell, MAGIC);
@@ -49,67 +50,19 @@ public:
 	void set_iteration(int iter) { m_densityScale = 1.0f / iter; }
 
 	// Increase the counter for a cell using a world position.
-	void increase_count(const ei::Vec3& position) {
-		ei::UVec3 gridPos = get_grid_cell(position);
-		u32 h = get_cell_hash(gridPos);
-		u32 i = h % m_mapSize;
-		int s = 1;
-		// Quadratic probing until we find the correct or the empty cell
-		while(s <= m_maxProbes) {
-			u32 expected = 0u;
-			// Check on empty and set a marker to allocate if empty
-			if(m_data[i].count.compare_exchange_strong(expected, ~0u)) {
-				// The cell was empty before -> initialize
-				m_data[i].cell = gridPos;
-				m_data[i].count.store(1u);	// Releases the lock at the same time as setting the correct count
-				m_dataCount.fetch_add(1u);
-				return;
-			} else if(expected != ~0u) { // Not a cell marked as 'in allocation'
-				if(m_data[i].cell == gridPos) {
-					m_data[i].count.fetch_add(1u);
-					return;
-				}
-				// Next probe: non-empty cell with different coordinate found
-				i = (h + (s&1 ? s*s : -s*s) + m_mapSize) % m_mapSize;
-				++s;
-			} // else spin-lock (achieved by not changing i)
-		}
-	}
+	void increase_count(const ei::Vec3& position, const T& value = T{ 1 });
 
-	float get_density(const ei::Vec3& position, const ei::Vec3& normal) const {
-		ei::IVec3 gridPosI = ei::floor(position / m_cellSize);
-		ei::UVec3 gridPos { gridPosI };
-		u32 c = get_count(gridPos);
-		// Determine intersection area between cell and query plane
-		ei::Vec3 localPos = position - gridPosI * m_cellSize;
-		float area = math::intersection_area_nrm(m_cellSize, localPos, normal);
-		return c * m_densityScale / area;
-	}
+	u32 get_cell_index(const ei::Vec3& pos) const;
+	float get_count(const u32 cellIndex) const;
 
-	float get_density_interpolated(const ei::Vec3& position, const ei::Vec3& normal) const {
-		// Get integer and interpolation coordinates
-		ei::Vec3 nrmPos = position / m_cellSize - 0.5f;
-		ei::IVec3 gridPosI = ei::floor(nrmPos);
-		ei::Vec3 ws[2];
-		ws[1] = nrmPos - gridPosI;
-		ws[0] = 1.0f - ws[1];
-		float countSum = 0.0f, areaSum = 0.0f;
-		// Iterate over all eight cells
-		for(int i = 0u; i < 8; ++i) {
-			int ix = i & 1, iy = (i>>1) & 1, iz = i>>2;
-			ei::IVec3 cellPos { gridPosI.x + ix,
-								gridPosI.y + iy,
-								gridPosI.z + iz };
-			ei::Vec3 localPos = position - cellPos * m_cellSize;
-			float area = math::intersection_area_nrm(m_cellSize, localPos, normal);
-			float count = static_cast<float>(get_count(ei::UVec3{cellPos}));
-			// Compute trilinear interpolated result of count and area (running sum)
-			float w = ws[ix].x * ws[iy].y * ws[iz].z;
-			areaSum += area * w;
-			countSum += count * w;
-		}
-		return sdiv(countSum, areaSum) * m_densityScale;
-	}
+	// Returns the point-sampled density at the given position wrt. the area of the plane passing through the cell
+	float get_density(const ei::Vec3& position, const ei::Vec3& normal) const;
+
+	// Returns the linearly interpolated density at the given position wrt. the area of the plane passing through the cell.
+	// Optionally returns the gradient of the density in each direction as well.
+	// Optionally uses smoothstep instead of linear interpolation.
+	template < bool UseSmoothStep = false >
+	float get_density_interpolated(const ei::Vec3& position, const ei::Vec3& normal, ei::Vec3* gradient = nullptr) const;
 
 	int capacity() const { return m_mapSize; }
 	int size() const { return m_dataCount.load(); }
@@ -118,30 +71,19 @@ public:
 private:
 	struct Entry {
 		ei::UVec3 cell;
-		std::atomic_uint32_t count = 0;
+		std::atomic<T> count;
 	};
+
+	T get_count(const ei::UVec3& gridPos) const;
 
 	ei::Vec3 m_cellSize;
 	// The density scale can be used to if multiple iterations are accumulated
 	// in the map. Set to 1/iterationCount to get correct densities.
 	float m_densityScale;
-	u32 m_mapSize;
-	int m_maxProbes;
+	const u32 m_mapSize;
+	const u32 m_maxProbes;
 	std::unique_ptr<Entry[]> m_data;
 	std::atomic_uint32_t m_dataCount;
-
-	u32 get_count(const ei::UVec3& gridPos) const {
-		u32 h = get_cell_hash(gridPos);
-		u32 i = h % m_mapSize;
-		int s = 1;
-		u32 c = m_data[i].count.load();
-		while(c > 0 && m_data[i].cell != gridPos) {
-			i = (h + (s&1 ? s*s : -s*s) + m_mapSize) % m_mapSize;
-			++s;
-			c = m_data[i].count.load();
-		}
-		return c;
-	}
 };
 
 }} // namespace mufflon::data_structs

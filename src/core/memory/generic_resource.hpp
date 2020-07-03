@@ -1,11 +1,9 @@
 #pragma once
 
-#include "allocator.hpp"
-#include "dyntype_memory.hpp"
+#include <cstddef>
+#include "residency.hpp"
+#include "unique_device_ptr.hpp"
 #include "util/tagged_tuple.hpp"
-#include "util/assert.hpp"
-#include "core/memory/residency.hpp"
-#include "core/concepts.hpp"
 
 namespace mufflon {
 
@@ -53,41 +51,21 @@ public:
 	//	return pMem;
 	//}
 	template < Device dev >
-	ArrayDevHandle_t<dev, char> acquire(bool sync = true) {
-		if(sync)
-			synchronize<dev>();
-		else if(m_mem.template get<SyncedDevPtr<dev>>().ptr == nullptr && m_size != 0u)
-			m_mem.template get<SyncedDevPtr<dev>>().ptr = make_udevptr_array<dev, char>(m_size);
-		// [Weird] using the following two lines as a one-liner causes an internal compiler bug.
-		auto pMem = m_mem.template get<SyncedDevPtr<dev>>().ptr.get();
-		return pMem;
-	}
+	ArrayDevHandle_t<dev, char> acquire(bool sync = true);
 	template < Device dev >
-	ConstArrayDevHandle_t<dev, char> acquire_const(bool sync = true) {
-		if(sync)
-			synchronize<dev>();
-		else if(m_mem.template get<SyncedDevPtr<dev>>().ptr == nullptr && m_size != 0u)
-			m_mem.template get<SyncedDevPtr<dev>>().ptr = make_udevptr_array<dev, char>(m_size);
-		auto pMem = m_mem.template get<SyncedDevPtr<dev>>().ptr.get();
-		return pMem;
-	}
+	ConstArrayDevHandle_t<dev, char> acquire_const(bool sync = true);
 
 	// Template variant for the synchronization
 	template < Device dstDev >
 	void synchronize();
 
 	template < Device dev >
-	void unload() {
-		m_mem.template get<SyncedDevPtr<dev>>().ptr = nullptr;
-		m_mem.template get<SyncedDevPtr<dev>>().synced = false;
-	}
+	void unload();
 
 	void mark_changed(Device changed) noexcept;
 
 	template < Device dev >
-	bool is_resident() const noexcept {
-		return m_mem.template get<SyncedDevPtr<dev>>().ptr != nullptr;
-	}
+	bool is_resident() const noexcept;
 private:
 	template < Device dev >
 	struct SyncedDevPtr {
@@ -103,6 +81,21 @@ private:
 		SyncedDevPtr<Device::CUDA>,
 		SyncedDevPtr<Device::OPENGL>> m_mem;
 };
-template struct DeviceManagerConcept<GenericResource>;
+
+extern template void GenericResource::synchronize<Device::CPU>();
+extern template void GenericResource::synchronize<Device::CUDA>();
+extern template void GenericResource::synchronize<Device::OPENGL>();
+extern template ArrayDevHandle_t<Device::CPU, char> GenericResource::acquire<Device::CPU>(bool);
+extern template ArrayDevHandle_t<Device::CUDA, char> GenericResource::acquire<Device::CUDA>(bool);
+extern template ArrayDevHandle_t<Device::OPENGL, char> GenericResource::acquire<Device::OPENGL>(bool);
+extern template ConstArrayDevHandle_t<Device::CPU, char> GenericResource::acquire_const<Device::CPU>(bool);
+extern template ConstArrayDevHandle_t<Device::CUDA, char> GenericResource::acquire_const<Device::CUDA>(bool);
+extern template ConstArrayDevHandle_t<Device::OPENGL, char> GenericResource::acquire_const<Device::OPENGL>(bool);
+extern template void GenericResource::unload<Device::CPU>();
+extern template void GenericResource::unload<Device::CUDA>();
+extern template void GenericResource::unload<Device::OPENGL>();
+extern template bool GenericResource::is_resident<Device::CPU>() const noexcept;
+extern template bool GenericResource::is_resident<Device::CUDA>() const noexcept;
+extern template bool GenericResource::is_resident<Device::OPENGL>() const noexcept;
 
 } // namespace mufflon
